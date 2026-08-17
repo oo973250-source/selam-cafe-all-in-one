@@ -1,0 +1,22 @@
+{
+  "name": "cafe-miniapp",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Telegram Mini App for an Ethiopian cafe ordering system",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "@twa-dev/sdk": "^8.0.1",
+    "framer-motion": "^12.43.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.10"
+  }
+}
