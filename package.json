@@ -1,0 +1,29 @@
+{
+  "name": "selam-cafe-all-in-one",
+  "version": "1.0.0",
+  "description": "Selam Cafe — Mini App + Bot + Chapa Proxy + Admin CMS in one deployable service",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "build:miniapp": "cd miniapp && npm install && npm run build",
+    "build:admin": "cd admin && npm install && npm run build",
+    "build:all": "npm run build:miniapp && npm run build:admin",
+    "postinstall": "npm run build:all",
+    "db:init": "node server/scripts/init-db.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "cors": "^2.8.5",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.5",
+    "pg": "^8.13.0",
+    "jsonwebtoken": "^9.0.2",
+    "node-telegram-bot-api": "^0.66.0",
+    "socket.io": "^4.8.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
