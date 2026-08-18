@@ -10,7 +10,6 @@
     "build:miniapp": "cd miniapp && npm install && npm run build",
     "build:admin": "cd admin && npm install && npm run build",
     "build:all": "npm run build:miniapp && npm run build:admin",
-    "postinstall": "npm run build:all",
     "db:init": "node server/scripts/init-db.js"
   },
   "dependencies": {
