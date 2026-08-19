@@ -32,12 +32,27 @@ const SERVICE_LABELS = {
   delivery: 'Delivery',
 }
 
-function miniAppButton(label = '☕ Open Menu') {
+function miniAppButton(label = '☕ Open Menu', lang = '') {
+  const url = lang ? `${WEBAPP_URL}?lang=${lang}` : WEBAPP_URL
   return {
     reply_markup: {
       inline_keyboard: [[
-        { text: label, web_app: { url: WEBAPP_URL } },
+        { text: label, web_app: { url } },
       ]],
+    },
+  }
+}
+
+function languageButtons() {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '🇬🇧 English', callback_data: 'lang_en' },
+          { text: '🇪🇹 አማርኛ', callback_data: 'lang_am' },
+          { text: '🇪🇹 Afaan Oromoo', callback_data: 'lang_om' },
+        ],
+      ],
     },
   }
 }
@@ -74,24 +89,39 @@ export async function startBot(io) {
 
   const bot = new TelegramBot(BOT_TOKEN, { polling: true })
 
-  // /start
+  // /start — shows language selection first
   bot.onText(/^\/start(\s+(.+))?$/, async (msg, match) => {
     const name = msg.from?.first_name || 'there'
     const deepLink = match?.[2]
     let greeting = `👋 Welcome to *Selam Cafe*, ${name}!\n\n` +
-      `Tap below to see today's menu and place an order. ☕\n`
+      `Please choose your language to continue:`
     if (deepLink === 'reorder') {
-      greeting = `👋 Welcome back, ${name}!\nTap below to reorder your favourites.`
+      greeting = `👋 Welcome back, ${name}!\n\nPlease choose your language:`
     }
     bot.sendMessage(msg.chat.id, greeting, {
       parse_mode: 'Markdown',
-      ...miniAppButton('☕ Open Menu'),
+      ...languageButtons(),
     })
   })
 
-  // /menu
+  // /menu — also shows language selection
   bot.onText(/^\/menu$/, (msg) => {
-    bot.sendMessage(msg.chat.id, 'Tap below to open the menu ☕', miniAppButton('☕ Open Menu'))
+    bot.sendMessage(msg.chat.id, 'Choose your language to open the menu ☕', languageButtons())
+  })
+
+  // /admin — sends admin panel link
+  bot.onText(/^\/admin$/, (msg) => {
+    if (!WEBAPP_URL) {
+      bot.sendMessage(msg.chat.id, '⚠️ Admin panel URL not configured.')
+      return
+    }
+    const adminUrl = WEBAPP_URL + '/admin'
+    bot.sendMessage(msg.chat.id, `📊 *Admin Panel*\n\n${adminUrl}`, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [[{ text: '📊 Open Admin Panel', url: adminUrl }]],
+      },
+    })
   })
 
   // /help
@@ -101,8 +131,9 @@ export async function startBot(io) {
       [
         '*Selam Cafe Bot* ☕',
         '',
-        '/start — welcome + open menu',
+        '/start — welcome + choose language',
         '/menu — open the menu',
+        '/admin — open admin panel',
         '/myorders — your last 3 orders',
         '/status <id> — check order status',
         '/help — this message',
@@ -232,14 +263,30 @@ export async function startBot(io) {
     }
   })
 
-  // callback_query from staff buttons
+  // callback_query — handles both language selection AND staff action buttons
   bot.on('callback_query', async (cq) => {
     const chatId = cq.message?.chat?.id
+    const data = cq.data
+
+    // 1) Language selection (any user can tap this)
+    const langMatch = data?.match(/^lang_(en|am|om)$/)
+    if (langMatch) {
+      const lang = langMatch[1]
+      const langNames = { en: 'English', am: 'Amharic', om: 'Afaan Oromoo' }
+      bot.sendMessage(chatId,
+        `✅ Language: *${langNames[lang]}*\n\nTap below to open the menu ☕`,
+        { parse_mode: 'Markdown', ...miniAppButton('☕ Open Menu', lang) }
+      )
+      bot.answerCallbackQuery(cq.id)
+      return
+    }
+
+    // 2) Staff action buttons (only authorised chat IDs)
     if (!NOTIFY_CHAT_IDS.includes(String(chatId))) {
       bot.answerCallbackQuery(cq.id, { text: 'Not authorised' })
       return
     }
-    const m = cq.data?.match(/^(prep|ready|cancel)_(\d+)$/)
+    const m = data?.match(/^(prep|ready|cancel)_(\d+)$/)
     if (!m) { bot.answerCallbackQuery(cq.id, { text: 'Unknown action' }); return }
 
     const [, action, orderIdStr] = m
