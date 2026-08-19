@@ -315,7 +315,7 @@ export async function startBot(io) {
     const lang = getUserLang(msg.from.id)
     const { rows } = await pool.query(
       `SELECT id, service_type, customer_name, total, status, payment_status, created_at
-         FROM orders WHERE tg_user_id = $1 ORDER BY created_at DESC LIMIT 3`,
+         FROM orders WHERE tg_user_id = $1::bigint ORDER BY created_at DESC LIMIT 3`,
       [msg.from.id]
     )
     if (!rows.length) {
@@ -335,7 +335,7 @@ export async function startBot(io) {
     const lang = getUserLang(msg.from.id)
     const orderId = Number(match[1])
     const { rows } = await pool.query(
-      `SELECT * FROM orders WHERE id = $1 AND tg_user_id = $2`,
+      `SELECT * FROM orders WHERE id = $1 AND tg_user_id = $2::bigint`,
       [orderId, msg.from.id]
     )
     if (!rows.length) {

@@ -112,7 +112,7 @@ export async function createOrder({ tgUserId, tgUsername, tgFirstName, payload }
        (tg_user_id, tg_username, tg_first_name,
         service_type, customer_name, customer_loc,
         items, total, trust_level, status, payment_status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'new', 'pending')
+     VALUES ($1::bigint, $2, $3, $4, $5, $6, $7, $8, $9, 'new', 'pending')
      RETURNING id`,
     [
       tgUserId,
@@ -182,7 +182,7 @@ export async function countTodaysOrdersForUser(tgUserId) {
   const { rows } = await pool.query(
     `SELECT COUNT(*)::int AS n
        FROM orders
-      WHERE tg_user_id = $1
+      WHERE tg_user_id = $1::bigint
         AND created_at >= date_trunc('day', now())`,
     [tgUserId]
   )
