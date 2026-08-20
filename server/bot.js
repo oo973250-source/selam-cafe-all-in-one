@@ -1,3 +1,4 @@
+// Updated by assistant to validate order IDs and guard DB calls
 /**
  * server/bot.js
  * -------------
@@ -16,7 +17,7 @@ import {
   pool,
 } from './db.js'
 
-// ── Config ───────────────────────────────────────────────────────────────
+// ── Config ───────────────────────────────────────────────────────────��[...]
 const BOT_TOKEN = process.env.BOT_TOKEN
 const WEBAPP_URL = process.env.WEBAPP_URL
 const NOTIFY_CHAT_IDS = (process.env.NOTIFY_CHAT_IDS || '')
@@ -267,6 +268,17 @@ function isAdmin(userId) {
   return NOTIFY_CHAT_IDS.includes(String(userId))
 }
 
+// New helper: validate order id to avoid passing out-of-range ints to Postgres
+function isValidOrderId(n) {
+  if (typeof n === 'string') n = Number(n)
+  if (!Number.isFinite(n)) return false
+  if (!Number.isSafeInteger(n)) return false
+  if (n < 1) return false
+  // orders.id is SERIAL (32-bit signed); guard against overflow
+  const MAX_INT32 = 2147483647
+  return n <= MAX_INT32
+}
+
 // ── Main bot function ────────────────────────────────────────────────────
 export async function startBot(io) {
   if (!BOT_TOKEN) {
@@ -280,7 +292,7 @@ export async function startBot(io) {
   await ensureSchema()
   const bot = new TelegramBot(BOT_TOKEN, { polling: true })
 
-  // ── /start ─────────────────────────────────────────────────────────────
+  // ── /start ──────────────────────────────────────────────────────────��[...]
   bot.onText(/\/start(\s+(.+))?$/, async (msg, match) => {
     const lang = getUserLang(msg.from.id)
     const name = msg.from.first_name || ''
@@ -294,18 +306,18 @@ export async function startBot(io) {
     })
   })
 
-  // ── /menu ─────────────────────────────────────────────────────────────
+  // ── /menu ───────────────────────────────────────────────────────────[...] 
   bot.onText(/\/menu$/, (msg) => {
     const lang = getUserLang(msg.from.id)
     bot.sendMessage(msg.chat.id, t('menuChooseLang', lang), languageButtons())
   })
 
-  // ── /lang ─────────────────────────────────────────────────────────────
+  // ── /lang ───────────────────────────────────────────────────────────[...] 
   bot.onText(/\/lang$/, (msg) => {
     bot.sendMessage(msg.chat.id, t('chooseLang', 'en'), languageButtons())
   })
 
-  // ── /admin ────────────────────────────────────────────────────────────
+  // ── /admin ──────────────────────────────────────────────────────────��[...]
   bot.onText(/\/admin$/, (msg) => {
     if (!isAdmin(msg.from.id)) {
       bot.sendMessage(msg.chat.id, t('adminUnauthorized', getUserLang(msg.from.id)))
@@ -317,7 +329,7 @@ export async function startBot(io) {
     })
   })
 
-  // ── /help ─────────────────────────────────────────────────────────────
+  // ── /help ───────────────────────────────────────────────────────────[...] 
   bot.onText(/\/help$/, (msg) => {
     const lang = getUserLang(msg.from.id)
     bot.sendMessage(msg.chat.id, [
@@ -336,11 +348,20 @@ export async function startBot(io) {
   // ── /myorders ─────────────────────────────────────────────────────────
   bot.onText(/\/myorders$/, async (msg) => {
     const lang = getUserLang(msg.from.id)
-    const { rows } = await pool.query(
-      `SELECT id, service_type, customer_name, total, status, payment_status, created_at
-         FROM orders WHERE tg_user_id = $1::bigint ORDER BY created_at DESC LIMIT 3`,
-      [msg.from.id]
-    )
+    let rows
+    try {
+      const res = await pool.query(
+        `SELECT id, service_type, customer_name, total, status, payment_status, created_at
+           FROM orders WHERE tg_user_id = $1::bigint ORDER BY created_at DESC LIMIT 3`,
+        [msg.from.id]
+      )
+      rows = res.rows
+    } catch (e) {
+      console.error('[bot] DB error in /myorders:', e)
+      bot.sendMessage(msg.chat.id, 'Error fetching your orders. Please try again later.')
+      return
+    }
+
     if (!rows.length) {
       bot.sendMessage(msg.chat.id, t('noOrders', lang), miniAppButton(t('openMenu', lang), lang))
       return
@@ -356,11 +377,27 @@ export async function startBot(io) {
   // ── /status <id> ───────────────────────────────────────────────────────
   bot.onText(/\/status\s+(\d+)$/, async (msg, match) => {
     const lang = getUserLang(msg.from.id)
-    const orderId = Number(match[1])
-    const { rows } = await pool.query(
-      `SELECT * FROM orders WHERE id = $1 AND tg_user_id = $2::bigint`,
-      [orderId, msg.from.id]
-    )
+    const orderIdRaw = match[1]
+    const orderId = Number(orderIdRaw)
+
+    if (!isValidOrderId(orderId)) {
+      bot.sendMessage(msg.chat.id, 'Invalid order ID. Please provide the numeric order ID from your receipt.')
+      return
+    }
+
+    let rows
+    try {
+      const res = await pool.query(
+        `SELECT * FROM orders WHERE id = $1 AND tg_user_id = $2::bigint`,
+        [orderId, msg.from.id]
+      )
+      rows = res.rows
+    } catch (e) {
+      console.error('[bot] DB error in /status:', e)
+      bot.sendMessage(msg.chat.id, 'Error checking order. Please try again later.')
+      return
+    }
+
     if (!rows.length) {
       bot.sendMessage(msg.chat.id, t('orderNotFound', lang))
       return
@@ -483,10 +520,18 @@ export async function startBot(io) {
         bot.answerCallbackQuery(cq.id, { text: t('notAuthorised', 'en') })
         return
       }
-      const { rows } = await pool.query(
-        `SELECT id, service_type, customer_name, total, status, created_at
-           FROM orders ORDER BY created_at DESC LIMIT 10`
-      )
+      let rows
+      try {
+        const res = await pool.query(
+          `SELECT id, service_type, customer_name, total, status, created_at
+             FROM orders ORDER BY created_at DESC LIMIT 10`
+        )
+        rows = res.rows
+      } catch (e) {
+        console.error('[bot] DB error in admin_list:', e)
+        bot.answerCallbackQuery(cq.id, { text: 'Error fetching orders' })
+        return
+      }
       if (!rows.length) {
         bot.sendMessage(chatId, t('adminNoOrders', 'en'))
         bot.answerCallbackQuery(cq.id)
@@ -522,9 +567,22 @@ export async function startBot(io) {
       }
       const [, action, orderIdStr] = m
       const orderId = Number(orderIdStr)
+
+      if (!isValidOrderId(orderId)) {
+        bot.answerCallbackQuery(cq.id, { text: 'Invalid order ID' })
+        return
+      }
+
       const newStatus = action === 'prep' ? 'preparing' : action === 'ready' ? 'ready' : 'cancelled'
 
-      const updated = await updateOrderStatus(orderId, newStatus)
+      let updated
+      try {
+        updated = await updateOrderStatus(orderId, newStatus)
+      } catch (e) {
+        console.error('[bot] DB error updating status:', e)
+        bot.answerCallbackQuery(cq.id, { text: 'Error updating order' })
+        return
+      }
       if (!updated) {
         bot.answerCallbackQuery(cq.id, { text: t('orderNotFoundAdmin', 'en') })
         return
