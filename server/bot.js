@@ -467,7 +467,6 @@ export async function startBot(io) {
     if (langMatch) {
       const lang = langMatch[1]
       setUserLang(userId, lang)
-      const langNames = { en: 'English', am: 'Amharic', om: 'Afaan Oromoo' }
       bot.sendMessage(chatId,
         `${t('langSet', lang)}\n\n${t('tapMenu', lang)}`, {
           parse_mode: 'Markdown',
