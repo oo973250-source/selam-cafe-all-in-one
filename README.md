@@ -1,4 +1,4 @@
-# Selam Cafe — All-in-One
+# medi Cafe — All-in-One
 
 **One repo. One Railway service. One bill. Everything works.**
 
