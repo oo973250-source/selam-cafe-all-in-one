@@ -1,4 +1,4 @@
-// Updated by assistant to validate order IDs and guard DB calls
+// Updated by assistant to validate order IDs, add delivery checks, admin DB checks, and UI improvements
 /**
  * server/bot.js
  * -------------
@@ -138,7 +138,7 @@ const T = {
     marked: 'ሁኔታ ተቀይሯል',
     notAuthorised: 'ፈቃድ የለም',
     unknownAction: 'ስህተት',
-    orderNotFoundAdmin: 'ትዕዛዝ አልተገኘም',
+    orderNotFoundAdmin: 'ትዕዛ��� አልተገኘም',
     changeLang: 'ቋንቋ መቀየር',
     items: 'እቃዎች',
     total: 'ጠቅላላ',
@@ -220,18 +220,18 @@ function miniAppButton(label, lang) {
 }
 
 function languageButtons() {
+  // two-row layout for readability
   return {
     reply_markup: {
-      inline_keyboard: [[
-        { text: '🇬🇧 English', callback_data: 'lang_en' },
-        { text: '🇪🇹 አማርኛ', callback_data: 'lang_am' },
-        { text: '🇪🇹 Afaan Oromoo', callback_data: 'lang_om' },
-      ]],
+      inline_keyboard: [
+        [{ text: '🇬🇧 English', callback_data: 'lang_en' }, { text: '🇪🇹 አማርኛ', callback_data: 'lang_am' }],
+        [{ text: '🇪🇹 Afaan Oromoo', callback_data: 'lang_om' }],
+      ],
     },
   }
 }
 
-function adminMenuButtons() {
+async function adminMenuButtons() {
   const btns = [
     [{ text: '📋 ' + t('adminOrders', 'en'), callback_data: 'admin_list' }],
   ]
@@ -263,9 +263,17 @@ function formatOrderReceipt(order) {
   )
 }
 
-function isAdmin(userId) {
+// Make isAdmin check DB and env; async so it can check admin_users
+async function isAdmin(userId) {
   if (OWNER_ID && userId === OWNER_ID) return true
-  return NOTIFY_CHAT_IDS.includes(String(userId))
+  if (NOTIFY_CHAT_IDS.includes(String(userId))) return true
+  try {
+    const { rows } = await pool.query('SELECT 1 FROM admin_users WHERE tg_user_id = $1 LIMIT 1', [Number(userId)])
+    return rows.length > 0
+  } catch (e) {
+    console.error('[bot] isAdmin DB check failed:', e)
+    return false
+  }
 }
 
 // New helper: validate order id to avoid passing out-of-range ints to Postgres
@@ -274,7 +282,6 @@ function isValidOrderId(n) {
   if (!Number.isFinite(n)) return false
   if (!Number.isSafeInteger(n)) return false
   if (n < 1) return false
-  // orders.id is SERIAL (32-bit signed); guard against overflow
   const MAX_INT32 = 2147483647
   return n <= MAX_INT32
 }
@@ -298,8 +305,8 @@ export async function startBot(io) {
     const name = msg.from.first_name || ''
     const deepLink = match?.[2]
     const greeting = deepLink === 'reorder'
-      ? `*${t('welcomeBack', lang)}, ${name}!*\n\n${t('chooseLang', lang)}`
-      : `*${t('welcome', lang)}, ${name}!*\n\n${t('chooseLang', lang)}`
+      ? `*${t('welcomeBack', lang)}, ${name}!***\n\n${t('chooseLang', lang)}`
+      : `*${t('welcome', lang)}, ${name}!***\n\n${t('chooseLang', lang)}`
     bot.sendMessage(msg.chat.id, greeting, {
       parse_mode: 'Markdown',
       ...languageButtons(),
@@ -318,15 +325,28 @@ export async function startBot(io) {
   })
 
   // ── /admin ──────────────────────────────────────────────────────────��[...]
-  bot.onText(/\/admin$/, (msg) => {
-    if (!isAdmin(msg.from.id)) {
+  bot.onText(/\/admin$/, async (msg) => {
+    if (!await isAdmin(msg.from.id)) {
       bot.sendMessage(msg.chat.id, t('adminUnauthorized', getUserLang(msg.from.id)))
       return
     }
     bot.sendMessage(msg.chat.id, `*${t('adminPanel', 'en')}*`, {
       parse_mode: 'Markdown',
-      ...adminMenuButtons(),
+      ...(await adminMenuButtons()),
     })
+  })
+
+  // Simple owner-only helper to add an admin to admin_users
+  bot.onText(/\/addadmin\s+(\d+)/, async (msg, match) => {
+    if (!OWNER_ID || msg.from.id !== OWNER_ID) return
+    const idToAdd = Number(match[1])
+    try {
+      await pool.query('INSERT INTO admin_users (tg_user_id) VALUES ($1) ON CONFLICT DO NOTHING', [idToAdd])
+      bot.sendMessage(msg.chat.id, `Added admin: ${idToAdd}`)
+    } catch (e) {
+      console.error('[bot] addadmin failed:', e)
+      bot.sendMessage(msg.chat.id, 'Failed to add admin')
+    }
   })
 
   // ── /help ───────────────────────────────────────────────────────────[...] 
@@ -353,7 +373,7 @@ export async function startBot(io) {
       const res = await pool.query(
         `SELECT id, service_type, customer_name, total, status, payment_status, created_at
            FROM orders WHERE tg_user_id = $1::bigint ORDER BY created_at DESC LIMIT 3`,
-        [msg.from.id]
+        [Number(msg.from.id)]
       )
       rows = res.rows
     } catch (e) {
@@ -389,7 +409,7 @@ export async function startBot(io) {
     try {
       const res = await pool.query(
         `SELECT * FROM orders WHERE id = $1 AND tg_user_id = $2::bigint`,
-        [orderId, msg.from.id]
+        [orderId, Number(msg.from.id)]
       )
       rows = res.rows
     } catch (e) {
@@ -428,6 +448,15 @@ export async function startBot(io) {
       return
     }
 
+    // If delivery selected but no location shared, prompt user to enable location
+    if (payload.serviceType === 'delivery' && !payload.customer?.location) {
+      bot.sendMessage(chatId,
+        "💬 Delivery selected — please enable location sharing on your phone and share your location in the mini app so we can deliver to you. Then press the delivery button again.",
+        { parse_mode: 'Markdown' }
+      )
+      return
+    }
+
     let order
     try {
       order = await createOrder({
@@ -443,9 +472,15 @@ export async function startBot(io) {
       return
     }
 
+    if (!order || !order.id) {
+      bot.sendMessage(chatId, 'Something went wrong creating your order. Please try again.')
+      return
+    }
+
     // ── Order confirmation message (in user's language) ──
     const todaysCount = await countTodaysOrdersForUser(user.id)
     const countText = `${todaysCount} ${todaysCount === 1 ? t('orderOne', lang) : t('orderMany', lang)}`
+    // send confirmation immediately before notifying staff
     bot.sendMessage(chatId,
       `*${t('orderReceived', lang)}*\n\n` +
       `${t('yourTicket', lang)} *#${order.id}*.\n` +
@@ -516,7 +551,7 @@ export async function startBot(io) {
 
     // 2) Admin: list recent orders
     if (data === 'admin_list') {
-      if (!isAdmin(userId)) {
+      if (!await isAdmin(userId)) {
         bot.answerCallbackQuery(cq.id, { text: t('notAuthorised', 'en') })
         return
       }
@@ -561,7 +596,7 @@ export async function startBot(io) {
     // 3) Staff action buttons (prep/ready/cancel)
     const m = data?.match(/^(prep|ready|cancel)_(\d+)$/)
     if (m) {
-      if (!isAdmin(userId)) {
+      if (!await isAdmin(userId)) {
         bot.answerCallbackQuery(cq.id, { text: t('notAuthorised', 'en') })
         return
       }
