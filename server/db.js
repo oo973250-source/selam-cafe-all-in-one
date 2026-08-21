@@ -113,9 +113,9 @@ export async function createOrder({ tgUserId, tgUsername, tgFirstName, payload }
         service_type, customer_name, customer_loc,
         items, total, trust_level, status, payment_status)
      VALUES ($1::bigint, $2, $3, $4, $5, $6, $7, $8, $9, 'new', 'pending')
-     RETURNING id`,
+     RETURNING id, tg_user_id`,
     [
-      tgUserId,
+      Number(tgUserId),
       tgUsername || null,
       tgFirstName || null,
       serviceType,
@@ -135,7 +135,7 @@ export async function createOrder({ tgUserId, tgUsername, tgFirstName, payload }
     [orderId, JSON.stringify(payload)]
   )
 
-  return { id: orderId }
+  return { id: orderId, tgUserId: rows[0].tg_user_id }
 }
 
 export async function updateOrderStatus(orderId, status, extra = {}) {
@@ -182,9 +182,9 @@ export async function countTodaysOrdersForUser(tgUserId) {
   const { rows } = await pool.query(
     `SELECT COUNT(*)::int AS n
        FROM orders
-      WHERE tg_user_id = $1::bigint
+      WHERE tg_user_id::text = $1
         AND created_at >= date_trunc('day', now())`,
-    [tgUserId]
+    [String(tgUserId)]
   )
   return rows[0]?.n || 0
 }
