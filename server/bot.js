@@ -1,4 +1,4 @@
-// Updated by assistant to validate order IDs, add delivery checks, admin DB checks, and UI improvements
+// Updated by assistant to persist language, always send confirmations reliably, and show delivery-location hint inline
 /**
  * server/bot.js
  * -------------
@@ -113,7 +113,7 @@ const T = {
     helpAdmin: '/admin — አስተዳዳሪ ፓነል',
     helpMyorders: '/myorders — የቅርብ ጊዜ 3 ትዕዛዞችዎ',
     helpStatus: '/status <id> — የትዕዛዝ ሁኔታ',
-    helpHelp: '/help — ይህ መልዕክት',
+    helpHelp: '/help — ይህ መልዕይት',
     helpLang: '/lang — ቋንቋ መቀየር',
     noOrders: 'ገና ምንም ትዕዛዝ አላከናወንምም።',
     orderReceived: 'ትዕዛዝ ተቀብሏል!',
@@ -138,7 +138,7 @@ const T = {
     marked: 'ሁኔታ ተቀይሯል',
     notAuthorised: 'ፈቃድ የለም',
     unknownAction: 'ስህተት',
-    orderNotFoundAdmin: 'ትዕዛ��� አልተገኘም',
+    orderNotFoundAdmin: 'ትዕዛዝ አልተገ��ም',
     changeLang: 'ቋንቋ መቀየር',
     items: 'እቃዎች',
     total: 'ጠቅላላ',
@@ -249,9 +249,11 @@ function formatOrderReceipt(order) {
     .map((i) => `  - ${i.quantity}x ${i.nameEn || i.nameAm || i.id} -- ${i.price * i.quantity} Br`)
     .join('\n')
   const loc = order.customer_loc
+  // If delivery, include small reminder next to the label (user requested inline hint)
+  const deliveryNote = order.service_type === 'delivery' ? ' (plz turn on your location in the phone)' : ''
   const locStr = loc?.address
-    ? `\n  ${loc.address}` + (loc.lat ? ` (${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)})` : '')
-    : ''
+    ? `\nDelivery location 📍${deliveryNote}: ${loc.address}` + (loc.lat ? ` (${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)})` : '')
+    : (order.service_type === 'delivery' ? `\nDelivery location 📍${deliveryNote}: (not provided)` : '')
   return (
     `*Order #${order.id}*\n` +
     `${order.customer_name}\n` +
@@ -427,9 +429,9 @@ export async function startBot(io) {
 
   // ── web_app_data — order received from miniapp ─────────────────────────
   bot.on('web_app_data', async (msg) => {
-    const chatId = msg.chat.id
+    const chatId = msg.chat?.id || msg.from.id
     const user = msg.from
-    const lang = getUserLang(user.id)
+    // persist lang if miniapp sends it, otherwise fall back to stored
     const raw = msg.web_app_data?.data
 
     console.log(`[bot] web_app_data from ${user.id} (${user.username || 'no-username'})`)
@@ -448,14 +450,9 @@ export async function startBot(io) {
       return
     }
 
-    // If delivery selected but no location shared, prompt user to enable location
-    if (payload.serviceType === 'delivery' && !payload.customer?.location) {
-      bot.sendMessage(chatId,
-        "💬 Delivery selected — please enable location sharing on your phone and share your location in the mini app so we can deliver to you. Then press the delivery button again.",
-        { parse_mode: 'Markdown' }
-      )
-      return
-    }
+    // persist selected language if provided by miniapp so translations continue
+    const lang = payload.lang || getUserLang(user.id)
+    setUserLang(user.id, lang)
 
     let order
     try {
