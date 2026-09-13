@@ -11,6 +11,8 @@ import { useEffect, useRef, useState } from 'react'
  *   - ready         boolean — true once tg.init was attempted
  *   - user          Telegram user object (or null)
  *   - userLanguage  'en' | 'am' | 'ru' | ...
+ *   - initData      raw initData string for server-side request verification
+ *                   (empty outside Telegram)
  *   - closeApp()    closes the mini app (no-op in browser)
  *   - sendData(payload)   tg.sendData(JSON.stringify(payload))
  *   - showPopup(opts)     tg.showPopup wrapper (no-op in browser)
@@ -121,6 +123,7 @@ export function useTelegram() {
     ready,
     user,
     userLanguage,
+    initData: tg?.initData || '',
     closeApp,
     sendData,
     showPopup,

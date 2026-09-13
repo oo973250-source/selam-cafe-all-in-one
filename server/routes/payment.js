@@ -23,20 +23,29 @@ router.post('/initialize', async (req, res) => {
 
   const callbackUrl = `${req.protocol}://${req.get('host')}/api/payment/webhook`
 
-  const result = await initializePayment({
-    amount, email, firstName, lastName, txRef, description,
-    callbackUrl,
-    returnUrl: RETURN_URL || `${req.protocol}://${req.get('host')}/`,
-  })
-
-  return res.status(result.status === 'success' ? 200 : 502).json(result)
+  try {
+    const result = await initializePayment({
+      amount, email, firstName, lastName, txRef, description,
+      callbackUrl,
+      returnUrl: RETURN_URL || `${req.protocol}://${req.get('host')}/`,
+    })
+    return res.status(result.status === 'success' ? 200 : 502).json(result)
+  } catch (e) {
+    console.error('[payment] initialize failed:', e.message)
+    return res.status(502).json({ status: 'failed', error: 'payment gateway unreachable' })
+  }
 })
 
 router.get('/verify/:txRef', async (req, res) => {
   const { txRef } = req.params
   if (!txRef) return res.status(400).json({ status: 'failed', error: 'txRef required' })
-  const result = await verifyPayment(txRef)
-  return res.json(result)
+  try {
+    const result = await verifyPayment(txRef)
+    return res.json(result)
+  } catch (e) {
+    console.error('[payment] verify failed:', e.message)
+    return res.status(502).json({ status: 'failed', error: 'payment gateway unreachable' })
+  }
 })
 
 router.post('/webhook', async (req, res) => {
@@ -55,12 +64,16 @@ router.post('/webhook', async (req, res) => {
   console.log(`[payment] webhook received: txRef=${txRef} status=${status}`)
 
   if (txRef) {
-    const verify = await verifyPayment(txRef)
-    if (verify.paid) {
-      console.log(`[payment] webhook: payment CONFIRMED for ${txRef}`)
-      await updatePaymentStatus(txRef, 'paid')
-    } else {
-      console.log(`[payment] webhook: payment NOT confirmed for ${txRef}`)
+    try {
+      const verify = await verifyPayment(txRef)
+      if (verify.paid) {
+        console.log(`[payment] webhook: payment CONFIRMED for ${txRef}`)
+        await updatePaymentStatus(txRef, 'paid')
+      } else {
+        console.log(`[payment] webhook: payment NOT confirmed for ${txRef}`)
+      }
+    } catch (e) {
+      console.error('[payment] webhook processing failed:', e.message)
     }
   }
 

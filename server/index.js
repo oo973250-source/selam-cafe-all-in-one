@@ -40,6 +40,7 @@ import authRoutes from './routes/auth.js'
 import ordersRoutes from './routes/orders.js'
 import menuRoutes from './routes/menu.js'
 import paymentRoutes from './routes/payment.js'
+import miniappRoutes from './routes/miniapp.js'
 
 const PORT = process.env.PORT || 3000
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -47,7 +48,7 @@ const miniappDist = join(__dirname, '..', 'miniapp', 'dist')
 const adminDist = join(__dirname, '..', 'admin', 'dist')
 
 const ALLOWED_ORIGINS = [
-  process.env.WEBAPP_URL,
+  process.env.WEBAPP_URL?.replace(/\/$/, ''),
   `http://localhost:5173`,
   `http://localhost:5174`,
   `http://localhost:3000`,
@@ -78,6 +79,9 @@ app.use('/api/payment', paymentRoutes)
 
 // Public menu read (no auth — Mini App loads menu)
 app.use('/api/menu', menuRoutes)
+
+// Public order submission from the Mini App (auth via Telegram initData)
+app.use('/api/miniapp', miniappRoutes)
 
 // Public auth routes (login flow)
 app.use('/api/auth', authRoutes)
@@ -140,6 +144,9 @@ const io = new IoServer(httpServer, {
   },
 })
 
+// Make io reachable from request handlers (req.app.get('io'))
+app.set('io', io)
+
 io.on('connection', (socket) => {
   console.log('[io] client connected:', socket.id)
   socket.on('disconnect', () => console.log('[io] client disconnected:', socket.id))
@@ -147,11 +154,29 @@ io.on('connection', (socket) => {
 
 // ─── Boot ────────────────────────────────────────────────────────────────────
 async function boot() {
-  console.log('[server] ensuring db schema…')
-  await ensureSchema()
+  // The web app should stay up even when Postgres is unreachable (e.g. during
+  // Railway variable changes) so /health keeps answering and the deploy
+  // doesn't flap. Static serving + health work without a DB.
+  let dbOk = false
+  if (process.env.DATABASE_URL) {
+    try {
+      console.log('[server] ensuring db schema…')
+      await ensureSchema()
+      dbOk = true
+    } catch (e) {
+      console.error('[server] DB not reachable:', e.message)
+      console.warn('[server] continuing without DB — orders/menu/bot disabled until Postgres is reachable')
+    }
+  } else {
+    console.warn('[server] DATABASE_URL not set — running in static-only mode (no DB, no bot)')
+  }
 
-  console.log('[server] starting telegram bot…')
-  await startBot(io)
+  if (dbOk) {
+    console.log('[server] starting telegram bot…')
+    await startBot(io)
+  } else {
+    console.warn('[server] bot not started (DB unavailable)')
+  }
 
   httpServer.listen(PORT, () => {
     console.log(`[server] Selam Cafe all-in-one listening on :${PORT}`)

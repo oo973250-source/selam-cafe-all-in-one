@@ -10,12 +10,15 @@ import 'dotenv/config'
 const JWT_SECRET = process.env.JWT_SECRET
 const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d'
 
+// Warn instead of crashing the whole process at import time — the server
+// should still boot (health, miniapp, menu) even if JWT_SECRET is missing;
+// admin-protected routes will simply reject every request.
 if (!JWT_SECRET) {
-  console.error('[auth] FATAL: JWT_SECRET is not set')
-  process.exit(1)
+  console.error('[auth] WARNING: JWT_SECRET is not set — admin login will fail until it is configured')
 }
 
 export function signToken(payload) {
+  if (!JWT_SECRET) throw new Error('JWT_SECRET is not configured')
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY })
 }
 

@@ -52,13 +52,18 @@ router.post('/telegram-callback', async (req, res) => {
     return res.status(403).json({ error: 'your Telegram account is not on the admin allowlist' })
   }
 
-  await pool.query(
-    `INSERT INTO admin_users (tg_user_id, tg_username, tg_first_name, last_login)
-     VALUES ($1, $2, $3, now())
-     ON CONFLICT (tg_user_id)
-     DO UPDATE SET tg_username = $2, tg_first_name = $3, last_login = now()`,
-    [tgUserId, auth.username || null, auth.first_name || null]
-  )
+  try {
+    await pool.query(
+      `INSERT INTO admin_users (tg_user_id, tg_username, tg_first_name, last_login)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (tg_user_id)
+       DO UPDATE SET tg_username = $2, tg_first_name = $3, last_login = now()`,
+      [tgUserId, auth.username || null, auth.first_name || null]
+    )
+  } catch (e) {
+    console.error('[auth] admin_users upsert failed:', e.message)
+    return res.status(503).json({ error: 'database unavailable' })
+  }
 
   const token = signToken({
     tgUserId,

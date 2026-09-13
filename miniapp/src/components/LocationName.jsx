@@ -12,11 +12,17 @@ import { useTelegram } from '../hooks/useTelegram.js'
  * - Name input (autoFocus)
  * - If delivery: location section
  *     - "Share my location" button (dashed border) -> navigator.geolocation
- *     - Manual address input below
- * - Submit button: "🚗 Place Delivery Order" or "✓ Place Order"
+ *     - Manual address input below *   - Submit button: "🚗 Place Delivery Order" or "✓ Place Order"
  *   - Disabled until name (and location if delivery) are filled
  *   - When enabled: gold gradient
- *   - On submit: call sendData with order payload, then closeApp after 300ms
+ *   - On submit: POST the order to /api/miniapp/orders (HTTP) with Telegram
+ *     initData for server-side verification. The server saves the order,
+ *     sends the confirmation message through the bot, and notifies staff.
+ *
+ *     IMPORTANT: We deliberately do NOT use tg.sendData() here. Telegram only
+ *     delivers web_app_data for Mini Apps opened from a keyboard button —
+ *     menu-button/link launches silently drop it, so the bot would never
+ *     receive the order and no confirmation would ever be sent.
  */
 export default function LocationName({ bgProps }) {
   const {
@@ -29,9 +35,10 @@ export default function LocationName({ bgProps }) {
     setCustomerLocation,
     successfulPayments,
   } = useCart()
-  const { sendData, closeApp, hapticFeedback } = useTelegram()
+  const { tg, initData, hapticFeedback } = useTelegram()
 
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const [locating, setLocating] = useState(false)
   const [manualAddress, setManualAddress] = useState(
     customerLocation?.address || ''
@@ -83,10 +90,11 @@ export default function LocationName({ bgProps }) {
     })
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) return
     setSubmitting(true)
-    hapticFeedback.notificationOccurred('success')
+    setSubmitError('')
+    hapticFeedback.impactOccurred('medium')
 
     const payload = {
       type: 'cafe_order',
@@ -107,11 +115,46 @@ export default function LocationName({ bgProps }) {
       trustLevel: successfulPayments,
     }
 
-    sendData(payload)
-    // Give the SDK a moment to flush, then close.
-    setTimeout(() => {
-      closeApp()
-    }, 300)
+    try {
+      const res = await fetch('/api/miniapp/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData, order: payload }),
+      })
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || `Order failed (${res.status})`)
+      }
+
+      hapticFeedback.notificationOccurred('success')
+
+      // Show the in-app confirmation with the real ticket number.
+      if (tg?.showAlert) {
+        tg.showAlert(`Order received! Your ticket is #${data.orderId}. Check the chat for your confirmation message.`)
+      } else {
+        window.alert(`Order received! Your ticket is #${data.orderId}.`)
+      }
+
+      // If the bot could not message the user (never pressed Start), show a hint.
+      if (data.confirmationSent === false) {
+        if (tg?.showAlert) {
+          tg.showAlert(data.warning || 'Order saved. Message the bot, then reopen to see confirmations.')
+        } else {
+          window.alert(data.warning || 'Order saved.')
+        }
+      }
+
+      // Done — close the Mini App and return to the chat.
+      setTimeout(() => {
+        try { tg?.close?.() } catch { /* no-op */ }
+      }, 800)
+    } catch (e) {
+      console.error('[order] submit failed:', e)
+      setSubmitError(e.message || 'Something went wrong. Please try again.')
+      setSubmitting(false)
+      hapticFeedback.notificationOccurred('error')
+    }
   }
 
   // Auto-focus name input on mount
@@ -250,7 +293,7 @@ export default function LocationName({ bgProps }) {
         <button
           type="button"
           className={`btn btn-block ${canSubmit ? 'btn-primary anim-pulseGlow' : 'btn-secondary'}`}
-          disabled={!canSubmit}
+          disabled={!canSubmit || submitting}
           onClick={handleSubmit}
           style={{ minHeight: 54 }}
         >
@@ -260,6 +303,24 @@ export default function LocationName({ bgProps }) {
             ? '🚗 Place Delivery Order'
             : '✓ Place Order'}
         </button>
+
+        {submitError && (
+          <div
+            role="alert"
+            style={{
+              marginTop: 12,
+              padding: '10px 14px',
+              borderRadius: 12,
+              background: 'rgba(196,69,54,0.12)',
+              border: '1px solid var(--accent-red)',
+              color: 'var(--accent-red)',
+              fontSize: 13,
+              textAlign: 'center',
+            }}
+          >
+            {submitError}
+          </div>
+        )}
 
         <p
           style={{
