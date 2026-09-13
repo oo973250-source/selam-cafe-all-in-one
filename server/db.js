@@ -9,9 +9,16 @@ import 'dotenv/config'
 
 const { Pool } = pg
 
+// Hosted Postgres (Railway, Neon, Supabase, Render…) requires TLS. Local
+// Postgres usually does not. Detect from the connection string instead of
+// hard-coding one provider, so swapping DATABASE_URL never breaks the boot.
+const isLocalDb = /^(localhost|127\.0\.0\.1|\[::1\]|::1)/.test(
+  (process.env.DATABASE_URL || '').split('@')[1] || ''
+)
+
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('railway')
+  ssl: process.env.DATABASE_URL && !isLocalDb
     ? { rejectUnauthorized: false }
     : undefined,
   max: 8,
@@ -79,6 +86,12 @@ export async function ensureSchema() {
     last_login    TIMESTAMPTZ
   );
 
+  CREATE TABLE IF NOT EXISTS user_langs (
+    tg_user_id    BIGINT PRIMARY KEY,
+    lang          TEXT NOT NULL DEFAULT 'en',
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
   INSERT INTO menu_items (id, category, name_en, name_am, price, description, sort_order)
   VALUES
     ('macchiato',  'hot_drinks', 'Macchiato',        'ማኪያቶ',         25, 'Espresso stained with steamed milk', 1),
@@ -93,6 +106,39 @@ export async function ensureSchema() {
   `
   await pool.query(sql)
   console.log('[db] schema ready')
+}
+
+/**
+ * Per-user bot language. Persisted so a bot restart (Railway redeploys,
+ * crashes, dyno moves) doesn't reset everyone to English.
+ */
+export async function getUserLang(tgUserId) {
+  const { rows } = await pool.query(
+    `SELECT lang FROM user_langs WHERE tg_user_id = $1`,
+    [Number(tgUserId)]
+  )
+  return rows[0]?.lang || 'en'
+}
+
+export async function setUserLang(tgUserId, lang, tgUsername = null, tgFirstName = null) {
+  await pool.query(
+    `INSERT INTO user_langs (tg_user_id, lang, updated_at)
+     VALUES ($1, $2, now())
+     ON CONFLICT (tg_user_id)
+     DO UPDATE SET lang = EXCLUDED.lang, updated_at = now()`,
+    [Number(tgUserId), lang]
+  )
+  // Keep admin/audit metadata fresh where it already exists (best-effort).
+  try {
+    await pool.query(
+      `UPDATE admin_users
+          SET tg_username = COALESCE($2, tg_username),
+              tg_first_name = COALESCE($3, tg_first_name)
+        WHERE tg_user_id = $1
+          AND (tg_username IS NULL OR tg_first_name IS NULL)`,
+      [Number(tgUserId), tgUsername, tgFirstName]
+    )
+  } catch (_) { /* table may not exist yet; non-critical */ }
 }
 
 /**

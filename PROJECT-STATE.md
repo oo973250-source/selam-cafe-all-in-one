@@ -28,13 +28,15 @@ Customer opens the Telegram bot → taps the Menu button → themed Mini App loa
 - Hardened every route: try/catch around all async handlers (Express 4 left DB-down requests hanging forever), clean JSON 503s instead.
 - `auth.js` no longer `process.exit(1)` at import; server boots and serves statics even without a DB.
 - Menu write routes now actually require admin auth (were permanently 401).
-- Committed as `1744506` on `main` and pushed (rebased on top of remote Neon workflow + cloche source-frame deletions).
+- Committed and pushed to `main` (rebased on top of remote Neon workflow + cloche source-frame deletions).
+- **Language selection overhauled (per user feedback):** chosen language now persists in a `user_langs` DB table (survives redeploys/restarts; seeds from the Telegram client language), language keyboard is in **2 rows** (English + Amharic / Afaan Oromoo), and the confirmation message, status updates, and Mini App URL (`?lang=`) all follow the user's stored language.
+- **Cloche animation fully removed** (user doesn't want it): component, CSS keyframes, `dist/cloche` frames, and stale comments deleted. Intro is now the 2-phase welcome splash only.
+- **Postgres SSL fix:** `db.js` now enables TLS for any hosted DB (Railway, Neon, Supabase, Render) instead of only URLs containing "railway" — this is what made Neon connections fail with an SSL error.
 
 ## ⚠️ Known issues / before production
 
-1. **Cloche animation source frames deleted on remote** (9 commits removed `miniapp/public/cloche/*.png`). The built copies in `miniapp/dist/cloche/` still exist, so the **current** build works — but any future `vite build` will ship without the intro animation. → Restore frames from history (`git show 7ef62d4:miniapp/public/cloche/frame-001.png`) or make the animation pure CSS.
-2. **Required env vars on Railway**: `DATABASE_URL` (Neon/Postgres — the `neon_workflow.yml` suggests branching DB), `BOT_TOKEN`, `JWT_SECRET`, `ADMIN_TELEGRAM_IDS`, `WEBAPP_URL` (Railway domain), `WEBHOOK_SECRET`. Optional: `CHAPA_SECRET_KEY` for live payments.
-3. After first deploy: set **BotFather → Menu Button** to the Railway URL, and press Start once as a customer.
+1. **Required env vars on Railway**: `DATABASE_URL` (Neon/Postgres — the `neon_workflow.yml` suggests branching DB), `BOT_TOKEN`, `JWT_SECRET`, `ADMIN_TELEGRAM_IDS`, `WEBAPP_URL` (Railway domain), `WEBHOOK_SECRET`. Optional: `CHAPA_SECRET_KEY` for live payments.
+2. After first deploy: set **BotFather → Menu Button** to the Railway URL, and press Start once as a customer.
 
 ## 🚀 Next phase — feature add/remove ideas
 
@@ -42,4 +44,4 @@ Customer opens the Telegram bot → taps the Menu button → themed Mini App loa
 - Order history / favorites for repeat customers
 - Kitchen display mode on the admin panel
 - Real DB-backed menu in the Mini App (currently bundled static menu; only orders hit the DB)
-- Restore/replace cloche animation (issue #1)
+- In-app language switcher inside the Mini App (currently language comes from the bot choice / client language / `?lang=`)

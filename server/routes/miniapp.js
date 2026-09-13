@@ -19,7 +19,7 @@ import { Router } from 'express'
 import crypto from 'node:crypto'
 import 'dotenv/config'
 
-import { createOrder, countTodaysOrdersForUser } from '../db.js'
+import { createOrder, countTodaysOrdersForUser, getUserLang } from '../db.js'
 import { sendOrderConfirmation, notifyStaff } from '../bot.js'
 
 const router = Router()
@@ -119,8 +119,12 @@ router.post('/orders', async (req, res) => {
   } catch (e) {
     console.warn('[miniapp] countTodaysOrdersForUser failed:', e.message)
   }
+  // Confirmation must arrive in the language the user picked in the bot
+  // (falls back to their Telegram client language, then English).
+  let lang = 'en'
+  try { lang = await getUserLang(tgUser.id) } catch (_) { /* default en */ }
   try {
-    await sendOrderConfirmation(tgUser.id, order, todaysCount)
+    await sendOrderConfirmation(tgUser.id, order, todaysCount, lang)
   } catch (e) {
     console.error('[miniapp] confirmation send failed:', e.message)
     return res.status(200).json({

@@ -18,7 +18,7 @@ import LocationName from './components/LocationName.jsx'
  * Frame controller. Renders one of 8 frames (0..7) and handles the
  * fade-out / fade-in transition between them.
  *
- *   Frame 0  IntroFrame         (cloche reveal + welcome)
+ *   Frame 0  IntroFrame         (welcome splash)
  *   Frame 1  ServiceChoice      (dine_in / takeaway / delivery)
  *   Frame 2  MainMenu           (foods / drinks tabs + category grid)
  *   Frame 3  CategoryMenu       (items in selected category)

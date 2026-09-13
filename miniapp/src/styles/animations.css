@@ -61,25 +61,6 @@
   animation: floatGentle 2s ease-in-out infinite;
 }
 
-/* ---- Cloche steam particles rising ---- */
-@keyframes clocheSteam {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, 0) scale(0.5);
-  }
-  35% {
-    opacity: 0.6;
-  }
-  60% {
-    opacity: 0.5;
-    transform: translate(-50%, -40px) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -80px) scale(1.3);
-  }
-}
-
 /* ---- Welcome text reveal (blur -> clear, slide up) ---- */
 @keyframes welcomeReveal {
   0% {

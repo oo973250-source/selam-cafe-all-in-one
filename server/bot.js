@@ -1,12 +1,9 @@
-// Updated: add polling backoff and improved web_app_data logging
 // server/bot.js
-
-/**
- * server/bot.js
- * -------------
- * Telegram bot with full i18n (en/am/om), admin management, order notifications.
- * Exports startBot() so the main server can launch it.
- */
+//
+// Telegram bot with full i18n (en/am/om), admin management, order notifications.
+// Exports startBot() so the main server can launch it, plus sendOrderConfirmation()
+// and notifyStaff() so the HTTP order path (POST /api/miniapp/orders) reuses the
+// same messages.
 
 import TelegramBot from 'node-telegram-bot-api'
 import 'dotenv/config'
@@ -16,6 +13,8 @@ import {
   createOrder,
   updateOrderStatus,
   countTodaysOrdersForUser,
+  getUserLang as dbGetUserLang,
+  setUserLang as dbSetUserLang,
   pool,
 } from './db.js'
 
@@ -43,10 +42,36 @@ const SERVICE_LABELS = {
   delivery: 'Delivery',
 }
 
-// ── In-memory user language store ────────────────────────────────────────
-const userLang = new Map()
-function getUserLang(id) { return userLang.get(id) || 'en' }
-function setUserLang(id, lang) { userLang.set(id, lang) }
+// ── User language (DB-persisted) ─────────────────────────────────────────
+// Choices survive bot restarts. Falls back to the Telegram client language
+// for first-time users, then English.
+const FALLBACK_CLIENT_LANGS = { am: 'am', om: 'om', or: 'om', en: 'en' }
+
+function normalizeLang(code) {
+  const base = (code || '').toLowerCase().split('-')[0]
+  if (base === 'or') return 'om'
+  if (base === 'am' || base === 'om') return base
+  return 'en'
+}
+
+async function getUserLang(id) {
+  try {
+    return await dbGetUserLang(id)
+  } catch (e) {
+    console.warn('[bot] getUserLang failed, defaulting to en:', e.message)
+    return 'en'
+  }
+}
+
+async function rememberUserLang(id, code, tgUsername = null, tgFirstName = null) {
+  const lang = normalizeLang(code)
+  try {
+    await dbSetUserLang(id, lang, tgUsername, tgFirstName)
+  } catch (e) {
+    console.warn('[bot] setUserLang failed:', e.message)
+  }
+  return lang
+}
 
 // ── Bot translations (consistent with miniapp i18n.js) ───────────────────
 const T = {
@@ -58,7 +83,7 @@ const T = {
     tapMenu: 'Tap below to open the menu',
     openMenu: '☕ Open Menu',
     orderAgain: '☕ Order again',
-    menuChooseLang: 'Choose your language to open the menu',
+    menuNotConfigured: 'Menu URL is not configured yet.',
     adminPanel: 'Admin Panel',
     adminLink: 'Open Admin Panel (Web)',
     adminOrders: 'Recent Orders (Bot)',
@@ -76,7 +101,7 @@ const T = {
     orderReceived: 'Order received!',
     yourTicket: 'Your ticket is',
     wellNotify: "We'll message you when it's being prepared and again when it's ready.",
-    ordersToday: "You've placed orders today.",
+    ordersToday: "You've placed {n} today.",
     orderOne: 'order',
     orderMany: 'orders',
     yourLastOrders: 'Your last 3 orders:',
@@ -113,13 +138,12 @@ const T = {
     tapMenu: 'ምናሌውን ለመክፈት ከታች ይንኩ',
     openMenu: '☕ ምናሌ ክፈት',
     orderAgain: '☕ እንደገና አዘዝ',
-    menuChooseLang: 'ምናሌውን ለመክፈት ቋንቋ ይምረጡ',
+    menuNotConfigured: 'የምናሌ አድራሻ አልተዋቀረም።',
     adminPanel: 'የአስተዳደር ክፍል',
     adminLink: 'የአስተዳደር ክፍል ክፈት (ድረ-ገጽ)',
     adminOrders: 'የቅርብ ትዕዛዞች (ቦት)',
     adminNoOrders: 'እስካሁን ትዕዛዝ የለም።',
     adminNotConfigured: 'የአስተዳደር ክፍል አድራሻ አልተዋቀረም።',
-    menuNotConfigured: 'የምናሌ አድራሻ አልተዋቀረም።',
     helpTitle: 'ሰላም ካፌ ቦት',
     helpStart: '/start — እንኳን ደህና መጡ',
     helpMenu: '/menu — ምናሌ ክፈት',
@@ -132,7 +156,7 @@ const T = {
     orderReceived: 'ትዕዛዝዎ ደርሷል!',
     yourTicket: 'ትኬትዎ',
     wellNotify: 'ስንዘጋጅ እና ስራቁ ሲዘጋጅ እናሳውቋለን።',
-    ordersToday: 'ዛሬ ትዕዛዞች አዝዘዋል።',
+    ordersToday: 'ዛሬ {n} አዝዘዋል።',
     orderOne: 'ትዕዛዝ',
     orderMany: 'ትዕዛዞች',
     yourLastOrders: 'የመጨረሻ 3 ትዕዛዞችዎ:',
@@ -162,20 +186,19 @@ const T = {
     location: 'አድራሻ',
   },
   om: {
-    welcome: 'Baga nagaan dhuftaan Kafeessa Selam',
+    welcome: 'Baga nagaan dhuftaan Kafee Selam',
     chooseLang: 'Maaloo afaan filadhaa:',
     welcomeBack: 'Baga nagaan dhuftaan',
-    langSet: 'Afaan Ingilizii filatameera',
+    langSet: 'Afaan Oromoo filatameera',
     tapMenu: 'Maajii banuuf dibbaabaa tuqi',
     openMenu: '☕ Maajii Banaa',
-    orderAgain: '☕ Irra deebii ajaja',
-    menuChooseLang: 'Maajii banuuf afaan filadhaa',
+    orderAgain: '☕ Irra deebi\u2019i ajaja',
+    menuNotConfigured: "Teessoo maajii hin qindaa'in.",
     adminPanel: 'Panel Bulchaa',
     adminLink: 'Panel Bulchaa Banaa (Saayidii)',
     adminOrders: 'Ajajawwan Dhiyoo (Bot)',
     adminNoOrders: 'Amma ajaja hin jiru.',
     adminNotConfigured: "Teessoo panel bulchaa hin qindaa'in.",
-    menuNotConfigured: "Teessoo maajii hin qindaa'in.",
     helpTitle: 'Bot Kafee Selam',
     helpStart: '/start — baga nagaan dhuftaan',
     helpMenu: '/menu — maajii banaa',
@@ -187,12 +210,12 @@ const T = {
     noOrders: 'Amma ajaja hin ajajne.',
     orderReceived: 'Ajajni kee dhufeeera!',
     yourTicket: 'Tikkeetii kee',
-    wellNotify: "Yeroo qopheessinu fi yeroo qopheessinus isin beeksiifna.",
-    ordersToday: "Har'a ajajawwan ajajtan.",
+    wellNotify: 'Yeroo qopheessinu fi yeroo qopheessame isin beeksiifna.',
+    ordersToday: "Har'a {n} ajajattaniitti.",
     orderOne: 'ajaja',
     orderMany: 'ajajawwan',
     yourLastOrders: 'Ajaja 3 dhiyoo kee:',
-    statusPreparing: 'Qopheeffamaa jira. Xiqqoo eegaa!',
+    statusPreparing: 'Qopheeffamaa jirti. Xiqqoo eegi!',
     statusReady: 'Qopheeffameera!',
     statusReadyDelivery: 'Guuraa keenya karaa irra jira.',
     statusReadyPickup: 'Maaloo fuudhuun koottaa.',
@@ -225,7 +248,10 @@ function t(key, lang) {
 
 // ── Helper functions ──────────────────────────────────────────────────────
 function miniAppButton(label, lang) {
-  const url = lang ? `${WEBAPP_URL}?lang=${lang}` : WEBAPP_URL
+  const base = WEBAPP_URL || ''
+  if (!base) return {}
+  // Pass the chosen language to the Mini App so its UI matches the bot's.
+  const url = lang ? `${base}?lang=${lang}` : base
   return {
     reply_markup: {
       inline_keyboard: [[{ text: label, web_app: { url } }]],
@@ -233,25 +259,29 @@ function miniAppButton(label, lang) {
   }
 }
 
+// Language buttons in TWO rows: English + Amharic on top, Afaan Oromoo below
+// (its long label would otherwise squeeze all three onto one cramped line).
 function languageButtons() {
   return {
     reply_markup: {
-      inline_keyboard: [[
-        { text: '🇬🇧 English', callback_data: 'lang_en' },
-        { text: '🇪🇹 አማርኛ', callback_data: 'lang_am' },
-        { text: '🇪🇹 Afaan Oromoo', callback_data: 'lang_om' },
-      ]],
+      inline_keyboard: [
+        [
+          { text: '🇬🇧 English', callback_data: 'lang_en' },
+          { text: '🇪🇹 አማርኛ', callback_data: 'lang_am' },
+        ],
+        [{ text: '🇪🇹 Afaan Oromoo', callback_data: 'lang_om' }],
+      ],
     },
   }
 }
 
-function adminMenuButtons() {
+function adminMenuButtons(lang = 'en') {
   const btns = [
-    [{ text: '📋 ' + t('adminOrders', 'en'), callback_data: 'admin_list' }],
+    [{ text: '📋 ' + t('adminOrders', lang), callback_data: 'admin_list' }],
   ]
   if (WEBAPP_URL) {
     const adminUrl = WEBAPP_URL + '/admin'
-    btns.push([{ text: '📊 ' + t('adminLink', 'en'), url: adminUrl }])
+    btns.push([{ text: '📊 ' + t('adminLink', lang), url: adminUrl }])
   }
   return {
     reply_markup: { inline_keyboard: btns },
@@ -260,7 +290,7 @@ function adminMenuButtons() {
 
 function formatOrderReceipt(order) {
   const itemLines = (order.items || [])
-    .map((i) => `  - ${i.quantity}x ${i.nameEn || i.nameAm || i.id} -- ${i.price * i.quantity} Br`)
+    .map((i) => `  - ${i.quantity}x ${i.nameEn || i.nameAm || i.id} — ${i.price * i.quantity} Br`)
     .join('\n')
   const loc = order.customer_loc
   const locStr = loc?.address
@@ -282,7 +312,7 @@ function isAdmin(userId) {
   return NOTIFY_CHAT_IDS.includes(String(userId))
 }
 
-// New helper: validate order id to avoid passing out-of-range ints to Postgres
+// Validate order id to avoid passing out-of-range ints to Postgres
 function isValidOrderId(n) {
   if (typeof n === 'string') n = Number(n)
   if (!Number.isFinite(n)) return false
@@ -291,14 +321,16 @@ function isValidOrderId(n) {
   // orders.id is SERIAL (32-bit signed); guard against overflow
   const MAX_INT32 = 2147483647
   return n <= MAX_INT32
-}// ── Main bot function ───────────────────────────────────────────────���─────────────────────────────────────
+}
+
+// ── Main bot function ────────────────────────────────────────────────────
 export async function startBot(io) {
   if (!BOT_TOKEN) {
-    console.warn('[bot] BOT_TOKEN not set -- bot disabled')
+    console.warn('[bot] BOT_TOKEN not set — bot disabled')
     return null
   }
   if (!WEBAPP_URL) {
-    console.warn('[bot] WEBAPP_URL not set -- buttons will be missing')
+    console.warn('[bot] WEBAPP_URL not set — buttons will be missing')
   }
 
   await ensureSchema()
@@ -313,8 +345,9 @@ export async function startBot(io) {
 
   // ── /start ─────────────────────────────────────────────────────────────
   bot.onText(/\/start(\s+(.+))?$/, async (msg, match) => {
-    const lang = getUserLang(msg.from.id)
     const name = msg.from.first_name || ''
+    const clientLang = FALLBACK_CLIENT_LANGS[(msg.from.language_code || '').toLowerCase().split('-')[0]] || 'en'
+    const lang = await getUserLang(msg.from.id)
     const deepLink = match?.[2]
     const greeting = deepLink === 'reorder'
       ? `*${t('welcomeBack', lang)}, ${name}!*\n\n${t('chooseLang', lang)}`
@@ -322,13 +355,17 @@ export async function startBot(io) {
     bot.sendMessage(msg.chat.id, greeting, {
       parse_mode: 'Markdown',
       ...languageButtons(),
-    })
+    }).catch(() => {})
+    // Remember the Telegram client language for first-time users so their
+    // first HTTP order already arrives in their language.
+    if (lang === 'en' && clientLang !== 'en') {
+      await rememberUserLang(msg.from.id, clientLang, msg.from.username, msg.from.first_name)
+    }
   })
-
 
   // ── /menu — open the Mini App ──────────────────────────────────────
   bot.onText(/\/menu$/, async (msg) => {
-    const lang = getUserLang(msg.from.id)
+    const lang = await getUserLang(msg.from.id)
     if (!WEBAPP_URL) {
       bot.sendMessage(msg.chat.id, t('menuNotConfigured', lang))
       return
@@ -340,13 +377,14 @@ export async function startBot(io) {
   })
 
   // ── /lang — change language ────────────────────────────────────────
-  bot.onText(/\/lang$/, (msg) => {
-    bot.sendMessage(msg.chat.id, t('chooseLang', getUserLang(msg.from.id)), languageButtons())
+  bot.onText(/\/lang$/, async (msg) => {
+    const lang = await getUserLang(msg.from.id)
+    bot.sendMessage(msg.chat.id, t('chooseLang', lang), languageButtons())
   })
 
   // ── /help — command list ─────────────────────────────────────────────
-  bot.onText(/\/help$/, (msg) => {
-    const lang = getUserLang(msg.from.id)
+  bot.onText(/\/help$/, async (msg) => {
+    const lang = await getUserLang(msg.from.id)
     bot.sendMessage(msg.chat.id, [
       `*${t('helpTitle', lang)}*`,
       '',
@@ -362,71 +400,78 @@ export async function startBot(io) {
 
   // ── /myorders — customer's last 3 orders ─────────────────────────────
   bot.onText(/\/myorders$/, async (msg) => {
-    const lang = getUserLang(msg.from.id)
-    const { rows } = await pool.query(
-      `SELECT id, service_type, total, status, created_at
-         FROM orders WHERE tg_user_id::text = $1
-        ORDER BY created_at DESC LIMIT 3`,
-      [String(msg.from.id)]
-    )
-    if (!rows.length) {
-      bot.sendMessage(msg.chat.id, t('noOrders', lang))
-      return
+    const lang = await getUserLang(msg.from.id)
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, service_type, total, status, created_at
+           FROM orders WHERE tg_user_id::text = $1
+          ORDER BY created_at DESC LIMIT 3`,
+        [String(msg.from.id)]
+      )
+      if (!rows.length) {
+        bot.sendMessage(msg.chat.id, t('noOrders', lang))
+        return
+      }
+      const lines = rows.map((r) =>
+        `#${r.id} · ${SERVICE_LABELS[r.service_type] || r.service_type} · ${r.total} Br · ${r.status} · ${new Date(r.created_at).toLocaleString()}`
+      )
+      bot.sendMessage(msg.chat.id, `${t('yourLastOrders', lang)}\n\n${lines.join('\n')}`)
+    } catch (e) {
+      console.error('[bot] /myorders failed:', e.message)
+      bot.sendMessage(msg.chat.id, t('orderNotFound', lang))
     }
-    const lines = rows.map((r) =>
-      `#${r.id} · ${SERVICE_LABELS[r.service_type] || r.service_type} · ${r.total} Br · ${r.status} · ${new Date(r.created_at).toLocaleString()}`
-    )
-    bot.sendMessage(msg.chat.id, `${t('yourLastOrders', lang)}\n\n${lines.join('\n')}`)
   })
 
   // ── /status <id> — check a specific order ────────────────────────────
   bot.onText(/\/status\s+(\d+)$/, async (msg, match) => {
-    const lang = getUserLang(msg.from.id)
+    const lang = await getUserLang(msg.from.id)
     const id = Number(match[1])
     if (!isValidOrderId(id)) {
       bot.sendMessage(msg.chat.id, t('orderNotFound', lang))
       return
     }
-    const { rows } = await pool.query(
-      `SELECT id, service_type, total, status, created_at
-         FROM orders WHERE id = $1 AND tg_user_id::text = $2`,
-      [id, String(msg.from.id)]
-    )
-    if (!rows.length) {
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, service_type, total, status, created_at
+           FROM orders WHERE id = $1 AND tg_user_id::text = $2`,
+        [id, String(msg.from.id)]
+      )
+      if (!rows.length) {
+        bot.sendMessage(msg.chat.id, t('orderNotFound', lang))
+        return
+      }
+      const r = rows[0]
+      const readyText = r.service_type === 'delivery' ? t('statusReadyDelivery', lang) : t('statusReadyPickup', lang)
+      const statusLine = r.status === 'preparing' ? t('statusPreparing', lang)
+        : r.status === 'ready' ? `${t('statusReady', lang)} ${readyText}`
+        : r.status === 'cancelled' ? t('statusCancelled', lang)
+        : `Status: ${r.status}`
+      bot.sendMessage(msg.chat.id, `Order #${r.id} ${statusLine}`)
+    } catch (e) {
+      console.error('[bot] /status failed:', e.message)
       bot.sendMessage(msg.chat.id, t('orderNotFound', lang))
-      return
     }
-    const r = rows[0]
-    const readyText = r.service_type === 'delivery' ? t('statusReadyDelivery', lang) : t('statusReadyPickup', lang)
-    const statusLine = r.status === 'preparing' ? t('statusPreparing', lang)
-      : r.status === 'ready' ? `${t('statusReady', lang)} ${readyText}`
-      : r.status === 'cancelled' ? t('statusCancelled', lang)
-      : `Status: ${r.status}`
-    bot.sendMessage(msg.chat.id, `Order #${r.id} ${statusLine}`)
   })
 
   // ── /admin — admin panel + recent orders (admins only) ───────────────
   bot.onText(/\/admin$/, async (msg) => {
-    const lang = getUserLang(msg.from.id)
+    const lang = await getUserLang(msg.from.id)
     if (!isAdmin(msg.from.id)) {
       bot.sendMessage(msg.chat.id, t('adminUnauthorized', lang))
       return
     }
-    bot.sendMessage(msg.chat.id, t('adminPanel', lang), adminMenuButtons())
+    bot.sendMessage(msg.chat.id, t('adminPanel', lang), adminMenuButtons(lang))
   })
 
-  // ── web_app_data — order received from miniapp ─────────────────────────
+  // ── web_app_data — order received from miniapp (keyboard-button launches)
   bot.on('web_app_data', async (msg) => {
     const chatId = msg.chat.id
     const user = msg.from
-    const lang = getUserLang(user.id)
     const raw = msg.web_app_data?.data
 
-    // More verbose top-level logging to confirm receipt in Railway logs
     const rawPresent = !!raw
     const rawLen = raw ? raw.length : 0
     console.log(`[bot] web_app_data EVENT ts=${new Date().toISOString()} from=${user.id} username=${user.username || 'no-username'} chat=${chatId} raw_present=${rawPresent} raw_len=${rawLen}`)
-    // Include a short preview for debugging (do not log full PII in production)
     if (rawPresent) {
       const preview = raw.length > 400 ? raw.slice(0, 400) + '...' : raw
       console.log('[bot] web_app_data preview:', preview)
@@ -461,54 +506,18 @@ export async function startBot(io) {
       return
     }
 
-    // ── Order confirmation message (in user's language) ──
-    const todaysCount = await countTodaysOrdersForUser(user.id)
-    const countText = `${todaysCount} ${todaysCount === 1 ? t('orderOne', lang) : t('orderMany', lang)}`
-    bot.sendMessage(chatId,
-      `*${t('orderReceived', lang)}*\n\n` +
-      `${t('yourTicket', lang)} *#${order.id}*.\n` +
-      `${t('wellNotify', lang)}\n\n` +
-      `_${t('ordersToday', lang).replace('orders', countText)}_`,
-      { parse_mode: 'Markdown', ...miniAppButton(t('orderAgain', lang), lang) }
-    )
+    // Remember the client language if the user never picked one.
+    await rememberUserLang(user.id, user.language_code || 'en', user.username, user.first_name)
+    const lang = await getUserLang(user.id)
+
+    await sendOrderConfirmation(chatId, order, await safeTodaysCount(user.id), lang)
 
     // ── Push to admin dashboard (real-time) ──
     if (io) {
-      const fullOrder = {
-        id: order.id,
-        service_type: payload.serviceType,
-        customer_name: payload.customer?.name || 'Unknown',
-        customer_loc: payload.customer?.location || null,
-        items: payload.items,
-        total: payload.total,
-        status: 'new',
-      }
-      io.emit('order:new', fullOrder)
+      io.emit('order:new', fullOrderForStaff(payload, order.id))
     }
 
-    // ── Notify staff chats ──
-    const staffMsg =
-      `*${t('newOrder', 'en')} #${order.id}*\n` +
-      `${t('from', 'en')}: @${user.username || '--'} (${user.first_name || ''})\n` +
-      formatOrderReceipt(fullOrderForStaff(payload, order.id)).replace(/.*\n/, '')
-
-    const staffKeyboard = {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: `${t('startPreparing', 'en')} `, callback_data: `prep_${order.id}` },
-            { text: ` ${t('markReady', 'en')} `, callback_data: `ready_${order.id}` },
-          ],
-          [{ text: ` ${t('cancelOrder', 'en')} `, callback_data: `cancel_${order.id}` }],
-        ],
-      },
-    }
-
-    for (const id of NOTIFY_CHAT_IDS) {
-      bot.sendMessage(id, staffMsg, { parse_mode: 'Markdown', ...staffKeyboard }).catch((e) => {
-        console.warn(`[bot] notify chat ${id} failed:`, e.message)
-      })
-    }
+    notifyStaff(order, payload, { username: user.username, firstName: user.first_name })
   })
 
   // ── callback_query — language selection + admin actions ──────────────
@@ -517,17 +526,18 @@ export async function startBot(io) {
     const userId = cq.from?.id
     const data = cq.data
 
-    // 1) Language selection (any user)
+    // 1) Language selection (any user) — persisted to the DB
     const langMatch = data?.match(/^lang_(en|am|om)$/)
     if (langMatch) {
-      const lang = langMatch[1]
-      setUserLang(userId, lang)
-      bot.sendMessage(chatId,
-        `${t('langSet', lang)}\n\n${t('tapMenu', lang)}`, {
-          parse_mode: 'Markdown',
-          ...miniAppButton(t('openMenu', lang), lang),
-        }
-      )
+      const lang = await rememberUserLang(userId, langMatch[1], cq.from?.username, cq.from?.first_name)
+      if (chatId) {
+        bot.sendMessage(chatId,
+          `${t('langSet', lang)}\n\n${t('tapMenu', lang)}`, {
+            parse_mode: 'Markdown',
+            ...miniAppButton(t('openMenu', lang), lang),
+          }
+        ).catch((e) => console.warn('[bot] lang confirm failed:', e.message))
+      }
       bot.answerCallbackQuery(cq.id)
       return
     }
@@ -539,14 +549,18 @@ export async function startBot(io) {
     }
 
     if (data === 'admin_list') {
-      const { rows } = await pool.query(
-        `SELECT id, customer_name, total, status FROM orders ORDER BY created_at DESC LIMIT 8`
-      )
-      if (!rows.length) {
-        bot.sendMessage(chatId, t('adminNoOrders', 'en'))
-      } else {
-        const lines = rows.map((r) => `#${r.id} · ${r.customer_name} · ${r.total} Br · ${r.status}`)
-        bot.sendMessage(chatId, `${t('adminOrders', 'en')}\n\n${lines.join('\n')}`)
+      try {
+        const { rows } = await pool.query(
+          `SELECT id, customer_name, total, status FROM orders ORDER BY created_at DESC LIMIT 8`
+        )
+        if (!rows.length) {
+          bot.sendMessage(chatId, t('adminNoOrders', 'en'))
+        } else {
+          const lines = rows.map((r) => `#${r.id} · ${r.customer_name} · ${r.total} Br · ${r.status}`)
+          bot.sendMessage(chatId, `${t('adminOrders', 'en')}\n\n${lines.join('\n')}`)
+        }
+      } catch (e) {
+        console.error('[bot] admin_list failed:', e.message)
       }
       bot.answerCallbackQuery(cq.id)
       return
@@ -562,20 +576,27 @@ export async function startBot(io) {
       }
       const statusMap = { prep: 'preparing', ready: 'ready', cancel: 'cancelled' }
       const newStatus = statusMap[action]
-      const updated = await updateOrderStatus(id, newStatus, { by: userId })
+      let updated
+      try {
+        updated = await updateOrderStatus(id, newStatus, { by: userId })
+      } catch (e) {
+        console.error('[bot] status update failed:', e.message)
+        bot.answerCallbackQuery(cq.id, { text: t('orderNotFoundAdmin', 'en') })
+        return
+      }
       if (!updated) {
         bot.answerCallbackQuery(cq.id, { text: t('orderNotFoundAdmin', 'en') })
         return
       }
       bot.answerCallbackQuery(cq.id, { text: `${t('marked', 'en')}: ${newStatus}` })
 
-      // Tell the customer their order status changed (in their language)
-      const lang = getUserLang(updated.tg_user_id)
-      const readyText = updated.service_type === 'delivery' ? t('statusReadyDelivery', lang) : t('statusReadyPickup', lang)
+      // Tell the customer their order status changed — in THEIR language
+      const custLang = await getUserLang(updated.tg_user_id)
+      const readyText = updated.service_type === 'delivery' ? t('statusReadyDelivery', custLang) : t('statusReadyPickup', custLang)
       let custMsg
-      if (newStatus === 'preparing') custMsg = `Order #${id} ${t('statusPreparing', lang)}`
-      else if (newStatus === 'ready') custMsg = `Order #${id} ${t('statusReady', lang)} ${readyText}`
-      else custMsg = `Order #${id} ${t('statusCancelled', lang)}`
+      if (newStatus === 'preparing') custMsg = `Order #${id} ${t('statusPreparing', custLang)}`
+      else if (newStatus === 'ready') custMsg = `Order #${id} ${t('statusReady', custLang)} ${readyText}`
+      else custMsg = `Order #${id} ${t('statusCancelled', custLang)}`
       try { bot.sendMessage(updated.tg_user_id, custMsg) } catch (e) {
         console.warn(`[bot] customer status message failed for ${updated.tg_user_id}:`, e.message)
       }
@@ -585,7 +606,7 @@ export async function startBot(io) {
     bot.answerCallbackQuery(cq.id, { text: t('unknownAction', 'en') })
   })
 
-  // Replace simple polling_error log with exponential backoff handling
+  // Polling errors → exponential backoff instead of error-spamming
   bot.on('polling_error', (err) => {
     try {
       console.error('[bot] polling_error:', err?.message || err)
@@ -599,7 +620,6 @@ export async function startBot(io) {
         if (pollingBackoffTimer) clearTimeout(pollingBackoffTimer)
         pollingBackoffTimer = setTimeout(() => {
           try {
-            // restart polling
             if (typeof bot.startPolling === 'function') {
               bot.startPolling()
               console.log('[bot] resumed polling after backoff')
@@ -625,6 +645,15 @@ export async function startBot(io) {
   return bot
 }
 
+async function safeTodaysCount(userId) {
+  try {
+    return await countTodaysOrdersForUser(userId)
+  } catch (e) {
+    console.warn('[bot] countTodaysOrdersForUser failed:', e.message)
+    return 0
+  }
+}
+
 function fullOrderForStaff(payload, orderId) {
   return {
     id: orderId,
@@ -647,10 +676,12 @@ export async function sendOrderConfirmation(chatId, order, todaysCount, lang = '
   const bot = activeBot
   if (!bot) throw new Error('bot not started')
 
-  const countText = `${todaysCount} ${todaysCount === 1 ? t('orderOne', lang) : t('orderMany', lang)}`
+  const countWord = todaysCount === 1 ? t('orderOne', lang) : t('orderMany', lang)
+  const countText = `${todaysCount} ${countWord}`
   const opts = { parse_mode: 'Markdown' }
-  if (WEBAPP_URL) {
-    opts.reply_markup = miniAppButton(t('orderAgain', lang), lang).reply_markup
+  const menuBtn = miniAppButton(t('orderAgain', lang), lang)
+  if (menuBtn.reply_markup) {
+    opts.reply_markup = menuBtn.reply_markup
   }
 
   return bot.sendMessage(
@@ -658,7 +689,7 @@ export async function sendOrderConfirmation(chatId, order, todaysCount, lang = '
     `*${t('orderReceived', lang)}*\n\n` +
       `${t('yourTicket', lang)} *#${order.id}*.\n` +
       `${t('wellNotify', lang)}\n\n` +
-      `_${t('ordersToday', lang).replace('orders', countText)}_`,
+      `_${t('ordersToday', lang).replace('{n}', countText)}_`,
     opts
   )
 }
