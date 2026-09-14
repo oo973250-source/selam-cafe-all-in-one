@@ -9,6 +9,7 @@ import crypto from 'node:crypto'
 import 'dotenv/config'
 
 import { signToken } from '../middleware/auth.js'
+import { consumeLoginCode } from '../bot.js'
 import { pool } from '../db.js'
 
 const router = Router()
@@ -39,6 +40,75 @@ function verifyTelegramLogin(auth) {
 router.get('/me', (req, res) => {
   if (!req.user) return res.status(401).json({ error: 'not authenticated' })
   res.json({ user: req.user })
+})
+
+/**
+ * POST /api/auth/login-code { code }
+ * -----------------------------------
+ * Alternative admin sign-in that needs NO BotFather domain setup:
+ * the admin runs /login in the bot, gets a one-time 6-digit code, and
+ * types it on the /admin page. The bot verifies the code belongs to the
+ * same Telegram account and is still valid (10 min, single-use); we then
+ * check the allowlist and mint the same JWT cookie as the Login Widget.
+ */
+router.post('/login-code', async (req, res) => {
+  try {
+    const code = String(req.body?.code || '').trim()
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({ error: 'enter the 6-digit code from the bot (/login)' })
+    }
+
+    const pending = consumeLoginCode(code)
+    if (!pending) {
+      return res.status(401).json({ error: 'invalid or expired code — send /login to the bot again' })
+    }
+
+    const tgUserId = Number(pending.tgUserId)
+    if (ADMIN_IDS.length && !ADMIN_IDS.includes(tgUserId)) {
+      return res.status(403).json({ error: 'your Telegram account is not on the admin allowlist (ADMIN_TELEGRAM_IDS)' })
+    }
+
+    try {
+      await pool.query(
+        `INSERT INTO admin_users (tg_user_id, tg_username, tg_first_name, last_login)
+         VALUES ($1, $2, $3, now())
+         ON CONFLICT (tg_user_id)
+         DO UPDATE SET tg_username = COALESCE($2, admin_users.tg_username),
+                       tg_first_name = COALESCE($3, admin_users.tg_first_name),
+                       last_login = now()`,
+        [tgUserId, pending.username, pending.firstName]
+      )
+    } catch (dbErr) {
+      console.error('[auth] admin_users upsert failed:', dbErr.message)
+      return res.status(503).json({ error: 'database unavailable' })
+    }
+
+    const token = signToken({
+      tgUserId,
+      username: pending.username,
+      firstName: pending.firstName,
+      role: 'staff',
+    })
+
+    res.cookie('selam_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    })
+
+    return res.json({
+      user: {
+        tgUserId,
+        username: pending.username,
+        firstName: pending.firstName,
+        role: 'staff',
+      },
+    })
+  } catch (e) {
+    console.error('[auth] login-code failed:', e.message)
+    return res.status(500).json({ error: 'login failed' })
+  }
 })
 
 router.post('/telegram-callback', async (req, res) => {

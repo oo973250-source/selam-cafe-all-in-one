@@ -36,6 +36,8 @@ export const api = {
   me: () => request('/auth/me'),
   telegramCallback: (payload) =>
     request('/auth/telegram-callback', { method: 'POST', body: JSON.stringify(payload) }),
+  loginWithCode: (code) =>
+    request('/auth/login-code', { method: 'POST', body: JSON.stringify({ code }) }),
   logout: () => request('/auth/logout', { method: 'POST' }),
 
   // Orders

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import SmartCafeBg from './SmartCafeBg.jsx'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
+import { getT } from '../utils/i18n.js'
 
 /**
  * LocationName (Frame 7)
@@ -35,7 +36,8 @@ export default function LocationName({ bgProps }) {
     setCustomerLocation,
     successfulPayments,
   } = useCart()
-  const { tg, initData, hapticFeedback } = useTelegram()
+  const { tg, initData, hapticFeedback, userLanguage } = useTelegram()
+  const t = getT(userLanguage)
 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -129,19 +131,21 @@ export default function LocationName({ bgProps }) {
 
       hapticFeedback.notificationOccurred('success')
 
-      // Show the in-app confirmation with the real ticket number.
+      // Show the in-app confirmation with the real ticket number, in the
+      // language the user selected in the bot (via ?lang= from bot buttons).
+      const alertText = `${t('orderReceivedTitle')}\n\n${t('yourTicketIs').replace('{n}', data.orderId)}\n${t('checkChat')}`
       if (tg?.showAlert) {
-        tg.showAlert(`Order received! Your ticket is #${data.orderId}. Check the chat for your confirmation message.`)
+        tg.showAlert(alertText)
       } else {
-        window.alert(`Order received! Your ticket is #${data.orderId}.`)
+        window.alert(alertText)
       }
 
       // If the bot could not message the user (never pressed Start), show a hint.
       if (data.confirmationSent === false) {
         if (tg?.showAlert) {
-          tg.showAlert(data.warning || 'Order saved. Message the bot, then reopen to see confirmations.')
+          tg.showAlert(data.warning || t('orderSavedWarning'))
         } else {
-          window.alert(data.warning || 'Order saved.')
+          window.alert(data.warning || t('orderSavedWarning'))
         }
       }
 

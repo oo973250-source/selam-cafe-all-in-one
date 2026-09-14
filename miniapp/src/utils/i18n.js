@@ -48,6 +48,11 @@ const translations = {
     infoStep2: '2. Tap a category to expand',
     infoStep3: '3. Tap again to select',
     infoStep4: '4. Add items to your cart',
+    // Order submission
+    orderReceivedTitle: 'Order received!',
+    yourTicketIs: 'Your ticket is #{n}.',
+    checkChat: 'Check the chat for your receipt.',
+    orderSavedWarning: 'Order saved, but the bot could not message you. Open the bot and press Start once, then check your ticket there.',
   },
 
   am: {
@@ -83,6 +88,11 @@ const translations = {
     infoStep2: '2. ምድብ ለመድረት ይንኩ',
     infoStep3: '3. ለመምረጥ ድጋሚ ይንኩ',
     infoStep4: '4. እቃዎችን ወደ ጋሪ ይጨምሩ',
+    // Order submission
+    orderReceivedTitle: 'ትዕዛዝዎ ደርሷል!',
+    yourTicketIs: 'ትኬትዎ #{n} ነው።',
+    checkChat: 'ደረሰኙን ከቻት ውስጥ ይመልከቱ።',
+    orderSavedWarning: 'ትዕዛዝዎ ተቀምጧል፣ ግን ቦቱ መልእክት መላክ አልቻለም። ቦቱን ክፈት እና አንዴ Start ይንኩ።',
   },
 
   om: {
@@ -118,6 +128,11 @@ const translations = {
     infoStep2: '2. Gosa argachuuf tuqi',
     infoStep3: '3. Filachuuf irra deebii tuqi',
     infoStep4: '4. Dhibbeentaa gara kaartaa iddoo',
+    // Order submission
+    orderReceivedTitle: 'Ajajni kee dhufeeera!',
+    yourTicketIs: 'Tikkeetiin kee #{n} dha.',
+    checkChat: 'Rasiisaa caatii keessatti ilaali.',
+    orderSavedWarning: 'Ajajni kee qabameera, garuu botin akkaana hin erginee. Boti banittii yimmoo Start tuqi.',
   },
 }
 

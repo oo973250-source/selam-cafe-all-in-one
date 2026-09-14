@@ -48,6 +48,20 @@ export function getBot() {
   return activeBot
 }
 
+// ── Admin web login codes ────────────────────────────────────────────
+// /login in the bot issues a one-time 6-digit code; the admin web dashboard
+// polls with it to finish sign-in. In-memory, single-use, 10-minute TTL.
+const pendingLoginCodes = new Map() // code -> { tgUserId, expiresAt }
+export function consumeLoginCode(code) {
+  const pending = pendingLoginCodes.get(String(code))
+  if (!pending || pending.expiresAt < Date.now()) {
+    pendingLoginCodes.delete(String(code))
+    return null
+  }
+  pendingLoginCodes.delete(String(code))
+  return pending
+}
+
 const SERVICE_LABELS = {
   dine_in: 'Dine in',
   takeaway: 'Takeaway',
@@ -116,6 +130,15 @@ const T = {
     ordersToday: "You've placed {n} today.",
     orderOne: 'order',
     orderMany: 'orders',
+    receiptTitle: 'ORDER RECEIPT',
+    yourItems: 'YOUR ITEMS',
+    orderedItems: 'ORDERED ITEMS',
+    orderCountLabel: 'Order Count',
+    loginPrompt: 'To sign in to the admin web dashboard, send this code to me as a message (or tap the button):',
+    loginInvalidCode: 'Invalid or expired code. Open the admin page again and try /login with a fresh code.',
+    loginOk: '✅ Verified! Your admin dashboard is now signed in — you can close this chat and reload the page.',
+    loginDenied: '⛔ Your Telegram account is not on the admin allowlist (ADMIN_TELEGRAM_IDS).',
+    loginHint: 'Admin sign-in',
     yourLastOrders: 'Your last 3 orders:',
     statusPreparing: 'is being prepared. Hang tight!',
     statusReady: 'is ready!',
@@ -141,6 +164,14 @@ const T = {
     customer: 'Customer',
     service: 'Service',
     location: 'Location',
+    wordNew: 'New',
+    wordPreparing: 'Preparing',
+    wordReady: 'Ready',
+    wordServed: 'Served',
+    wordCancelled: 'Cancelled',
+    serviceDineIn: 'Dine in',
+    serviceTakeaway: 'Takeaway',
+    serviceDelivery: 'Delivery',
   },
   am: {
     welcome: 'ሰላም ካፌ እንኳን ደህና መጡ',
@@ -171,6 +202,15 @@ const T = {
     ordersToday: 'ዛሬ {n} አዝዘዋል።',
     orderOne: 'ትዕዛዝ',
     orderMany: 'ትዕዛዞች',
+    receiptTitle: 'የትዕዛዝ ደረሰኝ',
+    yourItems: 'የእርስዎ እቃዎች',
+    orderedItems: 'የታዘዙ እቃዎች',
+    orderCountLabel: 'የትዕዛዝ ብዛት',
+    loginPrompt: 'የአስተዳደር ዳሽቦርዱን ለመግባት ይህንን ኮድ እንደ መልእክት ይላኩልኝ (ወይም አዝራሩን ይንኩ):',
+    loginInvalidCode: 'ልክ ያልሆነ ወይም ጊዜው ያለፈበት ኮድ። የአስተዳደር ገጹን እንደገና ክፈት።',
+    loginOk: '✅ ተረጋግጧል! የአስተዳደር ዳሽቦርዱ አሁን ገብቷል።',
+    loginDenied: '⛔ የቴሌግራም መለያዎ በአስተዳደር ፈቃድ ዝርዝር (ADMIN_TELEGRAM_IDS) ላይ አይገኝም።',
+    loginHint: 'የአስተዳደር መግቢያ',
     yourLastOrders: 'የመጨረሻ 3 ትዕዛዞችዎ:',
     statusPreparing: 'እየተዘጋጀ ነው። ትንሽ ይጠብቁ!',
     statusReady: 'ዝግጁ ነው!',
@@ -196,6 +236,14 @@ const T = {
     customer: 'ደንበኛ',
     service: 'አገልግሎት',
     location: 'አድራሻ',
+    wordNew: 'አዲስ',
+    wordPreparing: 'በመዘጋጀት ላይ',
+    wordReady: 'ዝግጁ',
+    wordServed: 'ያቀረበ',
+    wordCancelled: 'ተሰርዟል',
+    serviceDineIn: 'በስፍራው መብላት',
+    serviceTakeaway: 'ወስዶ መሄድ',
+    serviceDelivery: 'አድርሻ',
   },
   om: {
     welcome: 'Baga nagaan dhuftaan Kafee Selam',
@@ -237,6 +285,15 @@ const T = {
     newOrder: 'AJAJA HAARAA',
     from: 'Garga',
     startPreparing: 'Qopheessuu Jalqabi',
+    receiptTitle: 'RASIISAA AJAJAA',
+    yourItems: 'WAANOTA KEE',
+    orderedItems: 'WAANOTA AJAJAMAN',
+    orderCountLabel: 'Lakkoochsaa Ajajaa',
+    loginPrompt: "Dashboard bulchaa seenuuf koodii kana akka ergaa naa ergi (ykn dilbata tuqi):",
+    loginInvalidCode: "Koodii dogoggore ykn yeroon isaa darbe. Fuula bulchaa irra deebi'i bani.",
+    loginOk: "✅ Meeqeffameera! Dashboard bulchaa amma seeneera.",
+    loginDenied: "⛔ Herrega Telegram kee tarreessuu bulchaa (ADMIN_TELEGRAM_IDS) irratti hin jiru.",
+    loginHint: 'Seensa Bulchaa',
     markReady: 'Qopheeffame godhi',
     cancelOrder: 'Haqi',
     marked: 'Mallatteeffame',
@@ -249,6 +306,14 @@ const T = {
     status: 'Haala',
     time: 'Yeroo',
     customer: 'Maamila',
+    wordNew: 'Haaraa',
+    wordPreparing: 'Qopheeffamaa jira',
+    wordReady: 'Qopheeffameera',
+    wordServed: 'Kennameera',
+    wordCancelled: 'Haqameera',
+    serviceDineIn: 'Achumaa nyaachuu',
+    serviceTakeaway: 'Fudhaa jedhi',
+    serviceDelivery: 'Geeddara',
     service: 'Tajaajila',
     location: 'Iddoo',
   },
@@ -317,6 +382,83 @@ function formatOrderReceipt(order) {
     locStr +
     `\n_Status: ${order.status}_`
   )
+}
+
+// Status shown as emoji + localized word on receipts and staff alerts.
+const STATUS_BADGES = {
+  new: '🆕',
+  preparing: '⏳',
+  ready: '✅',
+  served: '🍽️',
+  cancelled: '❌',
+}
+
+function statusWord(status, lang) {
+  const map = {
+    new: 'wordNew',
+    preparing: 'wordPreparing',
+    ready: 'wordReady',
+    served: 'wordServed',
+    cancelled: 'wordCancelled',
+  }
+  return map[status] ? t(map[status], lang) : status
+}
+
+function serviceTypeLabel(serviceType, lang) {
+  const map = {
+    dine_in: 'serviceDineIn',
+    takeaway: 'serviceTakeaway',
+    delivery: 'serviceDelivery',
+  }
+  return map[serviceType] ? t(map[serviceType], lang) : (SERVICE_LABELS[serviceType] || serviceType)
+}
+
+/**
+ * Receipt-style order message, shared by the customer confirmation and the
+ * staff alert (per user request: boxed layout listing every ordered item).
+ * Sent as plain text (no Markdown) so the dividers render exactly as drawn.
+ */
+function buildOrderMessage(kind, order, lang, extras = {}) {
+  const sep = '============================'
+  const itemLines = (order.items || []).length
+    ? (order.items || [])
+        .map((i) => {
+          const name = i.nameEn || i.nameAm || i.id || '?'
+          return `• ${i.quantity}x ${name} — ${i.price * i.quantity} ETB`
+        })
+        .join('\n')
+    : '• —'
+
+  const lines = []
+  if (kind === 'alert') {
+    lines.push(`🔔 ${sep} 🔔`)
+    lines.push(`${t('newOrderAlert', lang)} (#${order.id})`)
+    lines.push(sep)
+    const who = extras.username
+      ? `@${extras.username}`
+      : (extras.firstName || '—')
+    lines.push(`👤 ${t('customer', lang)}: ${who}`)
+    lines.push(`🚚 ${t('service', lang)}: ${serviceTypeLabel(order.service_type, lang)}`)
+    lines.push('')
+    lines.push(`🛍️ ${t('orderedItems', lang)}:`)
+  } else {
+    lines.push(`🧾 ${sep} 🧾`)
+    lines.push(t('receiptTitle', lang))
+    lines.push(sep)
+    lines.push(`🎫 ${t('yourTicket', lang)}: #${order.id}`)
+    if (extras.todaysCount != null) {
+      lines.push(`📅 ${t('orderCountLabel', lang)}: ${extras.todaysCount}`)
+    }
+    lines.push('')
+    lines.push(`🛍️ ${t('yourItems', lang)}:`)
+  }
+  lines.push(itemLines)
+  lines.push('')
+  lines.push('----------------------------')
+  lines.push(`💰 ${t('total', lang)}: ${order.total} ETB`)
+  lines.push(`${kind === 'alert' ? '📊' : '⏳'} ${t('status', lang)}: ${STATUS_BADGES[order.status] || ''} ${statusWord(order.status, lang)}`.trimEnd())
+  lines.push(sep)
+  return lines.join('\n')
 }
 
 function isAdmin(userId) {
@@ -409,6 +551,53 @@ export async function startBot(io) {
         `3. DB must be connected (admins come from env + this bot's config).`,
       { parse_mode: 'Markdown' }
     ).catch(() => {})
+  })
+
+  // ── /login — issue a one-time code for the admin WEB dashboard ──────
+  // The Telegram Login Widget requires the bot's domain to be allowlisted in
+  // BotFather (/setdomain), which is easy to miss and often the reason the
+  // admin page can't sign anyone in. This code flow needs no BotFather setup:
+  //   /login in the bot → type the 6-digit code on the /admin page.
+  bot.onText(/\/login$/, async (msg) => {
+    const lang = await getUserLang(msg.from.id)
+    const code = String(Math.floor(100000 + Math.random() * 900000))
+    pendingLoginCodes.set(code, {
+      tgUserId: msg.from.id,
+      username: msg.from.username || null,
+      firstName: msg.from.first_name || null,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    })
+    // Opportunistic cleanup of expired codes
+    for (const [c, v] of pendingLoginCodes) {
+      if (v.expiresAt < Date.now()) pendingLoginCodes.delete(c)
+    }
+    bot.sendMessage(
+      msg.chat.id,
+      `${t('loginPrompt', lang)}\n\n${code}`,
+      {
+        reply_markup: {
+          inline_keyboard: [[{ text: t('loginHint', lang), callback_data: `logincode_${code}` }]],
+        },
+      }
+    )
+  })
+
+  // Typing the 6-digit code as a plain message also completes the handshake
+  // (the inline button just re-shows the code as a popup for easy copying).
+  bot.on('message', async (msg) => {
+    const text = (msg.text || '').trim()
+    if (!/^\d{6}$/.test(text)) return
+    const lang = await getUserLang(msg.from.id)
+    const pending = consumeLoginCode(text)
+    if (!pending || pending.tgUserId !== msg.from.id) {
+      bot.sendMessage(msg.chat.id, t('loginInvalidCode', lang))
+      return
+    }
+    if (!isAdmin(msg.from.id)) {
+      bot.sendMessage(msg.chat.id, t('loginDenied', lang))
+      return
+    }
+    bot.sendMessage(msg.chat.id, t('loginOk', lang))
   })
 
   // ── /help — command list ─────────────────────────────────────────────
@@ -554,6 +743,13 @@ export async function startBot(io) {
     const chatId = cq.message?.chat?.id
     const userId = cq.from?.id
     const data = cq.data
+
+    // 0) Admin-web login code popup (shows the code big for easy copying)
+    const loginCodeMatch = data?.match(/^logincode_(\d{6})$/)
+    if (loginCodeMatch) {
+      bot.answerCallbackQuery(cq.id, { text: loginCodeMatch[1], show_alert: true })
+      return
+    }
 
     // 1) Language selection (any user) — persisted to the DB
     const langMatch = data?.match(/^lang_(en|am|om)$/)
@@ -719,27 +915,25 @@ export async function sendOrderConfirmation(chatId, order, todaysCount, lang = '
   const bot = activeBot
   if (!bot) throw new Error('bot not started')
 
-  const countWord = todaysCount === 1 ? t('orderOne', lang) : t('orderMany', lang)
-  const countText = `${todaysCount} ${countWord}`
-  const opts = { parse_mode: 'Markdown' }
+  const opts = {}
   const menuBtn = miniAppButton(t('orderAgain', lang), lang)
   if (menuBtn.reply_markup) {
     opts.reply_markup = menuBtn.reply_markup
   }
 
-  return bot.sendMessage(
-    chatId,
-    `*${t('orderReceived', lang)}*\n\n` +
-      `${t('yourTicket', lang)} *#${order.id}*.\n` +
-      `${t('wellNotify', lang)}\n\n` +
-      `_${t('ordersToday', lang).replace('{n}', countText)}_`,
-    opts
-  )
+  const text =
+    buildOrderMessage('receipt', order, lang, { todaysCount }) +
+    `\n\n${t('wellNotify', lang)}`
+
+  return bot.sendMessage(chatId, text, opts)
 }
 
 // Staff notifications render in EACH staff member's own stored language
 // (staff pick /lang like customers; their choice persists in user_langs).
 // Recipients = ADMIN_TELEGRAM_IDS + NOTIFY_CHAT_IDS + OWNER_TELEGRAM_ID.
+// Staff alert: boxed NEW ORDER ALERT with the full item list, customer,
+// service type and status — rendered in EACH staff member's own language
+// (staff pick /lang like customers; their choice persists in user_langs).
 export function notifyStaff(order, payload, from = {}) {
   const bot = activeBot
   if (!bot) throw new Error('bot not started')
@@ -748,15 +942,17 @@ export function notifyStaff(order, payload, from = {}) {
     return
   }
 
+  const staffOrder = fullOrderForStaff(payload, order.id)
+
   for (const id of STAFF_CHAT_IDS) {
     ;(async () => {
       let lang = 'en'
       try { lang = await getUserLang(id) } catch (_) { /* default en */ }
 
-      const staffMsg =
-        `*${t('newOrder', lang)} #${order.id}*\n` +
-        `${t('from', lang)}: @${from.username || '--'} (${from.firstName || ''})\n` +
-        formatOrderReceipt(fullOrderForStaff(payload, order.id)).replace(/.*\n/, '')
+      const staffMsg = buildOrderMessage('alert', staffOrder, lang, {
+        username: from.username,
+        firstName: from.firstName,
+      })
 
       const staffKeyboard = {
         reply_markup: {
@@ -770,7 +966,7 @@ export function notifyStaff(order, payload, from = {}) {
         },
       }
 
-      await bot.sendMessage(id, staffMsg, { parse_mode: 'Markdown', ...staffKeyboard })
+      await bot.sendMessage(id, staffMsg, staffKeyboard)
     })().catch((e) => {
       console.warn(`[bot] notify chat ${id} failed:`, e.message)
     })
