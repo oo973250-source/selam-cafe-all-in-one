@@ -694,29 +694,36 @@ export async function sendOrderConfirmation(chatId, order, todaysCount, lang = '
   )
 }
 
+// Staff notifications render in EACH staff member's own stored language
+// (staff pick /lang like customers; their choice persists in user_langs).
 export function notifyStaff(order, payload, from = {}) {
   const bot = activeBot
   if (!bot) throw new Error('bot not started')
 
-  const staffMsg =
-    `*${t('newOrder', 'en')} #${order.id}*\n` +
-    `${t('from', 'en')}: @${from.username || '--'} (${from.firstName || ''})\n` +
-    formatOrderReceipt(fullOrderForStaff(payload, order.id)).replace(/.*\n/, '')
-
-  const staffKeyboard = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: t('startPreparing', 'en'), callback_data: `prep_${order.id}` },
-          { text: t('markReady', 'en'), callback_data: `ready_${order.id}` },
-        ],
-        [{ text: t('cancelOrder', 'en'), callback_data: `cancel_${order.id}` }],
-      ],
-    },
-  }
-
   for (const id of NOTIFY_CHAT_IDS) {
-    bot.sendMessage(id, staffMsg, { parse_mode: 'Markdown', ...staffKeyboard }).catch((e) => {
+    ;(async () => {
+      let lang = 'en'
+      try { lang = await getUserLang(id) } catch (_) { /* default en */ }
+
+      const staffMsg =
+        `*${t('newOrder', lang)} #${order.id}*\n` +
+        `${t('from', lang)}: @${from.username || '--'} (${from.firstName || ''})\n` +
+        formatOrderReceipt(fullOrderForStaff(payload, order.id)).replace(/.*\n/, '')
+
+      const staffKeyboard = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: t('startPreparing', lang), callback_data: `prep_${order.id}` },
+              { text: t('markReady', lang), callback_data: `ready_${order.id}` },
+            ],
+            [{ text: t('cancelOrder', lang), callback_data: `cancel_${order.id}` }],
+          ],
+        },
+      }
+
+      await bot.sendMessage(id, staffMsg, { parse_mode: 'Markdown', ...staffKeyboard })
+    })().catch((e) => {
       console.warn(`[bot] notify chat ${id} failed:`, e.message)
     })
   }

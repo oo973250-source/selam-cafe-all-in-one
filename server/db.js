@@ -9,18 +9,38 @@ import 'dotenv/config'
 
 const { Pool } = pg
 
-// Hosted Postgres (Railway, Neon, Supabase, Render…) requires TLS. Local
-// Postgres usually does not. Detect from the connection string instead of
-// hard-coding one provider, so swapping DATABASE_URL never breaks the boot.
-const isLocalDb = /^(localhost|127\.0\.0\.1|\[::1\]|::1)/.test(
-  (process.env.DATABASE_URL || '').split('@')[1] || ''
-)
+/**
+ * Decide the TLS setting from the connection string itself:
+ *   - explicit ?sslmode=disable  → no SSL (respect it)
+ *   - explicit ?sslmode=<other>  → SSL (self-signed friendly)
+ *   - private-network hosts (localhost, *.internal — e.g. Railway's
+ *     postgres.railway.internal) → no SSL; traffic never leaves the
+ *     private network and the internal endpoint can refuse TLS
+ *   - everything else (Neon, Railway public proxy, Supabase, Render…) → SSL
+ */
+function resolveSsl(connectionString) {
+  if (!connectionString) return undefined
+  let url
+  try { url = new URL(connectionString) } catch { return undefined }
+
+  const sslmode = (url.searchParams.get('sslmode') || '').toLowerCase()
+  if (sslmode === 'disable') return undefined
+  if (sslmode) return { rejectUnauthorized: false }
+
+  const host = (url.hostname || '').toLowerCase()
+  const isPrivate =
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '::1' ||
+    host.endsWith('.internal')
+  if (isPrivate) return undefined
+
+  return { rejectUnauthorized: false }
+}
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL && !isLocalDb
-    ? { rejectUnauthorized: false }
-    : undefined,
+  ssl: resolveSsl(process.env.DATABASE_URL),
   max: 8,
   idleTimeoutMillis: 30000,
 })

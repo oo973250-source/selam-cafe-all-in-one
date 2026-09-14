@@ -31,11 +31,12 @@ Customer opens the Telegram bot → taps the Menu button → themed Mini App loa
 - Committed and pushed to `main` (rebased on top of remote Neon workflow + cloche source-frame deletions).
 - **Language selection overhauled (per user feedback):** chosen language now persists in a `user_langs` DB table (survives redeploys/restarts; seeds from the Telegram client language), language keyboard is in **2 rows** (English + Amharic / Afaan Oromoo), and the confirmation message, status updates, and Mini App URL (`?lang=`) all follow the user's stored language.
 - **Cloche animation fully removed** (user doesn't want it): component, CSS keyframes, `dist/cloche` frames, and stale comments deleted. Intro is now the 2-phase welcome splash only.
-- **Postgres SSL fix:** `db.js` now enables TLS for any hosted DB (Railway, Neon, Supabase, Render) instead of only URLs containing "railway" — this is what made Neon connections fail with an SSL error.
+- **Postgres SSL fix:** `db.js` now enables TLS for any hosted DB (Railway public proxy, Neon, Supabase, Render) instead of only URLs containing "railway" — this is what made Neon connections fail with an SSL error. **Railway internal endpoints** (`*.internal`, e.g. `postgres.railway.internal`) are detected by hostname and skip SSL, since the private-network endpoint can refuse TLS and traffic never leaves the network. Works with Railway's own Postgres service via `${{Postgres.DATABASE_URL}}` reference variables.
 
 ## ⚠️ Known issues / before production
 
-1. **Required env vars on Railway**: `DATABASE_URL` (Neon/Postgres — the `neon_workflow.yml` suggests branching DB), `BOT_TOKEN`, `JWT_SECRET`, `ADMIN_TELEGRAM_IDS`, `WEBAPP_URL` (Railway domain), `WEBHOOK_SECRET`. Optional: `CHAPA_SECRET_KEY` for live payments.
+1. **Required env vars on Railway**: `DATABASE_URL` (Railway Postgres reference `${{Postgres.DATABASE_URL}}` or Neon), `BOT_TOKEN`, `JWT_SECRET`, `ADMIN_TELEGRAM_IDS`, `WEBAPP_URL` (Railway domain), `WEBHOOK_SECRET`. Optional: `CHAPA_SECRET_KEY` for live payments.
+1b. **Staff notifications are language-aware**: each staff ID in `ADMIN_TELEGRAM_IDS`/`NOTIFY_CHAT_IDS` receives order alerts in their own `/lang` choice (stored in `user_langs`); unknown staff default to English.
 2. After first deploy: set **BotFather → Menu Button** to the Railway URL, and press Start once as a customer.
 
 ## 🚀 Next phase — feature add/remove ideas
