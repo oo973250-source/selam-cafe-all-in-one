@@ -78,8 +78,12 @@ router.post('/orders', async (req, res) => {
 
   const tgUser = verifyTelegramInitData(initData)
   if (!tgUser) {
+    console.error('[miniapp] order REJECTED: initData verification failed' +
+      (initData ? ' (initData present — likely BOT_TOKEN mismatch)' : ' (initData MISSING — frontend not sending it)'))
     return res.status(401).json({ error: 'invalid or missing Telegram initData' })
   }
+  console.log(`[miniapp] order received from tg ${tgUser.id}` +
+    ` (@${tgUser.username || 'no-username'}): ${payload?.items?.length || 0} items, total ${payload?.total || 0} Br`)
 
   if (!payload || payload.type !== 'cafe_order' || !Array.isArray(payload.items)) {
     return res.status(400).json({ error: 'invalid order payload' })
@@ -93,6 +97,7 @@ router.post('/orders', async (req, res) => {
       tgFirstName: tgUser.first_name || null,
       payload,
     })
+    console.log(`[miniapp] order #${order.id} saved for tg ${tgUser.id}`)
   } catch (e) {
     console.error('[miniapp] DB insert failed:', e)
     return res.status(500).json({ error: 'could not save order' })
@@ -134,6 +139,7 @@ router.post('/orders', async (req, res) => {
       warning: 'order saved, but the bot could not message you. Please message the bot first (tap Start), then reopen the menu.',
     })
   }
+  console.log(`[miniapp] confirmation sent to tg ${tgUser.id} for order #${order.id}`)
 
   // 3) Staff notification with action buttons
   try {

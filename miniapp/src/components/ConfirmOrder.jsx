@@ -29,7 +29,7 @@ import { useTelegram } from '../hooks/useTelegram.js'
  *   - Cart item rows / qty steppers / total / bottom bar — preserved
  *     from v10.
  */
-export default function ConfirmOrder({ onCancel, onPay, bgProps }) {
+export default function ConfirmOrder({ onCancel, onPay, onSkipPayment, bgProps }) {
   const { items, total, addItem, removeItem, deleteItem } = useCart()
   const { hapticFeedback } = useTelegram()
 
@@ -251,16 +251,39 @@ export default function ConfirmOrder({ onCancel, onPay, bgProps }) {
         >
           ← Cancel
         </button>
-        <button
-          className="btn btn-primary"
-          disabled={items.length === 0}
-          onClick={() => {
-            hapticFeedback.impactOccurred('medium')
-            onPay?.()
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
           }}
         >
-          Pay {total} Br
-        </button>
+          <button
+            className="btn btn-primary"
+            disabled={items.length === 0}
+            onClick={() => {
+              hapticFeedback.impactOccurred('medium')
+              onPay?.()
+            }}
+          >
+            Pay {total} Br
+          </button>
+          {/* TEST BUTTON (temporary): skips the payment step and goes
+              straight to the order form, so the order pipeline can be
+              verified end-to-end without completing a payment. Remove
+              before real customers use the app. */}
+          <button
+            className="btn btn-secondary"
+            style={{ fontSize: 12, padding: '8px 10px' }}
+            disabled={items.length === 0}
+            onClick={() => {
+              hapticFeedback.impactOccurred('light')
+              onSkipPayment?.()
+            }}
+          >
+            🧪 Place Order (skip payment)
+          </button>
+        </div>
       </div>
     </div>
   )

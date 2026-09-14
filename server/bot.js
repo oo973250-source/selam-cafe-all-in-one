@@ -25,6 +25,18 @@ const NOTIFY_CHAT_IDS = (process.env.NOTIFY_CHAT_IDS || '')
   .split(',').map((s) => s.trim()).filter(Boolean)
 const OWNER_ID = process.env.OWNER_TELEGRAM_ID
   ? Number(process.env.OWNER_TELEGRAM_ID) : null
+// ADMIN_TELEGRAM_IDS is the canonical admin allowlist (also used by the admin
+// web login in routes/auth.js). Previously the bot only checked
+// NOTIFY_CHAT_IDS / OWNER_TELEGRAM_ID, so staff who set ADMIN_TELEGRAM_IDS on
+// Railway were never recognized as admins and never got staff alerts.
+const ADMIN_TELEGRAM_IDS = (process.env.ADMIN_TELEGRAM_IDS || '')
+  .split(',').map((s) => Number(s.trim())).filter(Boolean)
+// Everyone who should receive new-order staff alerts (deduped):
+const STAFF_CHAT_IDS = [...new Set([
+  ...ADMIN_TELEGRAM_IDS,
+  ...NOTIFY_CHAT_IDS.map((s) => Number(s)).filter((n) => Number.isFinite(n)),
+  ...(OWNER_ID ? [OWNER_ID] : []),
+])]
 
 // ── Bot instance (set by startBot) ────────────────────────────────────
 // Lets the HTTP layer (POST /api/miniapp/orders) send messages through the
@@ -309,6 +321,7 @@ function formatOrderReceipt(order) {
 
 function isAdmin(userId) {
   if (OWNER_ID && userId === OWNER_ID) return true
+  if (ADMIN_TELEGRAM_IDS.includes(Number(userId))) return true
   return NOTIFY_CHAT_IDS.includes(String(userId))
 }
 
@@ -380,6 +393,22 @@ export async function startBot(io) {
   bot.onText(/\/lang$/, async (msg) => {
     const lang = await getUserLang(msg.from.id)
     bot.sendMessage(msg.chat.id, t('chooseLang', lang), languageButtons())
+  })
+
+  // ── /ping — connectivity & identity diagnostic (what the bot sees) ──
+  bot.onText(/\/ping$/, (msg) => {
+    const isAdminUser = isAdmin(msg.from.id)
+    bot.sendMessage(
+      msg.chat.id,
+      `✅ pong\n\n` +
+        `your Telegram ID: ${msg.from.id}\n` +
+        `bot sees you as admin: ${isAdminUser ? 'YES' : 'no'}\n\n` +
+        `If this says "no" but you expected admin:\n` +
+        `1. ADMIN_TELEGRAM_IDS on Railway must be exactly this number: ${msg.from.id}\n` +
+        `2. Redeploy after changing variables.\n` +
+        `3. DB must be connected (admins come from env + this bot's config).`,
+      { parse_mode: 'Markdown' }
+    ).catch(() => {})
   })
 
   // ── /help — command list ─────────────────────────────────────────────
@@ -538,6 +567,14 @@ export async function startBot(io) {
           }
         ).catch((e) => console.warn('[bot] lang confirm failed:', e.message))
       }
+      // Keep the persistent Menu Button (above the keyboard) in the chosen
+      // language too, so EVERY entry point to the Mini App matches.
+      if (WEBAPP_URL) {
+        bot.setChatMenuButton({
+          chat_id: userId,
+          menu_button: { type: 'web_app', text: t('openMenu', lang), web_app: { url: `${WEBAPP_URL}?lang=${lang}` } },
+        }).catch((e) => console.warn('[bot] setChatMenuButton failed:', e.message))
+      }
       bot.answerCallbackQuery(cq.id)
       return
     }
@@ -638,6 +675,12 @@ export async function startBot(io) {
   })
 
   console.log('[bot] polling started. Bot is live.')
+  console.log(`[bot] admins: ADMIN_TELEGRAM_IDS=[${ADMIN_TELEGRAM_IDS.join(',')}]` +
+    ` NOTIFY_CHAT_IDS=[${NOTIFY_CHAT_IDS.join(',')}]` +
+    ` OWNER_ID=${OWNER_ID || 'none'} — staff alerts go to [${STAFF_CHAT_IDS.join(',')}]`)
+  if (ADMIN_TELEGRAM_IDS.length === 0 && NOTIFY_CHAT_IDS.length === 0 && !OWNER_ID) {
+    console.warn('[bot] WARNING: no admin/staff IDs configured — set ADMIN_TELEGRAM_IDS on Railway (comma-separated numeric Telegram IDs)')
+  }
   if (OWNER_ID) {
     bot.sendMessage(OWNER_ID, 'Selam Cafe bot is online.').catch(() => {})
   }
@@ -696,11 +739,16 @@ export async function sendOrderConfirmation(chatId, order, todaysCount, lang = '
 
 // Staff notifications render in EACH staff member's own stored language
 // (staff pick /lang like customers; their choice persists in user_langs).
+// Recipients = ADMIN_TELEGRAM_IDS + NOTIFY_CHAT_IDS + OWNER_TELEGRAM_ID.
 export function notifyStaff(order, payload, from = {}) {
   const bot = activeBot
   if (!bot) throw new Error('bot not started')
+  if (!STAFF_CHAT_IDS.length) {
+    console.warn('[bot] notifyStaff skipped — no staff IDs configured (ADMIN_TELEGRAM_IDS)')
+    return
+  }
 
-  for (const id of NOTIFY_CHAT_IDS) {
+  for (const id of STAFF_CHAT_IDS) {
     ;(async () => {
       let lang = 'en'
       try { lang = await getUserLang(id) } catch (_) { /* default en */ }

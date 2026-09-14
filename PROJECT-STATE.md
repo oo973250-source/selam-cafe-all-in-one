@@ -36,7 +36,10 @@ Customer opens the Telegram bot → taps the Menu button → themed Mini App loa
 ## ⚠️ Known issues / before production
 
 1. **Required env vars on Railway**: `DATABASE_URL` (Railway Postgres reference `${{Postgres.DATABASE_URL}}` or Neon), `BOT_TOKEN`, `JWT_SECRET`, `ADMIN_TELEGRAM_IDS`, `WEBAPP_URL` (Railway domain), `WEBHOOK_SECRET`. Optional: `CHAPA_SECRET_KEY` for live payments.
-1b. **Staff notifications are language-aware**: each staff ID in `ADMIN_TELEGRAM_IDS`/`NOTIFY_CHAT_IDS` receives order alerts in their own `/lang` choice (stored in `user_langs`); unknown staff default to English.
+1b. **Staff notifications are language-aware**: each staff ID receives order alerts in their own `/lang` choice (stored in `user_langs`); unknown staff default to English.
+1c. **Admin recognition fix (important):** `bot.js` originally only checked `NOTIFY_CHAT_IDS`/`OWNER_TELEGRAM_ID` and **ignored `ADMIN_TELEGRAM_IDS`** — staff who set `ADMIN_TELEGRAM_IDS` were never recognized and got no staff alerts. The bot now checks `ADMIN_TELEGRAM_IDS` too; staff alerts go to the union of ADMIN_TELEGRAM_IDS + NOTIFY_CHAT_IDS + OWNER_TELEGRAM_ID (deduped). The bot logs the resolved admin lists at startup, and `/ping` in the bot replies with **your Telegram ID and whether the bot sees you as admin** — use it to confirm the env var matches.
+1d. **Localized Menu Button:** choosing a language in the bot also updates your per-chat Menu Button (above the keyboard) via `setChatMenuButton`, in the chosen language, with `?lang=` — so the persistent button matches too.
+1e. **Order diagnostics:** `POST /api/miniapp/orders` logs every step (order received → saved → confirmation sent); rejections say exactly why (missing initData vs BOT_TOKEN mismatch). If an order still doesn't arrive, check Railway logs for `[miniapp]` lines at the moment you tap Place Order — no line means the request never reached the server (old deploy or wrong Menu Button URL).
 2. After first deploy: set **BotFather → Menu Button** to the Railway URL, and press Start once as a customer.
 
 ## 🚀 Next phase — feature add/remove ideas
@@ -46,3 +49,4 @@ Customer opens the Telegram bot → taps the Menu button → themed Mini App loa
 - Kitchen display mode on the admin panel
 - Real DB-backed menu in the Mini App (currently bundled static menu; only orders hit the DB)
 - In-app language switcher inside the Mini App (currently language comes from the bot choice / client language / `?lang=`)
+- **Remove the 🧪 "Place Order (skip payment)" test button** in `ConfirmOrder.jsx` before real customers use the app (it was added only to verify the order pipeline without paying).

@@ -108,6 +108,7 @@ function AppInner() {
             bgProps={bgProps}
             onCancel={() => goToFrame(4)}
             onPay={() => goToFrame(6)}
+            onSkipPayment={() => goToFrame(7)}
           />
         )
       case 6:
