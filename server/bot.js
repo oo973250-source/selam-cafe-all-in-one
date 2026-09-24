@@ -50,6 +50,13 @@ export function getBot() {
   return activeBot
 }
 
+// Safety net: an unhandled rejection (e.g. a bug in one Telegram handler) must
+// never take down the whole Railway service — previously it crash-looped the
+// deploy and even /start stopped responding.
+process.on('unhandledRejection', (reason) => {
+  console.error('[bot] unhandledRejection (process kept alive):', reason)
+})
+
 // ── Admin web login codes ────────────────────────────────────────────
 // /login in the bot issues a one-time 6-digit code; the admin web dashboard
 // polls with it to finish sign-in. In-memory, single-use, 10-minute TTL.
@@ -816,6 +823,11 @@ const adminActiveMsg = new Map() // chatId -> message_id
 const editAwait = new Map()
 
 async function renderAdminView(chatId, view, lang, param = null) {
+  // `bot` only exists inside startBot — always resolve the live instance via
+  // getBot(). A bare `bot` here is a ReferenceError (crashed the process on
+  // /admin before this fix).
+  const bot = getBot()
+  if (!bot) return
   const v = await buildAdminView(view, lang, param)
   if (!v) return
   const msgId = adminActiveMsg.get(chatId)
@@ -1311,7 +1323,7 @@ export async function startBot(io) {
         } else {
           bot.sendMessage(chatId,
             `🤖 ${t('adminOrders', lang)}\n\n${formatOrdersTable(rows)}`,
-            inBotMenuButtons(lang)
+            ADMIN_MAIN_KB(lang)
           )
         }
       } catch (e) {
