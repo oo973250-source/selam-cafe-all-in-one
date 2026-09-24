@@ -193,8 +193,13 @@ const T = {
     adminUnauthorized: 'You are not authorised to use admin commands.',
     newOrder: 'NEW ORDER',
     newOrderAlert: 'NEW ORDER ALERT',
-    recentOrders: 'Recent 4 Orders',
+    recentOrders: 'Recent 10 Orders',
     pickCategory: 'Pick a category to see its items:',
+    addItem: 'Add item here',
+    changeAlertLang: 'Change admin alert language',
+    sendNewItem: '✏️ Send the new item name (English):',
+    sendNewItemPrice: '💰 Now send the price (numbers only), e.g. 45',
+    itemAdded: 'Item added ✅',
     noItemsInCat: 'No items in this category yet.',
     editPrice: 'Edit price',
     editTitle: 'Edit title',
@@ -311,7 +316,7 @@ const T = {
     adminUnauthorized: 'የአስተዳደር ትዕዛዞችን ለመጠቀም ፈቃድ የለዎትም።',
     newOrder: 'አዲስ ትዕዛዝ',
     newOrderAlert: 'አዲስ ትዕዛዝ ማሳወቂያ',
-    recentOrders: 'የመጨረሻ 4 ትዕዛዞች',
+    recentOrders: 'የመጨረሻ 10 ትዕዛዞች',
     pickCategory: 'እቃዎቹን ለማየት ምድብ ይምረጡ:',
     noItemsInCat: 'በዚህ ምድብ ውስጥ እቃ የለም።',
     editPrice: 'ዋጋ ቀይር',
@@ -353,6 +358,11 @@ const T = {
     serviceDineIn: 'በስፍራው መብላት',
     serviceTakeaway: 'ወስዶ መሄድ',
     serviceDelivery: 'አድርሻ',
+    addItem: 'እቃ ጨምር',
+    changeAlertLang: 'የማሳወቂያ ቋንቋ ቀይር',
+    sendNewItem: '✏️ የአዲሱን እቃ ስም ላክ:',
+    sendNewItemPrice: '💰 አሁን ዋጋውን ላክ (ቁጥር ብቻ)፣ ለምሳሌ 45',
+    itemAdded: 'እቃው ታክሏል ✅',
   },
   om: {
     welcome: 'Baga nagaan dhuftaan Kafee Selam',
@@ -448,7 +458,7 @@ const T = {
     adminUnauthorized: 'Ajjaja bulchaa itti fayyadamuuf hayyama hin qabdu.',
     newOrder: 'AJAJA HAARAA',
     newOrderAlert: 'AJAJA HAARAA BEEKSISA',
-    recentOrders: 'Ajaja 4 dhiyoo',
+    recentOrders: 'Ajaja 10 dhiyoo',
     pickCategory: 'Meeshaalee arguuf ramaddii filadhu:',
     noItemsInCat: 'Ramaddii kana keessatti meeshaa hin jiru.',
     editPrice: 'Gatii jijjiiri',
@@ -497,6 +507,11 @@ const T = {
     serviceDineIn: 'Achumaa nyaachuu',
     serviceTakeaway: 'Fudhaa jedhi',
     serviceDelivery: 'Geeddara',
+    addItem: 'Meeshaa dabalii',
+    changeAlertLang: 'Afaan beeksisaa jijjiiri',
+    sendNewItem: '✏️ Maqaa meeshaa haaraa ergi:',
+    sendNewItemPrice: '💰 Amma gatii ergi (lakki qofa), fakkeenya 45',
+    itemAdded: 'Meeshaan darbameera ✅',
     service: 'Tajaajila',
     location: 'Iddoo',
   },
@@ -643,7 +658,7 @@ async function buildAdminView(view, lang, param = null) {
 
   if (view === 'recent') {
     const { rows } = await pool.query(
-      `SELECT id, customer_name, total, status, items FROM orders ORDER BY created_at DESC LIMIT 4`
+      `SELECT id, customer_name, total, status, items FROM orders ORDER BY created_at DESC LIMIT 10`
     )
     const body = rows.length
       ? formatOrdersTable(rows)
@@ -680,10 +695,11 @@ async function buildAdminView(view, lang, param = null) {
     const items = await loadMenuItems()
     const inCat = items.filter((i) => i.category === param)
     const cat = (await loadCategories()).find((c) => c.id === param)
+    const addBtn = [{ text: `➕ ${t('addItem', lang)}`, callback_data: `ib_additem_${param}` }]
     if (!inCat.length) {
       return {
         text: `${cat ? `${cat.icon} ${esc2(cat.name_en)}` : esc2(param)}\n\n${esc2(t('noItemsInCat', lang))}`,
-        kb: { reply_markup: { inline_keyboard: [[backBtn(lang, 'ib_items')]] } },
+        kb: { reply_markup: { inline_keyboard: [addBtn, [backBtn(lang, 'ib_items')]] } },
       }
     }
     return {
@@ -691,7 +707,8 @@ async function buildAdminView(view, lang, param = null) {
       kb: {
         reply_markup: {
           inline_keyboard: [
-            ...inCat.slice(0, 25).map((i) => [{
+            addBtn,
+            ...inCat.slice(0, 24).map((i) => [{
               text: `${i.available ? '✅' : '❌'} ${i.name_en} · ${i.price} Br`,
               callback_data: `ib_item_${i.id}`,
             }]),
@@ -708,8 +725,7 @@ async function buildAdminView(view, lang, param = null) {
     const i = rows[0]
     if (!i) return { text: esc2(t('orderNotFoundAdmin', lang)), kb: back('ib_items') }
     return {
-      text:
-        `📦 <b>${esc2(i.name_en)}</b>${i.name_am ? ` (${esc2(i.name_am)})` : ''}\n` +
+      text: `📦 <b>${esc2(i.name_en)}</b>${i.name_am ? ` (${esc2(i.name_am)})` : ''}\n` +
         `💰 ${i.price} Br\n` +
         (i.description ? `📝 ${esc2(i.description)}\n` : '') +
         `${i.available ? '✅ Available' : '❌ Unavailable'}`,
@@ -726,6 +742,8 @@ async function buildAdminView(view, lang, param = null) {
       },
     }
   }
+
+  // Add-item prompt state lives in editAwait (field: 'newitem', param = catId)
 
   // Categories: list with add / rename / delete
   if (view === 'cats') {
@@ -810,7 +828,36 @@ async function buildAdminView(view, lang, param = null) {
       `🔔 ${t('settingsStaff', lang)}: ${STAFF_CHAT_IDS.join(', ') || t('settingsNotSet', lang)}\n` +
       `🌐 ${t('settingsWebapp', lang)}: ${WEBAPP_URL || t('settingsNotSet', lang)}\n` +
       `💳 ${t('settingsPayment', lang)}: ${process.env.CHAPA_SECRET_KEY ? t('settingsPaymentLive', lang) : t('settingsPaymentMock', lang)}`
-    return { text, kb: { reply_markup: { inline_keyboard: [[backBtn(lang)]] } } }
+    return {
+      text,
+      kb: {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: `🌐 ${t('changeAlertLang', lang)}`, callback_data: 'ib_lang' }],
+            [backBtn(lang)],
+          ],
+        },
+      },
+    }
+  }
+
+  // Alert-language picker (admin's own staff-alert language)
+  if (view === 'lang') {
+    return {
+      text: `🌐 ${t('changeAlertLang', lang)}`,
+      kb: {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: `🇬🇧 English${lang === 'en' ? ' ✓' : ''}`, callback_data: 'ib_setlang_en' },
+              { text: `🇪🇹 አማርኛ${lang === 'am' ? ' ✓' : ''}`, callback_data: 'ib_setlang_am' },
+            ],
+            [{ text: `🇪🇹 Afaan Oromoo${lang === 'om' ? ' ✓' : ''}`, callback_data: 'ib_setlang_om' }],
+            [backBtn(lang, 'ib_settings')],
+          ],
+        },
+      },
+    }
   }
 
   return null
@@ -1104,6 +1151,34 @@ export async function startBot(io) {
           )
         } else if (awaiting.field === 'renamecat') {
           await pool.query(`UPDATE menu_categories SET name_en = $1 WHERE id = $2`, [text.slice(0, 60), awaiting.itemId])
+        } else if (awaiting.field === 'newitem') {
+          // Two-step flow: name first, then price. Store the name and ask
+          // for the price next (state kept in editAwait).
+          const name = text.slice(0, 120).trim()
+          if (!name) {
+            bot.sendMessage(msg.chat.id, t('sendNewItem', lang))
+            return
+          }
+          editAwait.set(msg.from.id, { field: 'newitemprice', itemId: awaiting.itemId, chatId: msg.chat.id, pendingName: name })
+          bot.sendMessage(msg.chat.id, t('sendNewItemPrice', lang))
+          return
+        } else if (awaiting.field === 'newitemprice') {
+          const price = parseInt(text.replace(/[^0-9]/g, ''), 10)
+          if (!Number.isFinite(price) || price <= 0) {
+            bot.sendMessage(msg.chat.id, t('sendNewItemPrice', lang))
+            return
+          }
+          const id = (awaiting.pendingName || 'item').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || `item_${Date.now()}`
+          await pool.query(
+            `INSERT INTO menu_items (id, category, name_en, price, available, sort_order)
+             VALUES ($1, $2, $3, $4, true,
+               (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM menu_items WHERE category = $2))
+             ON CONFLICT (id) DO NOTHING`,
+            [id, awaiting.itemId, awaiting.pendingName, price]
+          )
+          bot.sendMessage(msg.chat.id, '✅ ' + t('itemAdded', lang))
+          await renderAdminView(msg.chat.id, 'catitems', lang, awaiting.itemId)
+          return
         }
         bot.sendMessage(msg.chat.id, '✅ ' + t('marked', lang))
         // Re-render the portal message in place (root menu as fallback).
@@ -1388,6 +1463,25 @@ export async function startBot(io) {
           editAwait.set(userId, { field: 'newcat', chatId })
           await bot.sendMessage(chatId, t('sendNewCategory', lang))
           bot.answerCallbackQuery(cq.id)
+          return
+        } else if (data.startsWith('ib_additem_')) {
+          const catId = data.slice('ib_additem_'.length)
+          editAwait.set(userId, { field: 'newitem', itemId: catId, chatId })
+          await bot.sendMessage(chatId, t('sendNewItem', lang))
+          bot.answerCallbackQuery(cq.id)
+          return
+        } else if (data === 'ib_lang') {
+          await renderAdminView(chatId, 'lang', lang)
+          bot.answerCallbackQuery(cq.id)
+          return
+        } else if (data.startsWith('ib_setlang_')) {
+          const newLang = data.slice('ib_setlang_'.length)
+          if (['en', 'am', 'om'].includes(newLang)) {
+            await rememberUserLang(userId, newLang)
+            lang = newLang
+          }
+          await renderAdminView(chatId, 'lang', lang)
+          bot.answerCallbackQuery(cq.id, { text: t('langSet', lang) })
           return
         } else if (data.startsWith('ib_renamecat_')) {
           const catId = data.slice('ib_renamecat_'.length)
