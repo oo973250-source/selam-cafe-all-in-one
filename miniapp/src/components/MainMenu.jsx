@@ -5,7 +5,6 @@ import { menuData } from '../data/menuData.js'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
 import { useLang } from '../context/LangContext.jsx'
-
 /**
  * MainMenu (Frame 2 — rebuilt v3 to match the user's reference sketch)
  * --------------------------------------------------------------------
@@ -69,7 +68,7 @@ const MEAL_TABS = [
 export default function MainMenu({ onAdvance, bgProps }) {
   const { setCategory } = useCart()
   const { hapticFeedback } = useTelegram()
-  const { t } = useLang()
+  const { t, lang: userLanguage } = useLang()
   const [activeMeal, setActiveMeal] = useState('all')
   // Two-tap pattern: 1st tap expands the pill to show full category name,
   // 2nd tap on the same pill confirms selection and advances to Frame 3.
@@ -103,8 +102,17 @@ export default function MainMenu({ onAdvance, bgProps }) {
   )
 
   // Resolve localized category name based on user language.
-  const localizedCatName = (cat) =>
-    userLanguage === 'am' ? cat.nameAm : cat.nameEn
+  // Defensive: falls back to English name when anything is missing, so a
+  // null language can never crash the frame (the "dark screen" bug).
+  const localizedCatName = (cat) => {
+    try {
+      if (!cat) return ''
+      if (userLanguage === 'am' && cat.nameAm) return cat.nameAm
+      return cat.nameEn || ''
+    } catch {
+      return cat?.nameEn || ''
+    }
+  }
 
   const handlePick = (cat, sectionKey) => {
     if (expandedCatId === cat.id) {
@@ -551,7 +559,7 @@ export default function MainMenu({ onAdvance, bgProps }) {
                   lineHeight: 1.4,
                 }}
               >
-                Nothing on the menu for this meal time.
+                {t('noItemsForMeal') || 'Nothing on the menu for this meal time.'}
               </div>
             )}
             {foodCats.map((cat, i) => {

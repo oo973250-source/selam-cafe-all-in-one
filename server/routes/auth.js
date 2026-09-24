@@ -94,7 +94,9 @@ router.post('/login-code', async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      // Persistent session: 30 days. The admin signs in ONCE via /login and
+      // stays signed in until they explicitly log out (or the JWT expires).
+      maxAge: 30 * 24 * 60 * 60 * 1000,
     })
 
     return res.json({
@@ -146,7 +148,8 @@ router.post('/telegram-callback', async (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    // Persistent session: 30 days (widget path) — same as /login code path.
+    maxAge: 30 * 24 * 60 * 60 * 1000,
   })
 
   res.json({

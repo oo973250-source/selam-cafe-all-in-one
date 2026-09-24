@@ -43,6 +43,7 @@ const translations = {
     tapToSelect: 'Tap again to select',
     // Info box (Frame 2) — guidance card above the owner
     infoTitle: 'How to order',
+    noItemsForMeal: 'Nothing on the menu for this meal time.',
     infoSubtitle: 'Your fresh order in 4 quick taps',
     infoStep1: '1. Pick a meal time',
     infoStep2: '2. Tap a category to expand',
@@ -83,6 +84,7 @@ const translations = {
     tapToSelect: 'ለመምረጥ ድጋሚ ይንኩ',
     // Info box (Frame 2)
     infoTitle: 'እንዴት ይዘዙ',
+    noItemsForMeal: 'ለዚህ የምግብ ሰዓት ምንም የለም።',
     infoSubtitle: 'በ4 ፍጥነት ቅንብር ያድርጉ',
     infoStep1: '1. የምግብ ጊዜ ይምረጡ',
     infoStep2: '2. ምድብ ለመድረት ይንኩ',
@@ -123,6 +125,7 @@ const translations = {
     tapToSelect: 'Filachuuf irra deebi\'i tuqi',
     // Info box (Frame 2)
     infoTitle: 'Akkamitti order gochuu',
+    noItemsForMeal: 'Yeroon nyaataa kanaaf waan hin jiru.',
     infoSubtitle: 'Order keessan tapha 4 keessatti',
     infoStep1: '1. Yeroo nyaata filadhaa',
     infoStep2: '2. Gosa argachuuf tuqi',

@@ -104,13 +104,29 @@ export async function ensureSchema() {
     role          TEXT NOT NULL DEFAULT 'staff',
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_login    TIMESTAMPTZ
-  );
-
-  CREATE TABLE IF NOT EXISTS user_langs (
+  );  CREATE TABLE IF NOT EXISTS user_langs (
     tg_user_id    BIGINT PRIMARY KEY,
     lang          TEXT NOT NULL DEFAULT 'en',
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
   );
+
+  CREATE TABLE IF NOT EXISTS menu_categories (
+    id         TEXT PRIMARY KEY,
+    name_en    TEXT NOT NULL,
+    name_am    TEXT,
+    icon       TEXT NOT NULL DEFAULT '🍽️',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  INSERT INTO menu_categories (id, name_en, name_am, icon, sort_order)
+  VALUES
+    ('breakfast',  'Breakfast',  'ቁርስ',    '🌅', 1),
+    ('hot_drinks', 'Hot Drinks', 'ትኩስ መጠጦች', '☕', 2),
+    ('drinks',     'Drinks',     'መጠጦች',    '🥤', 3),
+    ('snacks',     'Snacks',     'መክሰስ',    '🥟', 4)
+  ON CONFLICT (id) DO NOTHING;
+  
 
   INSERT INTO menu_items (id, category, name_en, name_am, price, description, sort_order)
   VALUES
