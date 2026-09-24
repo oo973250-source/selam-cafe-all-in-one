@@ -20,7 +20,9 @@ import {
 
 // ── Config ─────────────────────────────────────────────────────────────
 const BOT_TOKEN = process.env.BOT_TOKEN
-const WEBAPP_URL = process.env.WEBAPP_URL
+// Trailing slash would produce `//admin` links, which the server's miniapp
+// fallback does not recognise as the admin UI — strip it defensively.
+const WEBAPP_URL = (process.env.WEBAPP_URL || '').replace(/\/+$/, '')
 const NOTIFY_CHAT_IDS = (process.env.NOTIFY_CHAT_IDS || '')
   .split(',').map((s) => s.trim()).filter(Boolean)
 const OWNER_ID = process.env.OWNER_TELEGRAM_ID

@@ -110,6 +110,8 @@ if (existsSync(adminDist)) {
   app.use('/admin', express.static(adminDist))
   app.get(/^\/admin(\/.*)?$/, (req, res, next) => {
     if (req.path.startsWith('/api/')) return next()
+    // tolerate `//admin…` (which Express routes as a miss) by redirecting to the canonical path
+    if (req.path.startsWith('//')) return res.redirect(301, req.path.replace(/^\/+/, '/'))
     res.sendFile(join(adminDist, 'index.html'))
   })
   console.log('[server] admin UI mounted at /admin')
@@ -121,7 +123,13 @@ if (existsSync(adminDist)) {
 if (existsSync(miniappDist)) {
   app.use(express.static(miniappDist))
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api/') || req.path.startsWith('/admin')) return next()
+    const p = '/' + req.path.replace(/^\/+|\/+$/g, '') // collapse stray leading/trailing slashes
+    if (p === '/health') return next()
+    if (p.startsWith('/api')) return next()
+    if (p.startsWith('/admin')) {
+      // e.g. `//admin` or `/admin/` — send to the canonical admin UI
+      return res.redirect(301, p)
+    }
     res.sendFile(join(miniappDist, 'index.html'))
   })
   console.log('[server] mini app mounted at /')
