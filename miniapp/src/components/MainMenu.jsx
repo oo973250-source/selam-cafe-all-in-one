@@ -4,7 +4,7 @@ import CafeLogo from './CafeLogo.jsx'
 import { menuData } from '../data/menuData.js'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
-import { getT } from '../utils/i18n.js'
+import { useLang } from '../context/LangContext.jsx'
 
 /**
  * MainMenu (Frame 2 — rebuilt v3 to match the user's reference sketch)
@@ -68,8 +68,8 @@ const MEAL_TABS = [
 
 export default function MainMenu({ onAdvance, bgProps }) {
   const { setCategory } = useCart()
-  const { hapticFeedback, userLanguage } = useTelegram()
-  const t = getT(userLanguage)
+  const { hapticFeedback } = useTelegram()
+  const { t } = useLang()
   const [activeMeal, setActiveMeal] = useState('all')
   // Two-tap pattern: 1st tap expands the pill to show full category name,
   // 2nd tap on the same pill confirms selection and advances to Frame 3.

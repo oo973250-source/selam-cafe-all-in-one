@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api.js'
+import { orderCode } from '../orderCode.js'
 
 const STATUS_FLOW = ['new', 'preparing', 'ready', 'served', 'cancelled']
 
@@ -51,7 +52,7 @@ export default function OrderDetail({ orderId, onBack }) {
   return (
     <div>
       <button onClick={onBack} style={{ marginBottom: 16 }}>← Back to orders</button>
-      <h1>Order #{order.id}</h1>
+      <h1>Order {orderCode(order.id)}</h1>
 
       <div className="stats-grid">
         <div className="stat">

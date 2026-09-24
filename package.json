@@ -6,6 +6,8 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
+    "postinstall": "npm run build:all || true",
+    "build": "npm run build:all",
     "dev": "node --watch server/index.js",
     "build:miniapp": "cd miniapp && npm install && npm run build",
     "build:admin": "cd admin && npm install && npm run build",

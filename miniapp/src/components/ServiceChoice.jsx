@@ -4,7 +4,7 @@ import SmartCafeBg from './SmartCafeBg.jsx'
 import BrandLogo from './BrandLogo.jsx'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
-import { getT } from '../utils/i18n.js'
+import { useLang } from '../context/LangContext.jsx'
 
 /**
  * ServiceChoice (Frame 1) — v3
@@ -91,8 +91,8 @@ const SERVICES = [
 
 export default function ServiceChoice({ onAdvance, bgProps }) {
   const { setServiceType } = useCart()
-  const { hapticFeedback, userLanguage } = useTelegram()
-  const t = getT(userLanguage)
+  const { hapticFeedback } = useTelegram()
+  const { t } = useLang()
   const [hoveredBg, setHoveredBg] = useState(null)
 
   const handleSelect = (svc) => {

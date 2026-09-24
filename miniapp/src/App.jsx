@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { CartProvider, useCart } from './context/CartContext.jsx'
+import { LangProvider } from './context/LangContext.jsx'
 import { useTelegram } from './hooks/useTelegram.js'
 
 import SmartCafeBg from './components/SmartCafeBg.jsx'
@@ -108,7 +109,6 @@ function AppInner() {
             bgProps={bgProps}
             onCancel={() => goToFrame(4)}
             onPay={() => goToFrame(6)}
-            onSkipPayment={() => goToFrame(7)}
           />
         )
       case 6:
@@ -175,8 +175,10 @@ function AppInner() {
 
 export default function App() {
   return (
-    <CartProvider>
-      <AppInner />
-    </CartProvider>
+    <LangProvider>
+      <CartProvider>
+        <AppInner />
+      </CartProvider>
+    </LangProvider>
   )
 }

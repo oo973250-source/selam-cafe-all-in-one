@@ -64,6 +64,13 @@ export function consumeLoginCode(code) {
   return pending
 }
 
+// ── Order code formatting ────────────────────────────────────────────
+// Global order-code format: #5 → MC-0005. Zero-padded to 4 digits so the
+// code sorts nicely and is easy to read aloud at the counter.
+export function orderCode(orderId) {
+  return `MC-${String(orderId).padStart(4, '0')}`
+}
+
 const SERVICE_LABELS = {
   dine_in: 'Dine in',
   takeaway: 'Takeaway',
@@ -114,7 +121,35 @@ const T = {
     menuNotConfigured: 'Menu URL is not configured yet.',
     adminPanel: 'Admin Panel',
     adminLink: 'Open Admin Panel (Web)',
-    adminOrders: 'Recent Orders (Bot)',
+    adminOrders: 'In Bot',
+    inBotTitle: '🤖 In-Bot Management',
+    inBotMenuItems: '📦 Menu Items',
+    inBotCategories: '🗂 Categories',
+    inBotAvailability: '🔄 Item Availability',
+    inBotSales: '📊 Sales Summary',
+    inBotSettings: '⚙️ Settings',
+    inBotBack: '← Back',
+    menuItemsTitle: '📦 Menu items — tap to toggle availability:',
+    categoriesTitle: '🗂 Product categories:',
+    salesTitle: '📊 Sales summary',
+    salesToday: 'Today',
+    salesWeek: 'This week',
+    salesOrders: 'Orders',
+    salesRevenue: 'Revenue',
+    settingsTitle: '⚙️ General settings (read-only in bot):',
+    settingsAdmins: 'Admin allowlist',
+    settingsStaff: 'Staff alert recipients',
+    settingsWebapp: 'Mini App URL',
+    settingsPayment: 'Payments',
+    settingsPaymentMock: 'Mock mode (no CHAPA_SECRET_KEY)',
+    settingsPaymentLive: 'Live (Chapa keys set)',
+    settingsNotSet: 'not set',
+    itemNowInStock: 'is now IN STOCK ✅',
+    itemNowOutOfStock: 'is now OUT OF STOCK ❌',
+    ordersTableHeader: 'Name        Code     Price   Item',
+    alertDismissed: 'Notification dismissed — order unchanged.',
+    startedWord: 'Started',
+    finishedWord: 'Finished',
     adminNoOrders: 'No orders yet.',
     adminNotConfigured: 'Admin panel URL not configured.',
     helpTitle: 'Selam Cafe Bot',
@@ -150,6 +185,7 @@ const T = {
     orderNotFound: 'No order found with that ID for your account.',
     adminUnauthorized: 'You are not authorised to use admin commands.',
     newOrder: 'NEW ORDER',
+    newOrderAlert: 'NEW ORDER ALERT',
     from: 'From',
     startPreparing: 'Start preparing',
     markReady: 'Mark ready',
@@ -186,7 +222,34 @@ const T = {
     menuNotConfigured: 'የምናሌ አድራሻ አልተዋቀረም።',
     adminPanel: 'የአስተዳደር ክፍል',
     adminLink: 'የአስተዳደር ክፍል ክፈት (ድረ-ገጽ)',
-    adminOrders: 'የቅርብ ትዕዛዞች (ቦት)',
+    adminOrders: 'በቦት ውስጥ',
+    inBotTitle: '🤖 የአስተዳደር መቆጣጠሪያ',
+    inBotMenuItems: '📦 የምናሌ እቃዎች',
+    inBotCategories: '🗂 ምድቦች',
+    inBotAvailability: '🔄 የእቃ መኖር',
+    inBotSales: '📊 የሽያጭ ማጠቃለያ',
+    inBotSettings: '⚙️ ቅንብሮች',
+    inBotBack: '← ተመለስ',
+    menuItemsTitle: '📦 የምናሌ እቃዎች — መኖሩን ለመቀየር ይንኩ:',
+    categoriesTitle: '🗂 የምርት ምድቦች:',
+    salesTitle: '📊 የሽያጭ ማጠቃለያ',
+    salesToday: 'ዛሬ',
+    salesWeek: 'በዚህ ሳምንት',
+    salesOrders: 'ትዕዛዞች',
+    salesRevenue: 'ገቢ',
+    settingsTitle: '⚙️ አጠቃላይ ቅንብሮች (ለማንበብ ብቻ):',
+    settingsAdmins: 'የአስተዳደር ፈቃድ',
+    settingsStaff: 'የሠራተኛ ማሳወቂያ ተቀባዮች',
+    settingsWebapp: 'የሚኒ አፕ አድራሻ',
+    settingsPayment: 'ክፍያ',
+    settingsPaymentMock: 'ሙከራ ሁኔታ',
+    settingsPaymentLive: 'በቀጥታ (Chapa)',
+    settingsNotSet: 'አልተቀናጠረም',
+    itemNowInStock: 'አሁን አለ ✅',
+    itemNowOutOfStock: 'አሁን የለም ❌',
+    alertDismissed: 'ማሳወቂያው ተዘግቷል — ትዕዛዙ አልተቀየረም።',
+    startedWord: 'ተጀምሯል',
+    finishedWord: 'ተጠናቋል',
     adminNoOrders: 'እስካሁን ትዕዛዝ የለም።',
     adminNotConfigured: 'የአስተዳደር ክፍል አድራሻ አልተዋቀረም።',
     helpTitle: 'ሰላም ካፌ ቦት',
@@ -222,6 +285,7 @@ const T = {
     orderNotFound: 'ለእርስዎ መለያ በዚያ ቁጥር ትዕዛዝ አልተገኘም።',
     adminUnauthorized: 'የአስተዳደር ትዕዛዞችን ለመጠቀም ፈቃድ የለዎትም።',
     newOrder: 'አዲስ ትዕዛዝ',
+    newOrderAlert: 'አዲስ ትዕዛዝ ማሳወቂያ',
     from: 'ከ',
     startPreparing: 'ማዘጋጀት ጀምር',
     markReady: 'ዝግጁ አድርግ',
@@ -258,7 +322,62 @@ const T = {
     menuNotConfigured: "Teessoo maajii hin qindaa'in.",
     adminPanel: 'Panel Bulchaa',
     adminLink: 'Panel Bulchaa Banaa (Saayidii)',
-    adminOrders: 'Ajajawwan Dhiyoo (Bot)',
+    adminOrders: 'Keessatti (Bot)',
+    inBotTitle: '🤖 Bulchiinsa Keessatti',
+    inBotMenuItems: '📦 Meeshaalee Maajii',
+    inBotCategories: '🗂 Ramaddii',
+    inBotAvailability: '🔄 Jirutta Meeshaa',
+    inBotSales: '📊 Xumura Gargaarsa',
+    inBotSettings: "⚙️ Qindaa'ina",
+    inBotBack: '← Gara duubaa',
+    menuItemsTitle: "📦 Meeshaalee maajii — jirutta jijjiiruuf tuqi:",
+    categoriesTitle: '🗂 Ramaddii oomishaa:',
+    salesTitle: '📊 Xumura gargaarsa',
+    salesToday: 'Har’a',
+    salesWeek: 'Torban kana',
+    salesOrders: 'Ajajawwan',
+    salesRevenue: 'Galii',
+    settingsTitle: "⚙️ Qindaa'ina waliigalaa (dubbisuuf qofa):",
+    settingsAdmins: 'Hayyama bulchaa',
+    settingsStaff: 'Namoota ergaa beeksisa argan',
+    settingsWebapp: 'Teessoo Mini App',
+    settingsPayment: 'Kaffaltaa',
+    settingsPaymentMock: 'Hojii maddisiisaa',
+    settingsPaymentLive: 'Kallattiin (Chapa)',
+    settingsNotSet: "hin qindaa'in",
+    itemNowInStock: 'amma jira ✅',
+    itemNowOutOfStock: 'amma hin jiru ❌',
+    alertDismissed: 'Ergaan beeksisaa cufame — ajaja hin jijjiiramne.',
+    startedWord: 'Jalqeffame',
+    finishedWord: 'Xumurame',
+    inBotTitle: '🤖 Bulchiinsa Keessatti',
+    inBotMenuItems: '📦 Meeshaalee Maajii',
+    inBotCategories: '🗂 Ramaddii',
+    inBotAvailability: '🔄 Jirutta Meeshaa',
+    inBotSales: '📊 Xumura Gargaarsa',
+    inBotSettings: '⚙️ Qindaa’ina',
+    inBotBack: '← Gara duubaa',
+    menuItemsTitle: "📦 Meeshaalee maajii — jirutta jijjiiruuf tuqi:",
+    categoriesTitle: '🗂 Ramaddii oomishaa:',
+    salesTitle: '📊 Xumura gargaarsa',
+    salesToday: 'Har’a',
+    salesWeek: 'Torban kana',
+    salesOrders: 'Ajajawwan',
+    salesRevenue: 'Galii',
+    settingsTitle: "⚙️ Qindaa'ina waliigalaa (dubbisuuf qofa):",
+    settingsAdmins: 'Hayyama bulchaa',
+    settingsStaff: "Namoota ergaa beeksisa argan",
+    settingsWebapp: "Teessoo Mini App",
+    settingsPayment: 'Kaffaltaa',
+    settingsPaymentMock: 'Hojii maddisiisaa',
+    settingsPaymentLive: 'Kallattiin (Chapa)',
+    settingsNotSet: "hin qindaa'in",
+    itemNowInStock: 'amma jira ✅',
+    itemNowOutOfStock: 'amma hin jiru ❌',
+    ordersTableHeader: 'Maqaa        Koodii     Gatiin   Meeshaa',
+    alertDismissed: "Ergaan beeksisaa cufame — ajaja hin jijjiiramne.",
+    startedWord: 'Jalqeffame',
+    finishedWord: 'Xumurame',
     adminNoOrders: 'Amma ajaja hin jiru.',
     adminNotConfigured: "Teessoo panel bulchaa hin qindaa'in.",
     helpTitle: 'Bot Kafee Selam',
@@ -285,6 +404,7 @@ const T = {
     orderNotFound: 'Galmee keetti ajaja lakkoofsa sanaan hin argamne.',
     adminUnauthorized: 'Ajjaja bulchaa itti fayyadamuuf hayyama hin qabdu.',
     newOrder: 'AJAJA HAARAA',
+    newOrderAlert: 'AJAJA HAARAA BEEKSISA',
     from: 'Garga',
     startPreparing: 'Qopheessuu Jalqabi',
     receiptTitle: 'RASIISAA AJAJAA',
@@ -356,7 +476,7 @@ function languageButtons() {
 
 function adminMenuButtons(lang = 'en') {
   const btns = [
-    [{ text: '📋 ' + t('adminOrders', lang), callback_data: 'admin_list' }],
+    [{ text: '🤖 ' + t('adminOrders', lang), callback_data: 'admin_list' }],
   ]
   if (WEBAPP_URL) {
     const adminUrl = WEBAPP_URL + '/admin'
@@ -365,6 +485,109 @@ function adminMenuButtons(lang = 'en') {
   return {
     reply_markup: { inline_keyboard: btns },
   }
+}
+
+// ── In-Bot management portal keyboard ────────────────────────────────
+function inBotMenuButtons(lang = 'en') {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: t('inBotMenuItems', lang), callback_data: 'ib_items' },
+         { text: t('inBotCategories', lang), callback_data: 'ib_cats' }],
+        [{ text: t('inBotAvailability', lang), callback_data: 'ib_avail' },
+         { text: t('inBotSales', lang), callback_data: 'ib_sales' }],
+        [{ text: t('inBotSettings', lang), callback_data: 'ib_settings' }],
+      ],
+    },
+  }
+}
+
+const MENU_CATEGORIES = ['breakfast', 'hot_drinks', 'drinks', 'snacks']
+
+async function loadMenuItems(availableOnly = false) {
+  const { rows } = await pool.query(
+    `SELECT id, category, name_en, name_am, price, available
+       FROM menu_items ${availableOnly ? 'WHERE available = TRUE' : ''}
+      ORDER BY category, sort_order, name_en`
+  )
+  return rows
+}
+
+// Recent orders as a clean aligned table: Name | Code | Price | Item
+function formatOrdersTable(rows) {
+  const pad = (s, n) => {
+    s = String(s)
+    return s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length)
+  }
+  const padL = (s, n) => {
+    s = String(s)
+    return s.length >= n ? s.slice(0, n) : ' '.repeat(n - s.length) + s
+  }
+  const header =
+    `${pad('Name', 16)} ${pad('Code', 8)} ${padL('Price', 7)} Item`
+  const lines = rows.map((r) => {
+    const items = Array.isArray(r.items) ? r.items : []
+    const itemSummary = items.length
+      ? items.map((i) => `${i.quantity}x ${i.nameEn || i.id || '?'}`).join(', ')
+      : '—'
+    return `${pad(r.customer_name || '—', 16)} ${pad(orderCode(r.id), 8)} ${padL(r.total, 7)} ${itemSummary}`
+  })
+  return [header, '-'.repeat(Math.max(header.length, 30)), ...lines].join('\n')
+}
+
+async function buildInBotView(view, lang) {
+  if (view === 'items' || view === 'avail') {
+    const items = await loadMenuItems()
+    if (!items.length) return { text: t('adminNoOrders', lang), kb: inBotMenuButtons(lang) }
+    const kb = {
+      reply_markup: {
+        inline_keyboard: [
+          ...items.slice(0, 30).map((i) => [{
+            text: `${i.available ? '✅' : '❌'} ${i.name_en} · ${i.price} Br`,
+            callback_data: `ib_toggle_${i.id}`,
+          }]),
+          [{ text: t('inBotBack', lang), callback_data: 'admin_list' }],
+        ],
+      },
+    }
+    return { text: t('menuItemsTitle', lang), kb }
+  }
+  if (view === 'cats') {
+    const items = await loadMenuItems()
+    const counts = {}
+    for (const i of items) counts[i.category] = (counts[i.category] || 0) + 1
+    const lines = MENU_CATEGORIES
+      .map((c) => `• ${c}: ${counts[c] || 0}`)
+      .concat(Object.keys(counts).filter((c) => !MENU_CATEGORIES.includes(c)).map((c) => `• ${c}: ${counts[c] || 0}`))
+      .join('\n')
+    return { text: `${t('categoriesTitle', lang)}\n\n${lines}`, kb: inBotMenuButtons(lang) }
+  }
+  if (view === 'sales') {
+    const { rows } = await pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now()))::int AS today_orders,
+         COALESCE(SUM(total) FILTER (WHERE created_at >= date_trunc('day', now()) AND status <> 'cancelled'), 0)::int AS today_rev,
+         COUNT(*) FILTER (WHERE created_at >= date_trunc('week', now()))::int AS week_orders,
+         COALESCE(SUM(total) FILTER (WHERE created_at >= date_trunc('week', now()) AND status <> 'cancelled'), 0)::int AS week_rev
+       FROM orders`
+    )
+    const s = rows[0] || {}
+    const text =
+      `${t('salesTitle', lang)}\n\n` +
+      `📅 ${t('salesToday', lang)}: ${s.today_orders || 0} ${t('salesOrders', lang)} · ${s.today_rev || 0} Br ${t('salesRevenue', lang)}\n` +
+      `🗓 ${t('salesWeek', lang)}: ${s.week_orders || 0} ${t('salesOrders', lang)} · ${s.week_rev || 0} Br ${t('salesRevenue', lang)}`
+    return { text, kb: inBotMenuButtons(lang) }
+  }
+  if (view === 'settings') {
+    const text =
+      `${t('settingsTitle', lang)}\n\n` +
+      `👤 ${t('settingsAdmins', lang)}: ${ADMIN_TELEGRAM_IDS.join(', ') || t('settingsNotSet', lang)}\n` +
+      `🔔 ${t('settingsStaff', lang)}: ${STAFF_CHAT_IDS.join(', ') || t('settingsNotSet', lang)}\n` +
+      `🌐 ${t('settingsWebapp', lang)}: ${WEBAPP_URL || t('settingsNotSet', lang)}\n` +
+      `💳 ${t('settingsPayment', lang)}: ${process.env.CHAPA_SECRET_KEY ? t('settingsPaymentLive', lang) : t('settingsPaymentMock', lang)}`
+    return { text, kb: inBotMenuButtons(lang) }
+  }
+  return null
 }
 
 function formatOrderReceipt(order) {
@@ -434,7 +657,7 @@ function buildOrderMessage(kind, order, lang, extras = {}) {
   const lines = []
   if (kind === 'alert') {
     lines.push(`🔔 ${sep} 🔔`)
-    lines.push(`${t('newOrderAlert', lang)} (#${order.id})`)
+    lines.push(`${t('newOrderAlert', lang)} (${orderCode(order.id)})`)
     lines.push(sep)
     const who = extras.username
       ? `@${extras.username}`
@@ -447,7 +670,7 @@ function buildOrderMessage(kind, order, lang, extras = {}) {
     lines.push(`🧾 ${sep} 🧾`)
     lines.push(t('receiptTitle', lang))
     lines.push(sep)
-    lines.push(`🎫 ${t('yourTicket', lang)}: #${order.id}`)
+    lines.push(`🎫 ${t('yourTicket', lang)}: ${orderCode(order.id)}`)
     if (extras.todaysCount != null) {
       lines.push(`📅 ${t('orderCountLabel', lang)}: ${extras.todaysCount}`)
     }
@@ -633,7 +856,7 @@ export async function startBot(io) {
         return
       }
       const lines = rows.map((r) =>
-        `#${r.id} · ${SERVICE_LABELS[r.service_type] || r.service_type} · ${r.total} Br · ${r.status} · ${new Date(r.created_at).toLocaleString()}`
+        `${orderCode(r.id)} · ${SERVICE_LABELS[r.service_type] || r.service_type} · ${r.total} Br · ${r.status} · ${new Date(r.created_at).toLocaleString()}`
       )
       bot.sendMessage(msg.chat.id, `${t('yourLastOrders', lang)}\n\n${lines.join('\n')}`)
     } catch (e) {
@@ -666,7 +889,7 @@ export async function startBot(io) {
         : r.status === 'ready' ? `${t('statusReady', lang)} ${readyText}`
         : r.status === 'cancelled' ? t('statusCancelled', lang)
         : `Status: ${r.status}`
-      bot.sendMessage(msg.chat.id, `Order #${r.id} ${statusLine}`)
+      bot.sendMessage(msg.chat.id, `Order ${orderCode(r.id)} ${statusLine}`)
     } catch (e) {
       console.error('[bot] /status failed:', e.message)
       bot.sendMessage(msg.chat.id, t('orderNotFound', lang))
@@ -785,19 +1008,65 @@ export async function startBot(io) {
 
     if (data === 'admin_list') {
       try {
+        const lang = await getUserLang(userId)
         const { rows } = await pool.query(
-          `SELECT id, customer_name, total, status FROM orders ORDER BY created_at DESC LIMIT 8`
+          `SELECT id, customer_name, total, status, items FROM orders ORDER BY created_at DESC LIMIT 8`
         )
         if (!rows.length) {
-          bot.sendMessage(chatId, t('adminNoOrders', 'en'))
+          bot.sendMessage(chatId, t('adminNoOrders', lang))
         } else {
-          const lines = rows.map((r) => `#${r.id} · ${r.customer_name} · ${r.total} Br · ${r.status}`)
-          bot.sendMessage(chatId, `${t('adminOrders', 'en')}\n\n${lines.join('\n')}`)
+          bot.sendMessage(chatId,
+            `🤖 ${t('adminOrders', lang)}\n\n${formatOrdersTable(rows)}`,
+            inBotMenuButtons(lang)
+          )
         }
       } catch (e) {
         console.error('[bot] admin_list failed:', e.message)
       }
       bot.answerCallbackQuery(cq.id)
+      return
+    }
+
+    // ── In-Bot management portal ─────────────────────────────────────
+    if (data?.startsWith('ib_')) {
+      try {
+        const lang = await getUserLang(userId)
+        if (data === 'ib_root') {
+          bot.sendMessage(chatId, t('inBotTitle', lang), inBotMenuButtons(lang))
+        } else if (/^ib_(items|cats|avail|sales|settings)$/.test(data)) {
+          // Keyboard buttons send short codes (ib_items…); map them to the
+          // ib_view_* convention the builder expects.
+          const v = await buildInBotView(data.slice('ib_'.length), lang)
+          if (v) bot.sendMessage(chatId, v.text, v.kb)
+        } else if (data.startsWith('ib_toggle_')) {
+          const itemId = data.slice('ib_toggle_'.length)
+          const { rows } = await pool.query(
+            `UPDATE menu_items SET available = NOT available, updated_at = now()
+              WHERE id = $1 RETURNING name_en, available`,
+            [itemId]
+          )
+          if (rows[0]) {
+            const r = rows[0]
+            bot.sendMessage(chatId,
+              `${r.name_en} ${r.available ? t('itemNowInStock', lang) : t('itemNowOutOfStock', lang)}`)
+            const v = await buildInBotView('items', lang)
+            if (v) bot.sendMessage(chatId, v.text, v.kb)
+          }
+        }
+      } catch (e) {
+        console.error('[bot] in-bot portal failed:', e.message)
+      }
+      bot.answerCallbackQuery(cq.id)
+      return
+    }
+
+    // Dismiss a staff notification card without changing the order
+    if (data?.startsWith('dismiss_')) {
+      const msgId = cq.message?.message_id
+      if (msgId) {
+        try { await bot.deleteMessage(chatId, msgId) } catch (_) { /* may be too old */ }
+      }
+      bot.answerCallbackQuery(cq.id, { text: t('alertDismissed', 'en') })
       return
     }
 
@@ -825,16 +1094,52 @@ export async function startBot(io) {
       }
       bot.answerCallbackQuery(cq.id, { text: `${t('marked', 'en')}: ${newStatus}` })
 
+      // Update the staff alert card in place: replace the status line and
+      // swap the buttons to reflect the new state (Started / Finished),
+      // with Cancel always styled and available for dismissal.
+      try {
+        const staffMsg = buildOrderMessage('alert', {
+          ...fullOrderForStaff({ items: updated.items || [], serviceType: updated.service_type, total: updated.total }, id),
+          status: newStatus,
+        }, await getUserLang(userId), {
+          username: updated.tg_username,
+          firstName: updated.tg_first_name,
+        })
+        const newKb = newStatus === 'preparing'
+          ? { reply_markup: { inline_keyboard: [
+              [{ text: `✅ ${t('markReady', 'en')}`, callback_data: `ready_${id}` }],
+              [{ text: `❌ ${t('cancelOrder', 'en')}`, callback_data: `dismiss_${id}` }],
+            ] } }
+          : newStatus === 'ready'
+          ? { reply_markup: { inline_keyboard: [
+              [{ text: `🍽️ ${t('finishedWord', 'en')}`, callback_data: `noop_${id}` }],
+              [{ text: `❌ ${t('cancelOrder', 'en')}`, callback_data: `dismiss_${id}` }],
+            ] } }
+          : { reply_markup: { inline_keyboard: [[{ text: `❌ ${t('cancelOrder', 'en')}`, callback_data: `dismiss_${id}` }]] } }
+        await bot.editMessageText(staffMsg, {
+          chat_id: chatId,
+          message_id: cq.message?.message_id,
+          ...newKb,
+        })
+      } catch (e) {
+        console.warn('[bot] alert card edit failed:', e.message)
+      }
+
       // Tell the customer their order status changed — in THEIR language
       const custLang = await getUserLang(updated.tg_user_id)
       const readyText = updated.service_type === 'delivery' ? t('statusReadyDelivery', custLang) : t('statusReadyPickup', custLang)
       let custMsg
-      if (newStatus === 'preparing') custMsg = `Order #${id} ${t('statusPreparing', custLang)}`
-      else if (newStatus === 'ready') custMsg = `Order #${id} ${t('statusReady', custLang)} ${readyText}`
-      else custMsg = `Order #${id} ${t('statusCancelled', custLang)}`
+      if (newStatus === 'preparing') custMsg = `Order ${orderCode(id)} ${t('statusPreparing', custLang)}`
+      else if (newStatus === 'ready') custMsg = `Order ${orderCode(id)} ${t('statusReady', custLang)} ${readyText}`
+      else custMsg = `Order ${orderCode(id)} ${t('statusCancelled', custLang)}`
       try { bot.sendMessage(updated.tg_user_id, custMsg) } catch (e) {
         console.warn(`[bot] customer status message failed for ${updated.tg_user_id}:`, e.message)
       }
+      return
+    }
+
+    if (data?.startsWith('noop_')) {
+      bot.answerCallbackQuery(cq.id)
       return
     }
 
@@ -960,10 +1265,10 @@ export function notifyStaff(order, payload, from = {}) {
         reply_markup: {
           inline_keyboard: [
             [
-              { text: t('startPreparing', lang), callback_data: `prep_${order.id}` },
-              { text: t('markReady', lang), callback_data: `ready_${order.id}` },
+              { text: `▶️ ${t('startPreparing', lang)}`, callback_data: `prep_${order.id}` },
+              { text: `🍽️ ${t('markReady', lang)}`, callback_data: `ready_${order.id}` },
             ],
-            [{ text: t('cancelOrder', lang), callback_data: `cancel_${order.id}` }],
+            [{ text: `❌ ${t('cancelOrder', lang)}`, callback_data: `cancel_${order.id}` }],
           ],
         },
       }

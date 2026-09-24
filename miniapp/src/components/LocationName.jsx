@@ -2,7 +2,12 @@ import React, { useEffect, useState } from 'react'
 import SmartCafeBg from './SmartCafeBg.jsx'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
-import { getT } from '../utils/i18n.js'
+import { useLang } from '../context/LangContext.jsx'
+
+// Order code format: #5 → MC-0005 (matches the bot and admin dashboard).
+function orderCode(orderId) {
+  return `MC-${String(orderId).padStart(4, '0')}`
+}
 
 /**
  * LocationName (Frame 7)
@@ -36,8 +41,8 @@ export default function LocationName({ bgProps }) {
     setCustomerLocation,
     successfulPayments,
   } = useCart()
-  const { tg, initData, hapticFeedback, userLanguage } = useTelegram()
-  const t = getT(userLanguage)
+  const { tg, initData, hapticFeedback } = useTelegram()
+  const { t } = useLang()
 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -133,7 +138,7 @@ export default function LocationName({ bgProps }) {
 
       // Show the in-app confirmation with the real ticket number, in the
       // language the user selected in the bot (via ?lang= from bot buttons).
-      const alertText = `${t('orderReceivedTitle')}\n\n${t('yourTicketIs').replace('{n}', data.orderId)}\n${t('checkChat')}`
+      const alertText = `${t('orderReceivedTitle')}\n\n${t('yourTicketIs').replace('{n}', orderCode(data.orderId))}\n${t('checkChat')}`
       if (tg?.showAlert) {
         tg.showAlert(alertText)
       } else {

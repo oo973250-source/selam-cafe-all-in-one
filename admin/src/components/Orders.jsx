@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api.js'
+import { orderCode } from '../orderCode.js'
 
 const STATUSES = ['new', 'preparing', 'ready', 'served', 'cancelled']
 
@@ -44,7 +45,7 @@ export default function Orders({ onOpenOrder }) {
         <table className="table">
           <thead>
             <tr>
-              <th>#</th>
+              <th>Code</th>
               <th>Customer</th>
               <th>Items</th>
               <th>Service</th>
@@ -63,7 +64,7 @@ export default function Orders({ onOpenOrder }) {
             )}
             {orders.map((o) => (
               <tr key={o.id} onClick={() => onOpenOrder(o.id)} style={{ cursor: 'pointer' }}>
-                <td><strong>#{o.id}</strong></td>
+                <td><strong>{orderCode(o.id)}</strong></td>
                 <td>
                   {o.customer_name}
                   <div style={{ fontSize: 11, color: '#888' }}>@{o.tg_username || '—'}</div>
