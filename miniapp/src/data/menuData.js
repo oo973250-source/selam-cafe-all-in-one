@@ -164,3 +164,83 @@ export function getAllCategoriesFlat() {
     ...menuData.drinks.categories.map((c) => ({ ...c, sectionKey: 'drinks' })),
   ]
 }
+
+/**
+ * Live menu sync
+ * --------------
+ * Fetches the DB-backed menu (GET /api/menu + /api/menu/categories) so items
+ * and categories added/edited/removed in the In-Bot admin portal or the web
+ * admin panel appear in the Mini App. Merges the server data over the static
+ * seed: matching category ids update names/items; server-only categories are
+ * appended under 'foods'; unavailable items are kept but flagged so the UI
+ * can grey them out. On any fetch failure the bundled static menu is used.
+ */
+export async function syncMenuFromServer() {
+  try {
+    const [itemsRes, catsRes] = await Promise.all([
+      fetch('/api/menu').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch('/api/menu/categories').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ])
+    const serverItems = itemsRes?.items
+    if (!Array.isArray(serverItems) || serverItems.length === 0) return menuData
+
+    const serverCats = Array.isArray(catsRes?.categories) ? catsRes.categories : []
+    const catMeta = new Map(serverCats.map((c) => [c.id, c]))
+
+    // Group server items by category
+    const byCat = new Map()
+    for (const it of serverItems) {
+      if (!byCat.has(it.category)) byCat.set(it.category, [])
+      byCat.get(it.category).push({
+        id: it.id,
+        nameEn: it.name_en,
+        nameAm: it.name_am || it.name_en,
+        price: Number(it.price) || 0,
+        available: it.available !== false,
+      })
+    }
+
+    const toCategory = (catId) => {
+      const meta = catMeta.get(catId)
+      return {
+        id: catId,
+        nameEn: meta?.name_en || catId.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()),
+        nameAm: meta?.name_am || '',
+        icon: meta?.icon || '🍽️',
+        mealTimes: ['all', 'breakfast', 'lunch', 'dinner', 'snacks'],
+        items: (byCat.get(catId) || []).map((i) => ({ ...i, available: i.available })),
+      }
+    }
+
+    // Update existing static categories that exist on the server; append
+    // server-only categories under 'foods'.
+    const existing = new Set()
+    for (const section of [menuData.foods, menuData.drinks]) {
+      for (let idx = 0; idx < section.categories.length; idx++) {
+        const cat = section.categories[idx]
+        if (byCat.has(cat.id)) {
+          existing.add(cat.id)
+          const meta = catMeta.get(cat.id)
+          section.categories[idx] = {
+            ...cat,
+            nameEn: meta?.name_en || cat.nameEn,
+            nameAm: meta?.name_am || cat.nameAm,
+            items: (byCat.get(cat.id) || []).map((i) => ({
+              id: i.id,
+              nameEn: i.nameEn,
+              nameAm: i.nameAm,
+              price: i.price,
+              available: i.available,
+            })),
+          }
+        }
+      }
+    }
+    for (const catId of byCat.keys()) {
+      if (!existing.has(catId)) menuData.foods.categories.push(toCategory(catId))
+    }
+    return menuData
+  } catch {
+    return menuData
+  }
+}

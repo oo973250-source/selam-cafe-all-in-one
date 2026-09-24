@@ -10,6 +10,20 @@ import { requireAuth, requireRole } from '../middleware/auth.js'
 
 const router = Router()
 
+// Public — categories (id, name_en, name_am, icon, sort_order) so the Mini App
+// mirrors whatever categories the admin creates/edits in the In-Bot portal.
+router.get('/categories', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name_en, name_am, icon, sort_order FROM menu_categories ORDER BY sort_order, name_en`
+    )
+    res.json({ categories: rows })
+  } catch (e) {
+    console.error('[menu] categories list failed:', e.message)
+    res.status(503).json({ error: 'menu unavailable', categories: [] })
+  }
+})
+
 // Public — used by the customer-facing Mini App to load the menu
 router.get('/', async (req, res) => {
   const { category, available } = req.query

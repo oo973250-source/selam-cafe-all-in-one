@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import CafeLogo from './CafeLogo.jsx'
-import { menuData } from '../data/menuData.js'
+import { menuData, syncMenuFromServer } from '../data/menuData.js'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
 import { useLang } from '../context/LangContext.jsx'
@@ -70,6 +70,19 @@ export default function MainMenu({ onAdvance, bgProps }) {
   const { hapticFeedback } = useTelegram()
   const { t, lang: userLanguage } = useLang()
   const [activeMeal, setActiveMeal] = useState('all')
+  // Live menu sync: bump a version counter when the DB-backed menu arrives so
+  // category lists re-render. Items/categories edited in the In-Bot admin
+  // portal or web admin panel then appear in the Mini App.
+  const [menuVersion, setMenuVersion] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    syncMenuFromServer().then(() => {
+      if (!cancelled) setMenuVersion((v) => v + 1)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
   // Two-tap pattern: 1st tap expands the pill to show full category name,
   // 2nd tap on the same pill confirms selection and advances to Frame 3.
   // Tapping a different pill collapses the previous one and expands the new.
@@ -94,11 +107,11 @@ export default function MainMenu({ onAdvance, bgProps }) {
   }
   const foodCats = useMemo(
     () => menuData.foods.categories.filter(filterByMeal),
-    [activeMeal]
+    [activeMeal, menuVersion]
   )
   const drinkCats = useMemo(
     () => menuData.drinks.categories.filter(filterByMeal),
-    [activeMeal]
+    [activeMeal, menuVersion]
   )
 
   // Resolve localized category name based on user language.
