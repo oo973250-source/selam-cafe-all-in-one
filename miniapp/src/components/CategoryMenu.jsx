@@ -104,11 +104,18 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
           {categoryItems.map((item, i) => {
             const qty = getQty(item.id)
             const has = qty > 0
+            // Admin availability toggle (In-Bot portal / web panel): when an
+            // item is out of stock the plus button is disabled and a badge
+            // shows instead of the stepper.
+            const inStock = item.available !== false
             return (
               <div
                 key={item.id}
                 className={`item-row anim-slideInUp ${has ? 'has-qty' : ''}`}
-                style={{ animationDelay: `${i * 80}ms` }}
+                style={{
+                  animationDelay: `${i * 80}ms`,
+                  opacity: inStock ? undefined : 0.45,
+                }}
               >
                 <div className="item-info">
                   <div className="item-name-en">{item.nameEn}</div>
@@ -118,6 +125,12 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
                 <div className="item-price">{item.price} Br</div>
 
                 <div className="qty-stepper">
+                  {!inStock ? (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-red, #c44536)' }}>
+                      Out of stock
+                    </span>
+                  ) : (
+                    <>
                   {has && (
                     <button
                       type="button"
@@ -148,6 +161,8 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
                   >
                     +
                   </button>
+                    </>
+                  )}
                 </div>
               </div>
             )
