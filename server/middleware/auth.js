@@ -8,7 +8,9 @@ import jwt from 'jsonwebtoken'
 import 'dotenv/config'
 
 const JWT_SECRET = process.env.JWT_SECRET
-const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d'
+// Long-lived session: the admin authenticates once and stays signed in for
+// 30 days (matches the cookie maxAge in routes/auth.js) unless they log out.
+const JWT_EXPIRY = process.env.JWT_EXPIRY || '30d'
 
 // Warn instead of crashing the whole process at import time — the server
 // should still boot (health, miniapp, menu) even if JWT_SECRET is missing;

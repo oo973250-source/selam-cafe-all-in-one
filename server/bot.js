@@ -186,6 +186,24 @@ const T = {
     adminUnauthorized: 'You are not authorised to use admin commands.',
     newOrder: 'NEW ORDER',
     newOrderAlert: 'NEW ORDER ALERT',
+    recentOrders: 'Recent 4 Orders',
+    pickCategory: 'Pick a category to see its items:',
+    noItemsInCat: 'No items in this category yet.',
+    editPrice: 'Edit price',
+    editTitle: 'Edit title',
+    editDesc: 'Edit description',
+    setAvailable: 'Set Available',
+    setUnavailable: 'Set Unavailable',
+    addCategory: 'Add category',
+    renameCategory: 'Rename',
+    deleteCategory: 'Delete category',
+    categoryDeleted: 'Category deleted',
+    sendNewPrice: '💰 Send the new price (numbers only), e.g. 45',
+    sendNewTitle: '✏️ Send the new item title:',
+    sendNewDesc: '📝 Send the new description:',
+    sendNewCategory: '➕ Send the new category name (English):',
+    sendNewCategoryName: '✏️ Send the new category name:',
+    tapToToggle: 'Tap an item to flip availability:',
     from: 'From',
     startPreparing: 'Start preparing',
     markReady: 'Mark ready',
@@ -286,6 +304,24 @@ const T = {
     adminUnauthorized: 'የአስተዳደር ትዕዛዞችን ለመጠቀም ፈቃድ የለዎትም።',
     newOrder: 'አዲስ ትዕዛዝ',
     newOrderAlert: 'አዲስ ትዕዛዝ ማሳወቂያ',
+    recentOrders: 'የመጨረሻ 4 ትዕዛዞች',
+    pickCategory: 'እቃዎቹን ለማየት ምድብ ይምረጡ:',
+    noItemsInCat: 'በዚህ ምድብ ውስጥ እቃ የለም።',
+    editPrice: 'ዋጋ ቀይር',
+    editTitle: 'ርዕስ ቀይር',
+    editDesc: 'መግለጫ ቀይር',
+    setAvailable: 'አለ አድርግ',
+    setUnavailable: 'የለም አድርግ',
+    addCategory: 'ምድብ ጨምር',
+    renameCategory: 'ስም ቀይር',
+    deleteCategory: 'ምድብ ሰርዝ',
+    categoryDeleted: 'ምድቡ ተሰርዟል',
+    sendNewPrice: '💰 አዲሱን ዋጋ ላክ (ቁጥር ብቻ)፣ ለምሳሌ 45',
+    sendNewTitle: '✏️ አዲሱን የእቃ ስም ላክ:',
+    sendNewDesc: '📝 አዲሱን መግለጫ ላክ:',
+    sendNewCategory: '➕ የአዲሱ ምድብ ስም ላክ (እንግሊዝኛ):',
+    sendNewCategoryName: '✏️ አዲሱን የምድብ ስም ላክ:',
+    tapToToggle: 'መኖሩን ለመቀየር እቃውን ይንኩ:',
     from: 'ከ',
     startPreparing: 'ማዘጋጀት ጀምር',
     markReady: 'ዝግጁ አድርግ',
@@ -405,6 +441,24 @@ const T = {
     adminUnauthorized: 'Ajjaja bulchaa itti fayyadamuuf hayyama hin qabdu.',
     newOrder: 'AJAJA HAARAA',
     newOrderAlert: 'AJAJA HAARAA BEEKSISA',
+    recentOrders: 'Ajaja 4 dhiyoo',
+    pickCategory: 'Meeshaalee arguuf ramaddii filadhu:',
+    noItemsInCat: 'Ramaddii kana keessatti meeshaa hin jiru.',
+    editPrice: 'Gatii jijjiiri',
+    editTitle: 'Mata dureen jijjiiri',
+    editDesc: 'Ibsa jijjiiri',
+    setAvailable: 'Jira godhi',
+    setUnavailable: 'Hin jiru godhi',
+    addCategory: 'Ramaddii dabalii',
+    renameCategory: 'Maqaa jijjiiri',
+    deleteCategory: 'Ramaddii haqi',
+    categoryDeleted: 'Ramaddiin haqameera',
+    sendNewPrice: '💰 Gatii haaraa ergi (lakkoofsaa qofa), fkn 45',
+    sendNewTitle: '✏️ Maqaa meeshaa haaraa ergi:',
+    sendNewDesc: '📝 Ibsa haaraa ergi:',
+    sendNewCategory: '➕ Maqaa ramaddii haaraa ergi (Ingliffaa):',
+    sendNewCategoryName: '✏️ Maqaa ramaddii haaraa ergi:',
+    tapToToggle: 'Jirutta jijjiiruuf meeshaa tuqi:',
     from: 'Garga',
     startPreparing: 'Qopheessuu Jalqabi',
     receiptTitle: 'RASIISAA AJAJAA',
@@ -487,107 +541,304 @@ function adminMenuButtons(lang = 'en') {
   }
 }
 
-// ── In-Bot management portal keyboard ────────────────────────────────
-function inBotMenuButtons(lang = 'en') {
-  return {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: t('inBotMenuItems', lang), callback_data: 'ib_items' },
-         { text: t('inBotCategories', lang), callback_data: 'ib_cats' }],
-        [{ text: t('inBotAvailability', lang), callback_data: 'ib_avail' },
-         { text: t('inBotSales', lang), callback_data: 'ib_sales' }],
-        [{ text: t('inBotSettings', lang), callback_data: 'ib_settings' }],
+// ── In-Bot management portal (single-message, in-place navigation) ───
+// Every admin view renders { text, keyboard } and ALL navigation edits
+// the SAME message (editMessageText) — zero chat clutter, universal Back.
+const ADMIN_MAIN_KB = (lang) => ({
+  reply_markup: {
+    inline_keyboard: [
+      [
+        { text: '🕐 ' + t('recentOrders', lang), callback_data: 'ib_recent' },
+        { text: '📦 ' + t('inBotMenuItems', lang), callback_data: 'ib_items' },
       ],
-    },
-  }
-}
+      [
+        { text: '🗂 ' + t('inBotCategories', lang), callback_data: 'ib_cats' },
+        { text: '🔄 ' + t('inBotAvailability', lang), callback_data: 'ib_avail' },
+      ],
+      [
+        { text: '📊 ' + t('inBotSales', lang), callback_data: 'ib_sales' },
+        { text: '⚙️ ' + t('inBotSettings', lang), callback_data: 'ib_settings' },
+      ],
+    ],
+  },
+})
 
-const MENU_CATEGORIES = ['breakfast', 'hot_drinks', 'drinks', 'snacks']
+const ADMIN_MAIN_TEXT = (lang) => `🤖 ${t('inBotTitle', lang)}`
+
+const backBtn = (lang, to = 'ib_root') => ({ text: '⬅️ ' + t('inBotBack', lang), callback_data: to })
+
+async function loadCategories() {
+  const { rows } = await pool.query(
+    `SELECT c.*, (SELECT COUNT(*)::int FROM menu_items m WHERE m.category = c.id) AS item_count
+       FROM menu_categories c ORDER BY c.sort_order, c.name_en`
+  )
+  return rows
+}
 
 async function loadMenuItems(availableOnly = false) {
   const { rows } = await pool.query(
-    `SELECT id, category, name_en, name_am, price, available
+    `SELECT id, category, name_en, name_am, price, description, available
        FROM menu_items ${availableOnly ? 'WHERE available = TRUE' : ''}
       ORDER BY category, sort_order, name_en`
   )
   return rows
 }
 
-// Recent orders as a clean aligned table: Name | Code | Price | Item
+function esc2(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function fmtMoney(n) {
+  return Number(n || 0).toLocaleString('en-US')
+}
+
+function padR(s, n) { s = String(s); return s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length) }
+function padL(s, n) { s = String(s); return s.length >= n ? s.slice(0, n) : ' '.repeat(n - s.length) + s }
+
+// Recent orders table: Name | Code | Price | Item (HTML <pre>, monospace)
 function formatOrdersTable(rows) {
-  const pad = (s, n) => {
-    s = String(s)
-    return s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length)
-  }
-  const padL = (s, n) => {
-    s = String(s)
-    return s.length >= n ? s.slice(0, n) : ' '.repeat(n - s.length) + s
-  }
-  const header =
-    `${pad('Name', 16)} ${pad('Code', 8)} ${padL('Price', 7)} Item`
+  const W_NAME = 14, W_CODE = 8, W_PRICE = 7
+  const header = `${padR('Name', W_NAME)} ${padR('Code', W_CODE)} ${padL('Price', W_PRICE)} Item`
+  const divider = '-'.repeat(52)
   const lines = rows.map((r) => {
     const items = Array.isArray(r.items) ? r.items : []
     const itemSummary = items.length
       ? items.map((i) => `${i.quantity}x ${i.nameEn || i.id || '?'}`).join(', ')
       : '—'
-    return `${pad(r.customer_name || '—', 16)} ${pad(orderCode(r.id), 8)} ${padL(r.total, 7)} ${itemSummary}`
+    return `${padR(r.customer_name || '—', W_NAME)} ${padR(orderCode(r.id), W_CODE)} ${padL(r.total, W_PRICE)} ${esc2(itemSummary)}`
   })
-  return [header, '-'.repeat(Math.max(header.length, 30)), ...lines].join('\n')
+  return `<pre>${[divider, header, divider, ...lines, divider].join('\n')}</pre>`
 }
 
-async function buildInBotView(view, lang) {
-  if (view === 'items' || view === 'avail') {
-    const items = await loadMenuItems()
-    if (!items.length) return { text: t('adminNoOrders', lang), kb: inBotMenuButtons(lang) }
-    const kb = {
-      reply_markup: {
-        inline_keyboard: [
-          ...items.slice(0, 30).map((i) => [{
-            text: `${i.available ? '✅' : '❌'} ${i.name_en} · ${i.price} Br`,
-            callback_data: `ib_toggle_${i.id}`,
-          }]),
-          [{ text: t('inBotBack', lang), callback_data: 'admin_list' }],
-        ],
+// ASCII grid sales summary (HTML <pre>, monospace) — today/week/month.
+function formatSalesTable(s) {
+  const rows = [
+    ["Today's Orders", s.today_orders, s.today_rev],
+    ['Weekly Summary', s.week_orders, s.week_rev],
+    ['Monthly Total', s.month_orders, s.month_rev],
+  ]
+  const W1 = 18, W2 = 7, W3 = 12
+  const sep = `+${'-'.repeat(W1 + 2)}+${'-'.repeat(W2 + 2)}+${'-'.repeat(W3 + 2)}+`
+  const fmt = (metric, count, rev) =>
+    `| ${padR(metric, W1)} | ${padL(fmtMoney(count), W2)} | ${padL('ETB ' + fmtMoney(rev), W3)} |`
+  return (
+    `<pre>${[sep, fmt('Metric', 'Count', 'Revenue'), sep, ...rows.map((r) => fmt(...r)), sep].join('\n')}</pre>`
+  )
+}
+
+// ── View builders: each returns { text, kb } for the active message ──
+async function buildAdminView(view, lang, param = null) {
+  const back = (to = 'ib_root') => ({ reply_markup: { inline_keyboard: [[backBtn(lang, to)]] } })
+
+  if (view === 'root') {
+    return { text: ADMIN_MAIN_TEXT(lang), kb: ADMIN_MAIN_KB(lang) }
+  }
+
+  if (view === 'recent') {
+    const { rows } = await pool.query(
+      `SELECT id, customer_name, total, status, items FROM orders ORDER BY created_at DESC LIMIT 4`
+    )
+    const body = rows.length
+      ? formatOrdersTable(rows)
+      : esc2(t('adminNoOrders', lang))
+    return {
+      text: `🕐 ${t('recentOrders', lang)}\n\n${body}`,
+      kb: { reply_markup: { inline_keyboard: [[backBtn(lang)]] } },
+    }
+  }
+
+  // Menu Items → list of categories → items inside that category
+  if (view === 'items') {
+    const cats = await loadCategories()
+    if (!cats.length) {
+      return { text: t('menuItemsTitle', lang), kb: back() }
+    }
+    return {
+      text: `📦 ${t('inBotMenuItems', lang)}\n\n${t('pickCategory', lang)}`,
+      kb: {
+        reply_markup: {
+          inline_keyboard: [
+            ...cats.map((c) => [{
+              text: `${c.icon} ${c.name_en} (${c.item_count})`,
+              callback_data: `ib_catitems_${c.id}`,
+            }]),
+            [backBtn(lang)],
+          ],
+        },
       },
     }
-    return { text: t('menuItemsTitle', lang), kb }
   }
-  if (view === 'cats') {
+
+  if (view === 'catitems') {
     const items = await loadMenuItems()
-    const counts = {}
-    for (const i of items) counts[i.category] = (counts[i.category] || 0) + 1
-    const lines = MENU_CATEGORIES
-      .map((c) => `• ${c}: ${counts[c] || 0}`)
-      .concat(Object.keys(counts).filter((c) => !MENU_CATEGORIES.includes(c)).map((c) => `• ${c}: ${counts[c] || 0}`))
-      .join('\n')
-    return { text: `${t('categoriesTitle', lang)}\n\n${lines}`, kb: inBotMenuButtons(lang) }
+    const inCat = items.filter((i) => i.category === param)
+    const cat = (await loadCategories()).find((c) => c.id === param)
+    if (!inCat.length) {
+      return {
+        text: `${cat ? `${cat.icon} ${esc2(cat.name_en)}` : esc2(param)}\n\n${esc2(t('noItemsInCat', lang))}`,
+        kb: { reply_markup: { inline_keyboard: [[backBtn(lang, 'ib_items')]] } },
+      }
+    }
+    return {
+      text: `${cat ? `${cat.icon} ${esc2(cat.name_en)}` : esc2(param)} — ${t('menuItemsTitle', lang)}`,
+      kb: {
+        reply_markup: {
+          inline_keyboard: [
+            ...inCat.slice(0, 25).map((i) => [{
+              text: `${i.available ? '✅' : '❌'} ${i.name_en} · ${i.price} Br`,
+              callback_data: `ib_item_${i.id}`,
+            }]),
+            [backBtn(lang, 'ib_items')],
+          ],
+        },
+      },
+    }
   }
+
+  // Item detail: edit price / title / description / availability
+  if (view === 'item') {
+    const { rows } = await pool.query(`SELECT * FROM menu_items WHERE id = $1`, [param])
+    const i = rows[0]
+    if (!i) return { text: esc2(t('orderNotFoundAdmin', lang)), kb: back('ib_items') }
+    return {
+      text:
+        `📦 <b>${esc2(i.name_en)}</b>${i.name_am ? ` (${esc2(i.name_am)})` : ''}\n` +
+        `💰 ${i.price} Br\n` +
+        (i.description ? `📝 ${esc2(i.description)}\n` : '') +
+        `${i.available ? '✅ Available' : '❌ Unavailable'}`,
+      kb: {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: `💰 ${t('editPrice', lang)}`, callback_data: `ib_editprice_${i.id}` },
+             { text: `✏️ ${t('editTitle', lang)}`, callback_data: `ib_edittitle_${i.id}` }],
+            [{ text: `📝 ${t('editDesc', lang)}`, callback_data: `ib_editdesc_${i.id}` },
+             { text: i.available ? `❌ ${t('setUnavailable', lang)}` : `✅ ${t('setAvailable', lang)}`, callback_data: `ib_toggle_${i.id}` }],
+            [backBtn(lang, `ib_catitems_${i.category}`)],
+          ],
+        },
+      },
+    }
+  }
+
+  // Categories: list with add / rename / delete
+  if (view === 'cats') {
+    const cats = await loadCategories()
+    return {
+      text: `🗂 ${t('inBotCategories', lang)}`,
+      kb: {
+        reply_markup: {
+          inline_keyboard: [
+            ...cats.map((c) => [{
+              text: `${c.icon} ${c.name_en} (${c.item_count})`,
+              callback_data: `ib_cat_${c.id}`,
+            }]),
+            [{ text: `➕ ${t('addCategory', lang)}`, callback_data: 'ib_addcat' }],
+            [backBtn(lang)],
+          ],
+        },
+      },
+    }
+  }
+
+  if (view === 'cat') {
+    const cats = await loadCategories()
+    const c = cats.find((x) => x.id === param)
+    if (!c) return { text: esc2(t('orderNotFoundAdmin', lang)), kb: back('ib_cats') }
+    return {
+      text: `🗂 <b>${esc2(c.name_en)}</b>${c.name_am ? ` (${esc2(c.name_am)})` : ''} · ${c.item_count} ${t('items', lang)}`,
+      kb: {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: `✏️ ${t('renameCategory', lang)}`, callback_data: `ib_renamecat_${c.id}` }],
+            [{ text: `🗑 ${t('deleteCategory', lang)}`, callback_data: `ib_delcat_${c.id}` }],
+            [backBtn(lang, 'ib_cats')],
+          ],
+        },
+      },
+    }
+  }
+
+  // Availability quick-toggle list
+  if (view === 'avail') {
+    const items = await loadMenuItems()
+    if (!items.length) return { text: t('menuItemsTitle', lang), kb: back() }
+    return {
+      text: `🔄 ${t('inBotAvailability', lang)}\n\n${t('tapToToggle', lang)}`,
+      kb: {
+        reply_markup: {
+          inline_keyboard: [
+            ...items.slice(0, 30).map((i) => [{
+              text: `${i.available ? '✅' : '❌'} ${i.name_en} · ${i.price} Br`,
+              callback_data: `ib_toggle_${i.id}`,
+            }]),
+            [backBtn(lang)],
+          ],
+        },
+      },
+    }
+  }
+
   if (view === 'sales') {
     const { rows } = await pool.query(
       `SELECT
          COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now()))::int AS today_orders,
          COALESCE(SUM(total) FILTER (WHERE created_at >= date_trunc('day', now()) AND status <> 'cancelled'), 0)::int AS today_rev,
          COUNT(*) FILTER (WHERE created_at >= date_trunc('week', now()))::int AS week_orders,
-         COALESCE(SUM(total) FILTER (WHERE created_at >= date_trunc('week', now()) AND status <> 'cancelled'), 0)::int AS week_rev
+         COALESCE(SUM(total) FILTER (WHERE created_at >= date_trunc('week', now()) AND status <> 'cancelled'), 0)::int AS week_rev,
+         COUNT(*) FILTER (WHERE created_at >= date_trunc('month', now()))::int AS month_orders,
+         COALESCE(SUM(total) FILTER (WHERE created_at >= date_trunc('month', now()) AND status <> 'cancelled'), 0)::int AS month_rev
        FROM orders`
     )
     const s = rows[0] || {}
-    const text =
-      `${t('salesTitle', lang)}\n\n` +
-      `📅 ${t('salesToday', lang)}: ${s.today_orders || 0} ${t('salesOrders', lang)} · ${s.today_rev || 0} Br ${t('salesRevenue', lang)}\n` +
-      `🗓 ${t('salesWeek', lang)}: ${s.week_orders || 0} ${t('salesOrders', lang)} · ${s.week_rev || 0} Br ${t('salesRevenue', lang)}`
-    return { text, kb: inBotMenuButtons(lang) }
+    return {
+      text: `📊 ${t('salesTitle', lang)}\n\n${formatSalesTable(s)}`,
+      kb: { reply_markup: { inline_keyboard: [[backBtn(lang)]] } },
+    }
   }
+
   if (view === 'settings') {
     const text =
-      `${t('settingsTitle', lang)}\n\n` +
+      `⚙️ ${t('settingsTitle', lang)}\n\n` +
       `👤 ${t('settingsAdmins', lang)}: ${ADMIN_TELEGRAM_IDS.join(', ') || t('settingsNotSet', lang)}\n` +
       `🔔 ${t('settingsStaff', lang)}: ${STAFF_CHAT_IDS.join(', ') || t('settingsNotSet', lang)}\n` +
       `🌐 ${t('settingsWebapp', lang)}: ${WEBAPP_URL || t('settingsNotSet', lang)}\n` +
       `💳 ${t('settingsPayment', lang)}: ${process.env.CHAPA_SECRET_KEY ? t('settingsPaymentLive', lang) : t('settingsPaymentMock', lang)}`
-    return { text, kb: inBotMenuButtons(lang) }
+    return { text, kb: { reply_markup: { inline_keyboard: [[backBtn(lang)]] } } }
   }
+
   return null
+}
+
+// The chat-id → active admin message-id map. Every admin navigation edits
+// THIS message instead of sending a new one (zero chat clutter).
+const adminActiveMsg = new Map() // chatId -> message_id
+// userId -> { field, itemId, chatId } — awaiting a typed value for admin edits
+const editAwait = new Map()
+
+async function renderAdminView(chatId, view, lang, param = null) {
+  const v = await buildAdminView(view, lang, param)
+  if (!v) return
+  const msgId = adminActiveMsg.get(chatId)
+  if (msgId) {
+    try {
+      await bot.editMessageText(v.text, {
+        chat_id: chatId,
+        message_id: msgId,
+        parse_mode: 'HTML',
+        ...v.kb,
+      })
+      return
+    } catch (e) {
+      // "message is not modified" is harmless; anything else → fall back
+      if (!/message is not modified/i.test(e.message)) {
+        console.warn('[bot] editMessageText failed, sending new:', e.message)
+      } else {
+        return
+      }
+    }
+  }
+  const sent = await bot.sendMessage(chatId, v.text, { parse_mode: 'HTML', ...v.kb })
+  adminActiveMsg.set(chatId, sent.message_id)
 }
 
 function formatOrderReceipt(order) {
@@ -811,6 +1062,46 @@ export async function startBot(io) {
   // (the inline button just re-shows the code as a popup for easy copying).
   bot.on('message', async (msg) => {
     const text = (msg.text || '').trim()
+
+    // ── Admin edit prompts: value typed after an "Edit price/title/…"
+    //    button. Applies the change, then re-renders the admin portal
+    //    message in place. ──────────────────────────────────────────
+    const awaiting = editAwait.get(msg.from.id)
+    if (awaiting && !text.startsWith('/')) {
+      editAwait.delete(msg.from.id)
+      try {
+        const lang = await getUserLang(msg.from.id)
+        if (awaiting.field === 'price') {
+          const price = parseInt(text.replace(/[^0-9]/g, ''), 10)
+          if (!Number.isFinite(price) || price <= 0) {
+            bot.sendMessage(msg.chat.id, t('sendNewPrice', lang))
+            return
+          }
+          await pool.query(`UPDATE menu_items SET price = $1, updated_at = now() WHERE id = $2`, [price, awaiting.itemId])
+        } else if (awaiting.field === 'name_en') {
+          await pool.query(`UPDATE menu_items SET name_en = $1, updated_at = now() WHERE id = $2`, [text.slice(0, 120), awaiting.itemId])
+        } else if (awaiting.field === 'description') {
+          await pool.query(`UPDATE menu_items SET description = $1, updated_at = now() WHERE id = $2`, [text.slice(0, 500), awaiting.itemId])
+        } else if (awaiting.field === 'newcat') {
+          const id = text.toLowerCase().replace(/[^a-z0-9_]+/g, '_').slice(0, 40) || `cat_${Date.now()}`
+          await pool.query(
+            `INSERT INTO menu_categories (id, name_en, sort_order)
+             VALUES ($1, $2, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM menu_categories))
+             ON CONFLICT (id) DO NOTHING`,
+            [id, text.slice(0, 60)]
+          )
+        } else if (awaiting.field === 'renamecat') {
+          await pool.query(`UPDATE menu_categories SET name_en = $1 WHERE id = $2`, [text.slice(0, 60), awaiting.itemId])
+        }
+        bot.sendMessage(msg.chat.id, '✅ ' + t('marked', lang))
+        // Re-render the portal message in place (root menu as fallback).
+        await renderAdminView(msg.chat.id, awaiting.itemId && awaiting.field !== 'newcat' && awaiting.field !== 'renamecat' ? 'item' : (awaiting.field === 'newcat' || awaiting.field === 'renamecat' ? 'cats' : 'item'), lang, awaiting.itemId)
+      } catch (e) {
+        console.error('[bot] admin edit failed:', e.message)
+      }
+      return
+    }
+
     if (!/^\d{6}$/.test(text)) return
     const lang = await getUserLang(msg.from.id)
     const pending = consumeLoginCode(text)
@@ -896,14 +1187,17 @@ export async function startBot(io) {
     }
   })
 
-  // ── /admin — admin panel + recent orders (admins only) ───────────────
+  // ── /admin — admin panel (admins only); one persistent message, all
+  // navigation edits it in place. ──────────────────────────────────────
   bot.onText(/\/admin$/, async (msg) => {
     const lang = await getUserLang(msg.from.id)
     if (!isAdmin(msg.from.id)) {
       bot.sendMessage(msg.chat.id, t('adminUnauthorized', lang))
       return
     }
-    bot.sendMessage(msg.chat.id, t('adminPanel', lang), adminMenuButtons(lang))
+    // A new /admin starts a fresh single-message session.
+    adminActiveMsg.delete(msg.chat.id)
+    await renderAdminView(msg.chat.id, 'root', lang)
   })
 
   // ── web_app_data — order received from miniapp (keyboard-button launches)
@@ -1027,17 +1321,24 @@ export async function startBot(io) {
       return
     }
 
-    // ── In-Bot management portal ─────────────────────────────────────
+    // ── In-Bot admin portal (in-place navigation; legacy entry) ─────
     if (data?.startsWith('ib_')) {
       try {
         const lang = await getUserLang(userId)
-        if (data === 'ib_root') {
-          bot.sendMessage(chatId, t('inBotTitle', lang), inBotMenuButtons(lang))
-        } else if (/^ib_(items|cats|avail|sales|settings)$/.test(data)) {
-          // Keyboard buttons send short codes (ib_items…); map them to the
-          // ib_view_* convention the builder expects.
-          const v = await buildInBotView(data.slice('ib_'.length), lang)
-          if (v) bot.sendMessage(chatId, v.text, v.kb)
+        // Track the active admin message so navigation edits in place.
+        if (!adminActiveMsg.has(chatId) && cq.message?.message_id) {
+          adminActiveMsg.set(chatId, cq.message.message_id)
+        }
+        if (data === 'ib_root' || data === 'admin_list') {
+          await renderAdminView(chatId, 'root', lang)
+        } else if (/^ib_(recent|items|cats|avail|sales|settings)$/.test(data)) {
+          await renderAdminView(chatId, data.slice('ib_'.length), lang)
+        } else if (data.startsWith('ib_catitems_')) {
+          await renderAdminView(chatId, 'catitems', lang, data.slice('ib_catitems_'.length))
+        } else if (data.startsWith('ib_cat_')) {
+          await renderAdminView(chatId, 'cat', lang, data.slice('ib_cat_'.length))
+        } else if (data.startsWith('ib_item_')) {
+          await renderAdminView(chatId, 'item', lang, data.slice('ib_item_'.length))
         } else if (data.startsWith('ib_toggle_')) {
           const itemId = data.slice('ib_toggle_'.length)
           const { rows } = await pool.query(
@@ -1046,12 +1347,48 @@ export async function startBot(io) {
             [itemId]
           )
           if (rows[0]) {
-            const r = rows[0]
-            bot.sendMessage(chatId,
-              `${r.name_en} ${r.available ? t('itemNowInStock', lang) : t('itemNowOutOfStock', lang)}`)
-            const v = await buildInBotView('items', lang)
-            if (v) bot.sendMessage(chatId, v.text, v.kb)
+            bot.answerCallbackQuery(cq.id, {
+              text: `${rows[0].name_en} ${rows[0].available ? t('itemNowInStock', lang) : t('itemNowOutOfStock', lang)}`,
+            })
+            const v = await buildAdminView('item', lang, itemId)
+            try {
+              await bot.editMessageText(v.text, {
+                chat_id: chatId,
+                message_id: adminActiveMsg.get(chatId),
+                parse_mode: 'HTML',
+                ...v.kb,
+              })
+            } catch (_) { /* not modified — fine */ }
           }
+          bot.answerCallbackQuery(cq.id)
+          return
+        } else if (/^ib_(editprice|edittitle|editdesc)_/.test(data)) {
+          const kind = data.slice('ib_'.length).split('_')[0]
+          const itemId = data.slice(('ib_' + kind + '_').length)
+          const fieldMap = { editprice: 'price', edittitle: 'name_en', editdesc: 'description' }
+          const field = fieldMap[kind]
+          const prompts = { price: t('sendNewPrice', lang), name_en: t('sendNewTitle', lang), description: t('sendNewDesc', lang) }
+          editAwait.set(userId, { field, itemId, chatId })
+          await bot.sendMessage(chatId, prompts[field])
+          bot.answerCallbackQuery(cq.id)
+          return
+        } else if (data === 'ib_addcat') {
+          editAwait.set(userId, { field: 'newcat', chatId })
+          await bot.sendMessage(chatId, t('sendNewCategory', lang))
+          bot.answerCallbackQuery(cq.id)
+          return
+        } else if (data.startsWith('ib_renamecat_')) {
+          const catId = data.slice('ib_renamecat_'.length)
+          editAwait.set(userId, { field: 'renamecat', itemId: catId, chatId })
+          await bot.sendMessage(chatId, t('sendNewCategoryName', lang))
+          bot.answerCallbackQuery(cq.id)
+          return
+        } else if (data.startsWith('ib_delcat_')) {
+          const catId = data.slice('ib_delcat_'.length)
+          const { rowCount } = await pool.query(`DELETE FROM menu_categories WHERE id = $1`, [catId])
+          if (rowCount) bot.answerCallbackQuery(cq.id, { text: t('categoryDeleted', lang) })
+          await renderAdminView(chatId, 'cats', lang)
+          return
         }
       } catch (e) {
         console.error('[bot] in-bot portal failed:', e.message)
