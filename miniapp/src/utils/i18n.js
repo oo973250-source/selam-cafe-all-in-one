@@ -147,7 +147,10 @@ const translations = {
  *   3. English fallback
  */
 export function getT(langCode) {
-  const lang = normalizeLang(langCode)
+  // An explicit code (from the in-app switcher) wins over the URL default.
+  const lang = langCode
+    ? (normalizeLang(langCode) || 'en')
+    : normalizeLang(null)
   const dict = translations[lang] || translations.en
   return (key) => dict[key] || translations.en[key] || key
 }
@@ -161,18 +164,21 @@ export function getT(langCode) {
  *   - 'am' or 'amh' → Amharic
  */
 function normalizeLang(code) {
-  if (!code) return 'en'
-  // Allow URL ?lang=xx override for browser testing
-  try {
-    const urlLang = new URLSearchParams(window.location.search).get('lang')
-    if (urlLang) {
-      const base = urlLang.toLowerCase().split('-')[0]
-      if (base === 'or') return 'om'
-      if (base in translations) return base
+  // Allow URL ?lang=xx as the default when no explicit code is given
+  if (!code) {
+    try {
+      const urlLang = new URLSearchParams(window.location.search).get('lang')
+      if (urlLang) {
+        const base = urlLang.toLowerCase().split('-')[0]
+        if (base === 'or') return 'om'
+        if (base in translations) return base
+      }
+    } catch (_) {
+      /* not in a browser */
     }
-  } catch (_) {
-    /* not in a browser */
+    return 'en'
   }
+  // Explicit code from the in-app switcher — no URL override
   const base = (code || '').toLowerCase().split('-')[0]
   if (base === 'or') return 'om'  // Telegram sometimes uses 'or' for Afaan Oromoo
   if (base in translations) return base

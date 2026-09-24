@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api.js'
+import { orderCode } from '../orderCode.js'
 
 export default function Dashboard({ onOpenOrder }) {
   const [stats, setStats] = useState(null)
@@ -68,7 +69,7 @@ export default function Dashboard({ onOpenOrder }) {
         <table className="table">
           <thead>
             <tr>
-              <th>#</th>
+              <th>Code</th>
               <th>Customer</th>
               <th>Service</th>
               <th>Total</th>
@@ -85,7 +86,7 @@ export default function Dashboard({ onOpenOrder }) {
             )}
             {recent.map((o) => (
               <tr key={o.id} onClick={() => onOpenOrder(o.id)} style={{ cursor: 'pointer' }}>
-                <td><strong>#{o.id}</strong></td>
+                <td><strong>{orderCode(o.id)}</strong></td>
                 <td>{o.customer_name}</td>
                 <td>{o.service_type}</td>
                 <td>{o.total} Br</td>
