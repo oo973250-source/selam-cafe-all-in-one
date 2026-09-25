@@ -15,6 +15,10 @@ import {
   countTodaysOrdersForUser,
   getUserLang as dbGetUserLang,
   setUserLang as dbSetUserLang,
+  isUserBlocked,
+  blockUser,
+  unblockUser,
+  findUserRef,
   pool,
 } from './db.js'
 
@@ -129,6 +133,26 @@ const T = {
     adminPanel: 'Admin Panel',
     adminLink: 'Open Admin Panel (Web)',
     adminOrders: 'In Bot',
+    catHidden: 'Hidden from customers',
+    catVisible: 'Visible to customers',
+    catShow: 'Show category',
+    catHide: 'Hide category (keeps items)',
+    catNotEmpty: 'Category still has items — move or delete them first',
+    adminChooseTitle: 'Admin area — what would you like to open?',
+    inBotAdminLabel: 'In-Bot Admin',
+    adminOpenPanel: 'Open Admin Panel',
+    blockUser: 'Block user',
+    unblockUser: 'Unblock',
+    blockedUsers: '🚫 Blocked users',
+    blockTitle: '🚫 Blocked users (scammer protection)',
+    sendBlockId: 'Send the Telegram ID or @username of the user to BLOCK:',
+    sendUnblockId: 'Send the Telegram ID or @username to UNBLOCK:',
+    userBlocked: '⛔ User blocked',
+    userUnblocked: '✅ User unblocked',
+    userNotFoundBlock: 'User not found. Try a numeric Telegram ID or exact @username.',
+    blocklistEmpty: 'Nobody is blocked.',
+    blockedUserMsg: '⛔ You have been restricted from placing orders. If you believe this is a mistake, please contact support.',
+    ordersBlockedCount: 'blocked orders',
     inBotTitle: '🤖 In-Bot Management',
     inBotMenuItems: '📦 Menu Items',
     inBotCategories: '🗂 Categories',
@@ -253,6 +277,26 @@ const T = {
     adminPanel: 'የአስተዳደር ክፍል',
     adminLink: 'የአስተዳደር ክፍል ክፈት (ድረ-ገጽ)',
     adminOrders: 'በቦት ውስጥ',
+    catHidden: 'ከደንበኞች ተደብቋል',
+    catVisible: 'ለደንበኞች ይታያል',
+    catShow: 'ምድብ አሳይ',
+    catHide: 'ምድብ ደብቅ (እቃዎቹ ይቀራሉ)',
+    catNotEmpty: 'ምድቡ እስካሁን እቃ አለው — መጀመሪያ አንቀሳቅስ ወይም ሰርዝ',
+    adminChooseTitle: 'የአስተዳደር ክፍል — ምን መክፈት ይፈልጋሉ?',
+    inBotAdminLabel: 'በቦት ውስጥ አስተዳደር',
+    adminOpenPanel: 'የአስተዳደር ፓነል ክፈት',
+    blockUser: 'ተጠቃሚ ዝጋ',
+    unblockUser: 'ክፈት',
+    blockedUsers: '🚫 የታገዱ ተጠቃሚዎች',
+    blockTitle: '🚫 የታገዱ ተጠቃሚዎች (ከማጭበርበሪዎች መጠበቅ)',
+    sendBlockId: 'ለመዝጋት የቴሌግራም መለያ ወይም @username ላክ:',
+    sendUnblockId: 'ለመክፈት የቴሌግራም መለያ ወይም @username ላክ:',
+    userBlocked: '⛔ ተጠቃሚ ተዝግቷል',
+    userUnblocked: '✅ ተጠቃሚ ተከፍቷል',
+    userNotFoundBlock: 'ተጠቃሚ አልተገኘም። የቁጥር መለያ ወይም ትክክለኛ @username ይሞክሩ።',
+    blocklistEmpty: 'ማንም አልታገደም።',
+    blockedUserMsg: '⛔ ትዕዛዝ መላክ ተገድበዋል። ስህተት ከሆነ እባክዎ ያግኙን።',
+    ordersBlockedCount: 'የታገዱ ትዕዛዞች',
     inBotTitle: '🤖 የአስተዳደር መቆጣጠሪያ',
     inBotMenuItems: '📦 የምናሌ እቃዎች',
     inBotCategories: '🗂 ምድቦች',
@@ -376,6 +420,26 @@ const T = {
     adminPanel: 'Panel Bulchaa',
     adminLink: 'Panel Bulchaa Banaa (Saayidii)',
     adminOrders: 'Keessatti (Bot)',
+    catHidden: 'Fayyadamtoota irraa dhokatee',
+    catVisible: 'Fayyadamtootti mul’ata',
+    catShow: 'Ramaddii agarsiisi',
+    catHide: 'Ramaddii dhoki (waanin hafa)',
+    catNotEmpty: 'Ramaddiin keessaa waan jira — jalqaba essaa qabee ykn haqi',
+    adminChooseTitle: 'Naannoo bulchaa — maal banaa barbaadda?',
+    inBotAdminLabel: 'Bulchiinsa Keessatti',
+    adminOpenPanel: 'Panel Bulchaa Banaa',
+    blockUser: 'Fayyadamaa dhorki',
+    unblockUser: 'Bani',
+    blockedUsers: '🚫 Fayyadamtoota dhorkaman',
+    blockTitle: '🚫 Fayyadamtoota dhorkaman (eegumsa gonkumaa irraa)',
+    sendBlockId: 'Dhorkuuf ID Telegram ykn @username ergi:',
+    sendUnblockId: 'Banuuf ID Telegram ykn @username ergi:',
+    userBlocked: '⛕ Fayyadamaan dhorkameera',
+    userUnblocked: '✅ Fayyadamaan banameera',
+    userNotFoundBlock: 'Fayyadamaan hin argamne. ID lakkoofsaa ykn @username sirrii yaali.',
+    blocklistEmpty: 'Kamiyyuu hin dhorkamne.',
+    blockedUserMsg: '⛕ Ajaja erguu dhorkamtaniitta. Dogoggoro yoo ta’e maaloo nu qunnamsiisi.',
+    ordersBlockedCount: 'ajajawwan dhorkaman',
     inBotTitle: '🤖 Bulchiinsa Keessatti',
     inBotMenuItems: '📦 Meeshaalee Maajii',
     inBotCategories: '🗂 Ramaddii',
@@ -563,6 +627,17 @@ function adminMenuButtons(lang = 'en') {
   }
 }
 
+// /admin chooser (Task 5): verified admins pick between the chat-based
+// In-Bot portal and the web Admin Panel. Non-admins never get this message
+// (handled in the /admin command below).
+function adminChooserButtons(lang = 'en') {
+  const btns = [[{ text: '🤖 ' + t('inBotAdminLabel', lang), callback_data: 'admin_choice_ib' }]]
+  if (WEBAPP_URL) {
+    btns.push([{ text: '📊 ' + t('adminOpenPanel', lang), url: WEBAPP_URL + '/admin' }])
+  }
+  return { reply_markup: { inline_keyboard: btns } }
+}
+
 // ── In-Bot management portal (single-message, in-place navigation) ───
 // Every admin view renders { text, keyboard } and ALL navigation edits
 // the SAME message (editMessageText) — zero chat clutter, universal Back.
@@ -589,12 +664,32 @@ const ADMIN_MAIN_TEXT = (lang) => `🤖 ${t('inBotTitle', lang)}`
 
 const backBtn = (lang, to = 'ib_root') => ({ text: '⬅️ ' + t('inBotBack', lang), callback_data: to })
 
-async function loadCategories() {
+async function loadCategories(section = null) {
   const { rows } = await pool.query(
     `SELECT c.*, (SELECT COUNT(*)::int FROM menu_items m WHERE m.category = c.id) AS item_count
-       FROM menu_categories c ORDER BY c.sort_order, c.name_en`
+       FROM menu_categories c ${section ? 'WHERE c.section = $1' : ''}
+      ORDER BY c.section, c.sort_order, c.name_en`,
+    section ? [section] : []
   )
   return rows
+}
+
+async function loadBlockedUsers() {
+  const { rows } = await pool.query(
+    `SELECT b.*, o.order_count, o.last_order_at
+       FROM blocked_users b
+       LEFT JOIN (
+         SELECT tg_user_id, COUNT(*)::int AS order_count, MAX(created_at) AS last_order_at
+           FROM orders GROUP BY tg_user_id
+       ) o ON o.tg_user_id = b.tg_user_id
+      ORDER BY b.blocked_at DESC LIMIT 20`
+  )
+  return rows
+}
+
+async function countBlockedUsers() {
+  const { rows } = await pool.query(`SELECT COUNT(*)::int AS n FROM blocked_users`)
+  return rows[0]?.n || 0
 }
 
 async function loadMenuItems(availableOnly = false) {
@@ -745,19 +840,31 @@ async function buildAdminView(view, lang, param = null) {
 
   // Add-item prompt state lives in editAwait (field: 'newitem', param = catId)
 
-  // Categories: list with add / rename / delete
+  // Categories (Task 2): two INDEPENDENT sections — Food and Drink. Each
+  // section lists only its own categories with its own add button; manage
+  // (rename/hide/reorder/delete) operates on that one category only.
   if (view === 'cats') {
     const cats = await loadCategories()
+    const food = cats.filter((c) => c.section !== 'drink')
+    const drink = cats.filter((c) => c.section === 'drink')
+    const sectionBlock = (label, list, prefix) => {
+      if (!list.length) return [[{ text: label, callback_data: 'noop_' }]]
+      return [
+        [{ text: label, callback_data: 'noop_' }],
+        ...list.map((c, i) => [{
+          text: `${c.hidden ? '🚫' : c.icon} ${c.name_en} (${c.item_count})`,
+          callback_data: `ib_cat_${c.id}`,
+        }]),
+        [{ text: `➕ ${t('addCategory', lang)} (${prefix})`, callback_data: `ib_addcat_${prefix}` }],
+      ]
+    }
     return {
-      text: `🗂 ${t('inBotCategories', lang)}`,
+      text: `🗂 ${t('inBotCategories', lang)}\n\n🍲 ${t('foods', lang)} / 🥤 ${t('drinks', lang)}`,
       kb: {
         reply_markup: {
           inline_keyboard: [
-            ...cats.map((c) => [{
-              text: `${c.icon} ${c.name_en} (${c.item_count})`,
-              callback_data: `ib_cat_${c.id}`,
-            }]),
-            [{ text: `➕ ${t('addCategory', lang)}`, callback_data: 'ib_addcat' }],
+            ...sectionBlock(`🍲 ${t('foods', lang)} — ${food.length}`, food, 'food'),
+            ...sectionBlock(`🥤 ${t('drinks', lang)} — ${drink.length}`, drink, 'drink'),
             [backBtn(lang)],
           ],
         },
@@ -766,15 +873,25 @@ async function buildAdminView(view, lang, param = null) {
   }
 
   if (view === 'cat') {
-    const cats = await loadCategories()
-    const c = cats.find((x) => x.id === param)
+    const c = (await loadCategories()).find((x) => x.id === param)
     if (!c) return { text: esc2(t('orderNotFoundAdmin', lang)), kb: back('ib_cats') }
+    const sameSection = (await loadCategories(c.section)).sort((a, b) => a.sort_order - b.sort_order)
+    const idx = sameSection.findIndex((x) => x.id === c.id)
+    const sectionLabel = c.section === 'drink' ? `🥤 ${t('drinks', lang)}` : `🍲 ${t('foods', lang)}`
     return {
-      text: `🗂 <b>${esc2(c.name_en)}</b>${c.name_am ? ` (${esc2(c.name_am)})` : ''} · ${c.item_count} ${t('items', lang)}`,
+      text: `🗂 <b>${esc2(c.name_en)}</b>${c.name_am ? ` (${esc2(c.name_am)})` : ''}\n` +
+        `${sectionLabel} · ${c.item_count} ${t('items', lang)}\n` +
+        (c.hidden ? `🚫 ${t('catHidden', lang)}` : `✅ ${t('catVisible', lang)}`),
       kb: {
         reply_markup: {
           inline_keyboard: [
             [{ text: `✏️ ${t('renameCategory', lang)}`, callback_data: `ib_renamecat_${c.id}` }],
+            [{ text: c.hidden ? `✅ ${t('catShow', lang)}` : `🚫 ${t('catHide', lang)}`, callback_data: `ib_togglecat_${c.id}` }],
+            [
+              { text: '⬆️', callback_data: `ib_catup_${c.id}` },
+              { text: `${idx + 1}/${sameSection.length}`, callback_data: 'noop_' },
+              { text: '⬇️', callback_data: `ib_catdown_${c.id}` },
+            ],
             [{ text: `🗑 ${t('deleteCategory', lang)}`, callback_data: `ib_delcat_${c.id}` }],
             [backBtn(lang, 'ib_cats')],
           ],
@@ -834,6 +951,34 @@ async function buildAdminView(view, lang, param = null) {
         reply_markup: {
           inline_keyboard: [
             [{ text: `🌐 ${t('changeAlertLang', lang)}`, callback_data: 'ib_lang' }],
+            [{ text: t('blockedUsers', lang), callback_data: 'ib_blocked' }],
+            [backBtn(lang)],
+          ],
+        },
+      },
+    }
+  }
+
+  // Blocked users (Task 4) — list + block + unblock entry points.
+  if (view === 'blocked') {
+    const rows = await loadBlockedUsers()
+    const body = rows.length
+      ? rows.map((b) => {
+          const who = b.tg_username ? `@${esc2(b.tg_username)}` : esc2(b.tg_first_name || '')
+          const label = who ? `${who} · ${b.tg_user_id}` : String(b.tg_user_id)
+          return `${label} — ${b.order_count ?? 0} ${t('orderMany', lang)}` +
+            (b.last_order_at ? ` · ${new Date(b.last_order_at).toISOString().slice(0, 10)}` : '')
+        }).join('\n')
+      : esc2(t('blocklistEmpty', lang))
+    return {
+      text: `${t('blockTitle', lang)}\n\n${body}`,
+      kb: {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: `⛔ ${t('blockUser', lang)}`, callback_data: 'ib_block' },
+              { text: `🔓 ${t('unblockUser', lang)}`, callback_data: 'ib_unblock' },
+            ],
             [backBtn(lang)],
           ],
         },
@@ -1142,15 +1287,58 @@ export async function startBot(io) {
         } else if (awaiting.field === 'description') {
           await pool.query(`UPDATE menu_items SET description = $1, updated_at = now() WHERE id = $2`, [text.slice(0, 500), awaiting.itemId])
         } else if (awaiting.field === 'newcat') {
+          // Task 2: the category is created inside the section whose ➕
+          // button the admin pressed (food or drink), ordered last there.
+          const section = awaiting.section === 'drink' ? 'drink' : 'food'
           const id = text.toLowerCase().replace(/[^a-z0-9_]+/g, '_').slice(0, 40) || `cat_${Date.now()}`
           await pool.query(
-            `INSERT INTO menu_categories (id, name_en, sort_order)
-             VALUES ($1, $2, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM menu_categories))
+            `INSERT INTO menu_categories (id, name_en, section, sort_order)
+             VALUES ($1, $2, $3, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM menu_categories WHERE section = $3))
              ON CONFLICT (id) DO NOTHING`,
-            [id, text.slice(0, 60)]
+            [id, text.slice(0, 60), section]
           )
         } else if (awaiting.field === 'renamecat') {
           await pool.query(`UPDATE menu_categories SET name_en = $1 WHERE id = $2`, [text.slice(0, 60), awaiting.itemId])
+        } else if (awaiting.field === 'blockuser') {
+          // Task 4: block by numeric Telegram ID or exact @username. When a
+          // username is given, we resolve the ID from past orders so the
+          // blocklist stores the permanent numeric key.
+          const raw = text.trim().replace(/^@/, '')
+          if (!raw) {
+            bot.sendMessage(msg.chat.id, t('sendBlockId', lang))
+            return
+          }
+          let ref = null
+          if (/^\d+$/.test(raw)) {
+            ref = await findUserRef(raw)
+          } else {
+            ref = await findUserRef(`@${raw}`)
+            if (!ref) {
+              bot.sendMessage(msg.chat.id, t('userNotFoundBlock', lang))
+              return
+            }
+          }
+          await blockUser({
+            tgUserId: ref.tg_user_id,
+            tgUsername: ref.tg_username,
+            tgFirstName: ref.tg_first_name,
+            reason: 'manual block via bot',
+            blockedBy: msg.from.id,
+          })
+          console.log(`[bot] user blocked: ${ref.tg_user_id} by admin ${msg.from.id}`)
+          bot.sendMessage(msg.chat.id, `⛔ ${t('userBlocked', lang)} (${ref.tg_user_id})`)
+          await renderAdminView(msg.chat.id, 'blocked', lang)
+          return
+        } else if (awaiting.field === 'unblockuser') {
+          const removed = await unblockUser(text.trim())
+          if (!removed) {
+            bot.sendMessage(msg.chat.id, t('userNotFoundBlock', lang))
+            return
+          }
+          console.log(`[bot] user unblocked: ${removed.tg_user_id} by admin ${msg.from.id}`)
+          bot.sendMessage(msg.chat.id, `✅ ${t('userUnblocked', lang)} (${removed.tg_user_id})`)
+          await renderAdminView(msg.chat.id, 'blocked', lang)
+          return
         } else if (awaiting.field === 'newitem') {
           // Two-step flow: name first, then price. Store the name and ask
           // for the price next (state kept in editAwait).
@@ -1282,9 +1470,10 @@ export async function startBot(io) {
       bot.sendMessage(msg.chat.id, t('adminUnauthorized', lang))
       return
     }
-    // A new /admin starts a fresh single-message session.
-    adminActiveMsg.delete(msg.chat.id)
-    await renderAdminView(msg.chat.id, 'root', lang)
+    // Task 5: present the chooser (In-Bot Admin vs Web Panel) instead of
+    // opening the portal directly. The ib-portal opens via the
+    // admin_choice_ib callback when "In-Bot Admin" is tapped.
+    bot.sendMessage(msg.chat.id, `🛠 ${t('adminChooseTitle', lang)}`, adminChooserButtons(lang))
   })
 
   // ── web_app_data — order received from miniapp (keyboard-button launches)
@@ -1312,6 +1501,19 @@ export async function startBot(io) {
 
     if (payload.type !== 'cafe_order') {
       bot.sendMessage(chatId, 'Unrecognised order payload.')
+      return
+    }
+
+    // Task 4 — scammer protection: the blocklist is checked server-side
+    // BEFORE the order is saved, so a blocked user can never create an
+    // order from the bot path.
+    let blocked = false
+    try { blocked = await isUserBlocked(user.id) } catch (e) {
+      console.warn('[bot] blocklist check failed (fail-open):', e.message)
+    }
+    if (blocked) {
+      console.log(`[bot] order BLOCKED for tg ${user.id} (web_app_data path)`)
+      bot.sendMessage(chatId, t('blockedUserMsg', await getUserLang(user.id)))
       return
     }
 
@@ -1387,6 +1589,20 @@ export async function startBot(io) {
       return
     }
 
+    // Task 5: "In-Bot Admin" choice from the /admin chooser — open the
+    // in-place portal on a fresh message.
+    if (data === 'admin_choice_ib') {
+      try {
+        const lang = await getUserLang(userId)
+        adminActiveMsg.delete(chatId)
+        await renderAdminView(chatId, 'root', lang)
+      } catch (e) {
+        console.error('[bot] admin_choice_ib failed:', e.message)
+      }
+      bot.answerCallbackQuery(cq.id)
+      return
+    }
+
     if (data === 'admin_list') {
       try {
         const lang = await getUserLang(userId)
@@ -1411,7 +1627,10 @@ export async function startBot(io) {
     // ── In-Bot admin portal (in-place navigation; legacy entry) ─────
     if (data?.startsWith('ib_')) {
       try {
-        const lang = await getUserLang(userId)
+        // `let` (not `const`): ib_setlang_ reassigns it after saving the
+        // alert-language choice. Was a silent no-op bug before (TypeError
+        // swallowed by the try/catch → picker never re-rendered).
+        let lang = await getUserLang(userId)
         // Track the active admin message so navigation edits in place.
         if (!adminActiveMsg.has(chatId) && cq.message?.message_id) {
           adminActiveMsg.set(chatId, cq.message.message_id)
@@ -1459,8 +1678,9 @@ export async function startBot(io) {
           await bot.sendMessage(chatId, prompts[field])
           bot.answerCallbackQuery(cq.id)
           return
-        } else if (data === 'ib_addcat') {
-          editAwait.set(userId, { field: 'newcat', chatId })
+        } else if (data === 'ib_addcat' || data.startsWith('ib_addcat_')) {
+          const section = data === 'ib_addcat_drink' ? 'drink' : 'food'
+          editAwait.set(userId, { field: 'newcat', chatId, section })
           await bot.sendMessage(chatId, t('sendNewCategory', lang))
           bot.answerCallbackQuery(cq.id)
           return
@@ -1469,6 +1689,55 @@ export async function startBot(io) {
           editAwait.set(userId, { field: 'newitem', itemId: catId, chatId })
           await bot.sendMessage(chatId, t('sendNewItem', lang))
           bot.answerCallbackQuery(cq.id)
+          return
+        } else if (data === 'ib_blocked') {
+          await renderAdminView(chatId, 'blocked', lang)
+          bot.answerCallbackQuery(cq.id)
+          return
+        } else if (data === 'ib_block') {
+          editAwait.set(userId, { field: 'blockuser', chatId })
+          await bot.sendMessage(chatId, t('sendBlockId', lang))
+          bot.answerCallbackQuery(cq.id)
+          return
+        } else if (data === 'ib_unblock') {
+          editAwait.set(userId, { field: 'unblockuser', chatId })
+          await bot.sendMessage(chatId, t('sendUnblockId', lang))
+          bot.answerCallbackQuery(cq.id)
+          return
+        } else if (data.startsWith('ib_togglecat_')) {
+          // Hide/show WITHOUT deleting — items and ordering are untouched.
+          const catId = data.slice('ib_togglecat_'.length)
+          const { rows } = await pool.query(
+            `UPDATE menu_categories SET hidden = NOT hidden WHERE id = $1 RETURNING name_en, hidden`,
+            [catId]
+          )
+          if (rows[0]) {
+            bot.answerCallbackQuery(cq.id, {
+              text: rows[0].hidden ? t('catHidden', lang) : t('catVisible', lang),
+            })
+          }
+          await renderAdminView(chatId, 'cat', lang, catId)
+          return
+        } else if (data.startsWith('ib_catup_') || data.startsWith('ib_catdown_')) {
+          // Reorder WITHIN the category's own section only (Task 2):
+          // a food category can never swap past a drink category.
+          const catId = data.replace(/^ib_cat(up|down)_/, '')
+          const dir = data.includes('ib_catup_') ? -1 : 1
+          const c = (await loadCategories()).find((x) => x.id === catId)
+          if (c) {
+            const sibs = (await loadCategories(c.section)).sort((a, b) => a.sort_order - b.sort_order)
+            const idx = sibs.findIndex((x) => x.id === catId)
+            const j = idx + dir
+            if (idx >= 0 && j >= 0 && j < sibs.length) {
+              const ids = sibs.map((x) => x.id)
+              ;[ids[idx], ids[j]] = [ids[j], ids[idx]]
+              for (let k = 0; k < ids.length; k++) {
+                await pool.query(`UPDATE menu_categories SET sort_order = $1 WHERE id = $2`, [k + 1, ids[k]])
+              }
+            }
+          }
+          bot.answerCallbackQuery(cq.id)
+          await renderAdminView(chatId, 'cat', lang, catId)
           return
         } else if (data === 'ib_lang') {
           await renderAdminView(chatId, 'lang', lang)
@@ -1490,7 +1759,20 @@ export async function startBot(io) {
           bot.answerCallbackQuery(cq.id)
           return
         } else if (data.startsWith('ib_delcat_')) {
+          // Safeguard (Task 2): a category that still has items cannot be
+          // deleted — the admin must move/delete those items first.
           const catId = data.slice('ib_delcat_'.length)
+          const { rows } = await pool.query(
+            `SELECT COUNT(*)::int AS n FROM menu_items WHERE category = $1`, [catId]
+          )
+          const itemCount = rows[0]?.n || 0
+          if (itemCount > 0) {
+            bot.answerCallbackQuery(cq.id, {
+              text: `${itemCount} ${t('items', lang)} — ${t('catNotEmpty', lang)}`,
+              show_alert: true,
+            })
+            return
+          }
           const { rowCount } = await pool.query(`DELETE FROM menu_categories WHERE id = $1`, [catId])
           if (rowCount) bot.answerCallbackQuery(cq.id, { text: t('categoryDeleted', lang) })
           await renderAdminView(chatId, 'cats', lang)

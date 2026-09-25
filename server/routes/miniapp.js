@@ -19,7 +19,7 @@ import { Router } from 'express'
 import crypto from 'node:crypto'
 import 'dotenv/config'
 
-import { createOrder, countTodaysOrdersForUser, getUserLang } from '../db.js'
+import { createOrder, countTodaysOrdersForUser, getUserLang, isUserBlocked } from '../db.js'
 import { sendOrderConfirmation, notifyStaff } from '../bot.js'
 
 const router = Router()
@@ -87,6 +87,22 @@ router.post('/orders', async (req, res) => {
 
   if (!payload || payload.type !== 'cafe_order' || !Array.isArray(payload.items)) {
     return res.status(400).json({ error: 'invalid order payload' })
+  }
+
+  // Task 4 — scammer protection: server-side blocklist gate BEFORE the
+  // order is saved (not just hidden client-side). Returns 403 with a
+  // `blocked` flag the Mini App maps to its "restricted" screen.
+  let blocked = false
+  try { blocked = await isUserBlocked(tgUser.id) } catch (e) {
+    console.warn('[miniapp] blocklist check failed (fail-open):', e.message)
+  }
+  if (blocked) {
+    console.log(`[miniapp] order BLOCKED for tg ${tgUser.id}`)
+    return res.status(403).json({
+      error: 'account restricted',
+      blocked: true,
+      message: 'You have been restricted from placing orders. If you believe this is a mistake, please contact support.',
+    })
   }
 
   let order

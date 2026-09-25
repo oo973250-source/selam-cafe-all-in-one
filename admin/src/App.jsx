@@ -8,13 +8,15 @@ import Dashboard from './components/Dashboard.jsx'
 import Orders from './components/Orders.jsx'
 import OrderDetail from './components/OrderDetail.jsx'
 import Menu from './components/Menu.jsx'
+import Categories from './components/Categories.jsx'
+import Users from './components/Users.jsx'
 
 const socket = io({ transports: ['websocket', 'polling'] })
 
 export default function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState('dashboard') // dashboard | orders | order | menu
+  const [view, setView] = useState('dashboard') // dashboard | orders | order | menu | categories | users
   const [selectedOrderId, setSelectedOrderId] = useState(null)
   const [newOrderFlash, setNewOrderFlash] = useState(false)
 
@@ -70,6 +72,10 @@ export default function App() {
         )
       case 'menu':
         return <Menu />
+      case 'categories':
+        return <Categories />
+      case 'users':
+        return <Users />
       default:
         return null
     }

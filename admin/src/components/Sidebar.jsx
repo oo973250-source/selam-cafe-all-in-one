@@ -1,9 +1,11 @@
 import React from 'react'
 
 const NAV = [
-  { key: 'dashboard', label: 'Dashboard', icon: '📊' },
-  { key: 'orders',    label: 'Orders',    icon: '🧾' },
-  { key: 'menu',      label: 'Menu',      icon: '☕' },
+  { key: 'dashboard',  label: 'Dashboard',  icon: '📊' },
+  { key: 'orders',     label: 'Orders',     icon: '🧾' },
+  { key: 'menu',       label: 'Menu',       icon: '☕' },
+  { key: 'categories', label: 'Categories', icon: '🗂' },
+  { key: 'users',      label: 'Users',      icon: '🚫' },
 ]
 
 export default function Sidebar({ user, view, onNavigate, onLogout, newOrderFlash }) {

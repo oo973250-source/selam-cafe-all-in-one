@@ -1,14 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { openTelegramLink, absoluteUrl } from '../utils/telegram.js'
 import { motion, AnimatePresence } from 'framer-motion'
 import BrandLogo from './BrandLogo.jsx'
-import { useTelegram } from '../hooks/useTelegram.js'
-import { getT } from '../utils/i18n.js'
 import { useLang } from '../context/LangContext.jsx'
-import { brandConfig } from '../data/brand.js'
 
 /**
- * IntroFrame (Frame 0) — CafeIntro v3
+ * IntroFrame (Frame 0) — CafeIntro v4
  * ------------------------------------
  * 2-phase animated splash screen:
  *
@@ -28,24 +24,16 @@ import { brandConfig } from '../data/brand.js'
  *
  *   Progress dots at the bottom indicate the current phase.
  *
- * Background: /backgrounds/night-stall.png (Ethiopian street-food stall at night,
- * warm purple sky with stars — used as the cafe-night image).
- *
- * Logo: loads from brandConfig.logoUrl (default: /brand/logo.png).
- * Admin can swap /public/brand/logo.png to change the logo everywhere
- * it appears (intro, top-right of frames 1 & 2, etc.).
+ * Locale (Tasks 1 + 3): the screen renders in the language the user picked
+ * in the bot (persisted per Telegram ID in `user_langs` and passed here via
+ * ?lang= on the Mini App URL). Language is read ONLY from LangContext —
+ * there is no in-app language switcher and no Admin Panel entry point on
+ * this screen any more; admins reach the panel through the bot's /admin
+ * command.
  */
 export default function IntroFrame({ onAdvance }) {
-  const { userLanguage } = useTelegram()
-  const { lang: chosenLang, choose } = useLang()
-  const t = getT(chosenLang || userLanguage)
+  const { t } = useLang()
   const [phase, setPhase] = useState(1) // 1 = welcome, 2 = choose-service
-
-  const langs = [
-    { code: 'en', label: 'English' },
-    { code: 'am', label: 'አማርኛ' },
-    { code: 'om', label: 'Afaan Oromoo' },
-  ]
 
   // Phase timer — phase 1 → 2 at 1.8s, auto-advance at 3.2s
   useEffect(() => {
@@ -227,73 +215,6 @@ export default function IntroFrame({ onAdvance }) {
       >
         {t('introTapHint')}
       </motion.p>
-
-      {/* ────────────────────────────────────────────────────────────
-          In-app language switcher — persists to localStorage. Stops
-          propagation so tapping a language doesn't skip the intro.
-      ──────────────────────────────────────────────────────────── */}
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute',
-          top: 'calc(var(--safe-top, 0px) + 12px)',
-          right: 12,
-          display: 'flex',
-          gap: 6,
-          zIndex: 20,
-        }}
-      >
-        {langs.map((l) => (
-          <button
-            key={l.code}
-            onClick={() => choose(l.code)}
-            style={{
-              padding: '5px 9px',
-              fontSize: 11,
-              fontWeight: 700,
-              borderRadius: 999,
-              border: '1px solid rgba(252, 211, 77, 0.55)',
-              background: (chosenLang || null) === l.code
-                ? 'rgba(252, 211, 77, 0.92)'
-                : 'rgba(0, 0, 0, 0.42)',
-              color: (chosenLang || null) === l.code ? '#3A2410' : '#FFE096',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {l.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ────────────────────────────────────────────────────────────
-          Admin panel link (bottom-left). Opens the dedicated admin
-          dashboard at /admin — NOT the customer mini app. Uses the
-          Telegram helper so it opens as an external browser link
-          (Mini Apps can't navigate the webview to a different app). */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          openTelegramLink(absoluteUrl('/admin'))
-        }}
-        style={{
-          position: 'absolute',
-          bottom: 'calc(var(--safe-bottom, 0px) + 32px)',
-          left: 16,
-          zIndex: 20,
-          padding: '6px 12px',
-          fontSize: 11,
-          fontWeight: 700,
-          borderRadius: 999,
-          border: '1px solid rgba(252, 211, 77, 0.4)',
-          background: 'rgba(0, 0, 0, 0.42)',
-          color: '#FFE096',
-          cursor: 'pointer',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        🛠️ Admin Panel
-      </button>
 
       {/* ────────────────────────────────────────────────────────────
           Progress dots (2 phases)

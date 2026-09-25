@@ -2,6 +2,7 @@ import React from 'react'
 import SmartCafeBg from './SmartCafeBg.jsx'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
+import { useLang } from '../context/LangContext.jsx'
 
 /**
  * ConfirmOrder (Frame 5) — v11f
@@ -32,6 +33,11 @@ import { useTelegram } from '../hooks/useTelegram.js'
 export default function ConfirmOrder({ onCancel, onPay, bgProps }) {
   const { items, total, addItem, removeItem, deleteItem } = useCart()
   const { hapticFeedback } = useTelegram()
+  const { t, lang } = useLang()
+
+  // Localized item name: Amharic speakers see nameAm first, others nameEn.
+  const primaryName = (item) => (lang === 'am' && item.nameAm ? item.nameAm : item.nameEn)
+  const secondaryName = (item) => (lang === 'am' ? item.nameEn : item.nameAm)
 
   const handleMinus = (item) => {
     if (item.quantity <= 1) {
@@ -173,7 +179,7 @@ export default function ConfirmOrder({ onCancel, onPay, bgProps }) {
                 textShadow: '0 2px 6px rgba(0, 0, 0, 0.6)',
               }}
             >
-              Confirm Your Order
+              {t('confirmTitle')}
             </h1>
           </div>
         </div>
@@ -181,7 +187,7 @@ export default function ConfirmOrder({ onCancel, onPay, bgProps }) {
         {items.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: 24 }}>
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-              Your cart is empty.
+              {t('confirmCartEmpty')}
             </p>
           </div>
         ) : (
@@ -193,9 +199,9 @@ export default function ConfirmOrder({ onCancel, onPay, bgProps }) {
                 style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="item-info">
-                  <div className="item-name-en">{item.nameEn}</div>
+                  <div className="item-name-en">{primaryName(item)}</div>
                   <div className="item-name-am">
-                    {item.price} Br each · {item.nameAm}
+                    {item.price} Br {t('each')} · {secondaryName(item)}
                   </div>
                 </div>
 
@@ -203,7 +209,7 @@ export default function ConfirmOrder({ onCancel, onPay, bgProps }) {
                   <button
                     type="button"
                     className="qty-btn qty-minus"
-                    aria-label={`Decrease ${item.nameEn}`}
+                    aria-label={`${t('decreaseQty')} ${primaryName(item)}`}
                     onClick={() => handleMinus(item)}
                   >
                     −
@@ -212,7 +218,7 @@ export default function ConfirmOrder({ onCancel, onPay, bgProps }) {
                   <button
                     type="button"
                     className="qty-btn qty-plus"
-                    aria-label={`Increase ${item.nameEn}`}
+                    aria-label={`${t('increaseQty')} ${primaryName(item)}`}
                     onClick={() => {
                       addItem({
                         id: item.id,
@@ -234,7 +240,7 @@ export default function ConfirmOrder({ onCancel, onPay, bgProps }) {
             ))}
 
             <div className="total-line">
-              <div className="total-label">Total</div>
+              <div className="total-label">{t('total')}</div>
               <div className="total-value">{total} Br</div>
             </div>
           </>
@@ -249,7 +255,7 @@ export default function ConfirmOrder({ onCancel, onPay, bgProps }) {
             onCancel?.()
           }}
         >
-          ← Cancel
+          {t('cancel')}
         </button>
         <div
           style={{

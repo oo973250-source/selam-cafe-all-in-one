@@ -47,7 +47,7 @@ export const api = {
     request(`/orders/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   todayStats: () => request('/orders/stats/today'),
 
-  // Menu
+  // Menu items
   listMenu: (params = '') => request(`/menu${params}`),
   createMenuItem: (body) =>
     request('/menu', { method: 'POST', body: JSON.stringify(body) }),
@@ -55,4 +55,28 @@ export const api = {
     request(`/menu/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteMenuItem: (id) =>
     request(`/menu/${id}`, { method: 'DELETE' }),
+
+  // Menu categories (Task 2: independent Food / Drink sections)
+  listCategories: () => request('/menu/categories'),
+  createCategory: (body) =>
+    request('/menu/categories', { method: 'POST', body: JSON.stringify(body) }),
+  updateCategory: (id, body) =>
+    request(`/menu/categories/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  reorderCategories: (section, ids) =>
+    request('/menu/categories/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ section, ids }),
+    }),
+  deleteCategory: (id, force = false) =>
+    request(`/menu/categories/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+
+  // Blocked users (Task 4: scammer protection)
+  listBlockedUsers: () => request('/blocked-users'),
+  blockUser: (body) =>
+    request('/blocked-users', { method: 'POST', body: JSON.stringify(body) }),
+  unblockUser: (id) =>
+    request(`/blocked-users/${id}`, { method: 'DELETE' }),
+
+  // Customer directory (search past orders by name/username/id)
+  listCustomers: (params = '') => request(`/blocked-users/customers/directory${params}`),
 }

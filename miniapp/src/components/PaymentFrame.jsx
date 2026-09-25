@@ -3,6 +3,7 @@ import SmartCafeBg from './SmartCafeBg.jsx'
 import BrandLogo from './BrandLogo.jsx'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
+import { useLang } from '../context/LangContext.jsx'
 import {
   initializePayment,
   verifyPayment,
@@ -106,11 +107,13 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
   const { serviceType, items, total, successfulPayments, recordSuccessfulPayment } =
     useCart()
   const { hapticFeedback, user } = useTelegram()
+  const { t } = useLang()
 
-  const [state, setState] = useState('options') // 'options' | 'processing' | 'success' | 'error'
-  const [selectedMethod, setSelectedMethod] = useState(null)
-  const [errorMsg, setErrorMsg] = useState('')
-  const [pressedKey, setPressedKey] = useState(null)
+  const serviceShort = serviceType === 'dine_in'
+    ? t('dineInShort')
+    : serviceType === 'takeaway'
+    ? t('takeawayShort')
+    : t('deliveryShort')
 
   // Build the available payment methods based on service type + trust.
   const methods = (() => {
@@ -119,8 +122,8 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
         {
           key: 'upfront',
           icon: '🪙',
-          label: `Pay ${DEPOSIT_AMOUNT} Br Upfront`,
-          desc: 'Pay a small deposit now, the rest on arrival',
+          label: t('payUpfront').replace('{n}', DEPOSIT_AMOUNT),
+          desc: t('payUpfrontDesc'),
           amount: DEPOSIT_AMOUNT,
           unlocked: true,
           progress: null,
@@ -128,8 +131,8 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
         {
           key: 'on-delivery',
           icon: '🚗',
-          label: 'Pay on Delivery',
-          desc: 'Pay the full amount when your order arrives',
+          label: t('payOnDelivery'),
+          desc: t('payOnDeliveryDesc'),
           amount: total,
           unlocked: successfulPayments >= 3,
           progress: `${Math.min(successfulPayments, 3)}/3`,
@@ -141,8 +144,8 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
       {
         key: 'full',
         icon: '💳',
-        label: 'Pay Full Amount',
-        desc: `Pay the full ${total} Br now`,
+        label: t('payFull'),
+        desc: t('payFullDesc'),
         amount: total,
         unlocked: true,
         progress: null,
@@ -150,8 +153,8 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
       {
         key: 'deposit',
         icon: '🪙',
-        label: `Pay ${DEPOSIT_AMOUNT} Br Deposit`,
-        desc: 'Reserve your order with a small deposit',
+        label: t('payDeposit').replace('{n}', DEPOSIT_AMOUNT),
+        desc: t('payDepositDesc'),
         amount: DEPOSIT_AMOUNT,
         unlocked: successfulPayments >= 1,
         progress: successfulPayments < 1 ? `${Math.min(successfulPayments, 1)}/1` : null,
@@ -159,14 +162,19 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
       {
         key: 'counter',
         icon: '🏪',
-        label: serviceType === 'dine_in' ? 'Pay at Table' : 'Pay at Counter',
-        desc: 'Pay in person when you arrive',
+        label: serviceType === 'dine_in' ? t('payTable') : t('payCounter'),
+        desc: t('payCounterDesc'),
         amount: 0,
         unlocked: successfulPayments >= 2,
         progress: successfulPayments < 2 ? `${Math.min(successfulPayments, 2)}/2` : null,
       },
     ]
   })()
+
+  const [state, setState] = useState('options') // 'options' | 'processing' | 'success' | 'error'
+  const [selectedMethod, setSelectedMethod] = useState(null)
+  const [errorMsg, setErrorMsg] = useState('')
+  const [pressedKey, setPressedKey] = useState(null)
 
   // When entering success state, fire success haptic and record successful payment.
   useEffect(() => {
@@ -212,7 +220,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
     })
 
     if (init.status !== 'success') {
-      setErrorMsg(init.raw?.message || 'Payment initialization failed.')
+      setErrorMsg(init.raw?.message || t('paymentInitFailed'))
       setState('error')
       return
     }
@@ -227,7 +235,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
     if (verification.paid) {
       setState('success')
     } else {
-      setErrorMsg(verification.raw?.message || 'Payment was not completed.')
+      setErrorMsg(verification.raw?.message || t('paymentNotCompleted'))
       setState('error')
     }
   }
@@ -241,8 +249,8 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
         <div className="frame-scroll no-bottom-bar" style={{ position: 'relative', zIndex: 2 }}>
           <div className="frame-header" style={{ paddingTop: 12, paddingRight: 60 }}>
             <div className="title-block">
-              <h1>Payment</h1>
-              <p>Choose how you'd like to pay</p>
+              <h1>{t('payment')}</h1>
+              <p>{t('chooseHowToPay')}</p>
             </div>
           </div>
 
@@ -257,7 +265,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
               }}
             >
               <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
-                Order total
+                {t('orderTotal')}
               </span>
               <span style={{ fontWeight: 700, color: 'var(--accent-gold)', fontSize: 18 }}>
                 {total} Br
@@ -271,12 +279,8 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
                 paddingTop: 8,
               }}
             >
-              {items.length} {items.length === 1 ? 'item' : 'items'} ·{' '}
-              {serviceType === 'dine_in'
-                ? 'Dine in'
-                : serviceType === 'takeaway'
-                ? 'Takeaway'
-                : 'Delivery'}
+              {items.length} {items.length === 1 ? t('item') : t('items')} ·{' '}
+              {serviceShort}
             </div>
           </div>
 
@@ -328,8 +332,10 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
             }}
           >
             {successfulPayments === 0
-              ? '🔒 Complete your first payment to unlock more options.'
-              : `✓ You've made ${successfulPayments} successful payment${successfulPayments === 1 ? '' : 's'}. More options unlock as you order.`}
+              ? t('trustLockedHint')
+              : t('trustProgress')
+                  .replace('{n}', successfulPayments)
+                  .replace('{s}', successfulPayments === 1 ? '' : 's')}
           </div>
         </div>
       </div>
@@ -369,7 +375,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
               color: 'var(--text-primary)',
             }}
           >
-            Processing your payment…
+            {t('paymentProcessing')}
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
             {selectedMethod?.label}
@@ -423,7 +429,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
               color: 'var(--accent-green)',
             }}
           >
-            Payment Successful!
+            {t('paymentSuccess')}
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
             {selectedMethod?.label}
@@ -447,7 +453,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
               onSuccess?.()
             }}
           >
-            Continue →
+            {t('continue')}
           </button>
         </div>
       </div>
@@ -498,11 +504,10 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
             margin: '16px 0 8px',
             color: 'var(--accent-red)',
           }}
-        >
-          Payment Failed
+        >            {t('paymentFailed')}
         </h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 24px' }}>
-          {errorMsg || 'Something went wrong. Please try again.'}
+          {errorMsg || t('paymentErrorDefault')}
         </p>
         <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 320 }}>
           <button
@@ -514,7 +519,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
               setErrorMsg('')
             }}
           >
-            ← Back
+            {t('back')}
           </button>
           <button
             className="btn btn-danger"
@@ -524,7 +529,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
               onError?.()
             }}
           >
-            Cancel Order
+            {t('cancelOrder')}
           </button>
         </div>
       </div>

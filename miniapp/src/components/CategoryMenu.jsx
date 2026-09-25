@@ -4,6 +4,7 @@ import CafeLogo from './CafeLogo.jsx'
 import { useCart } from '../context/CartContext.jsx'
 import { menuData } from '../data/menuData.js'
 import { useTelegram } from '../hooks/useTelegram.js'
+import { useLang } from '../context/LangContext.jsx'
 
 /**
  * CategoryMenu (Frame 3)
@@ -22,6 +23,7 @@ import { useTelegram } from '../hooks/useTelegram.js'
 export default function CategoryMenu({ onBack, onNext, bgProps }) {
   const { currentCategory, items, addItem, removeItem } = useCart()
   const { hapticFeedback } = useTelegram()
+  const { t, lang } = useLang()
 
   // Resolve items for the active category.
   const categoryItems = useMemo(() => {
@@ -39,9 +41,9 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
       <div style={{ position: 'absolute', inset: 0 }}>
         <SmartCafeBg {...bgProps} />
         <div className="frame-scroll" style={{ position: 'relative', zIndex: 2 }}>
-          <p>Please pick a category first.</p>
+          <p>{t('pickCategoryFirst')}</p>
           <button className="btn btn-secondary" onClick={onBack}>
-            ← Back
+            {t('back')}
           </button>
         </div>
       </div>
@@ -91,10 +93,13 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
               <span style={{ fontSize: 26, marginRight: 8 }}>
                 {currentCategory.icon}
               </span>
-              {currentCategory.nameEn}
+              {lang === 'am' && currentCategory.nameAm
+                ? currentCategory.nameAm
+                : currentCategory.nameEn}
             </h1>
             <p>
-              {currentCategory.nameAm} · {categoryItems.length} items
+              {lang === 'am' ? currentCategory.nameEn : currentCategory.nameAm} ·{' '}
+              {categoryItems.length} {categoryItems.length === 1 ? t('item') : t('items')}
             </p>
           </div>
         </div>
@@ -118,8 +123,12 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
                 }}
               >
                 <div className="item-info">
-                  <div className="item-name-en">{item.nameEn}</div>
-                  <div className="item-name-am">{item.nameAm}</div>
+                  <div className="item-name-en">
+                    {lang === 'am' && item.nameAm ? item.nameAm : item.nameEn}
+                  </div>
+                  <div className="item-name-am">
+                    {lang === 'am' ? item.nameEn : item.nameAm}
+                  </div>
                 </div>
 
                 <div className="item-price">{item.price} Br</div>
@@ -127,7 +136,7 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
                 <div className="qty-stepper">
                   {!inStock ? (
                     <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-red, #c44536)' }}>
-                      Out of stock
+                      {t('outOfStock')}
                     </span>
                   ) : (
                     <>
@@ -173,14 +182,14 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
       {/* Bottom action bar */}
       <div className="bottom-bar">
         <button className="btn btn-secondary" onClick={onBack}>
-          ← Back
+          {t('back')}
         </button>
         <button
           className="btn btn-primary"
           onClick={onNext}
           disabled={items.length === 0}
         >
-          Next ✓
+          {t('next')}
         </button>
       </div>
     </div>

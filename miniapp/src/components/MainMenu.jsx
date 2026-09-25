@@ -68,7 +68,7 @@ const MEAL_TABS = [
 export default function MainMenu({ onAdvance, bgProps }) {
   const { setCategory } = useCart()
   const { hapticFeedback } = useTelegram()
-  const { t, lang: userLanguage } = useLang()
+  const { t, lang } = useLang()
   const [activeMeal, setActiveMeal] = useState('all')
   // Live menu sync: bump a version counter when the DB-backed menu arrives so
   // category lists re-render. Items/categories edited in the In-Bot admin
@@ -114,13 +114,15 @@ export default function MainMenu({ onAdvance, bgProps }) {
     [activeMeal, menuVersion]
   )
 
-  // Resolve localized category name based on user language.
-  // Defensive: falls back to English name when anything is missing, so a
-  // null language can never crash the frame (the "dark screen" bug).
+  // Resolve localized category name based on the active locale (LangContext).
+  // NOTE: the DB only stores name_en + name_am (no Oromo column), so only
+  // Amharic speakers get a localized *item* name — Oromo users get the full
+  // Oromo UI chrome with English item names. Defensive fallbacks keep a
+  // missing name from ever crashing the frame (the "dark screen" bug).
   const localizedCatName = (cat) => {
     try {
       if (!cat) return ''
-      if (userLanguage === 'am' && cat.nameAm) return cat.nameAm
+      if (lang === 'am' && cat.nameAm) return cat.nameAm
       return cat.nameEn || ''
     } catch {
       return cat?.nameEn || ''

@@ -186,6 +186,9 @@ export async function syncMenuFromServer() {
 
     const serverCats = Array.isArray(catsRes?.categories) ? catsRes.categories : []
     const catMeta = new Map(serverCats.map((c) => [c.id, c]))
+    // Task 2: categories now carry `section` ('food'|'drink') and `hidden`.
+    const sectionOf = (catId) => (catMeta.get(catId)?.section === 'drink' ? 'drinks' : 'foods')
+    const isHidden = (catId) => catMeta.get(catId)?.hidden === true
 
     // Group server items by category
     const byCat = new Map()
@@ -213,12 +216,22 @@ export async function syncMenuFromServer() {
     }
 
     // Update existing static categories that exist on the server; append
-    // server-only categories under 'foods'.
+    // server-only categories under the section the server assigned (Task 2:
+    // food and drink are independent — a server category with section
+    // 'drink' goes to the drinks column, everything else to foods).
+    // Hidden (disabled) categories are dropped from the live data so they
+    // disappear from the Mini App without deleting their items.
     const existing = new Set()
     for (const section of [menuData.foods, menuData.drinks]) {
       for (let idx = 0; idx < section.categories.length; idx++) {
         const cat = section.categories[idx]
         if (byCat.has(cat.id)) {
+          if (isHidden(cat.id)) {
+            section.categories.splice(idx, 1)
+            idx--
+            existing.add(cat.id)
+            continue
+          }
           existing.add(cat.id)
           const meta = catMeta.get(cat.id)
           section.categories[idx] = {
@@ -237,7 +250,10 @@ export async function syncMenuFromServer() {
       }
     }
     for (const catId of byCat.keys()) {
-      if (!existing.has(catId)) menuData.foods.categories.push(toCategory(catId))
+      if (existing.has(catId) || isHidden(catId)) continue
+      const built = toCategory(catId)
+      if (sectionOf(catId) === 'drinks') menuData.drinks.categories.push(built)
+      else menuData.foods.categories.push(built)
     }
     return menuData
   } catch {

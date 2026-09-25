@@ -104,7 +104,17 @@ export async function ensureSchema() {
     role          TEXT NOT NULL DEFAULT 'staff',
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_login    TIMESTAMPTZ
-  );  CREATE TABLE IF NOT EXISTS user_langs (
+  );  CREATE TABLE IF NOT EXISTS blocked_users (
+    tg_user_id   BIGINT PRIMARY KEY,
+    tg_username  TEXT,
+    tg_first_name TEXT,
+    reason       TEXT,
+    blocked_by   BIGINT,
+    blocked_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE INDEX IF NOT EXISTS idx_blocked_users_username ON blocked_users(tg_username);
+
+  CREATE TABLE IF NOT EXISTS user_langs (
     tg_user_id    BIGINT PRIMARY KEY,
     lang          TEXT NOT NULL DEFAULT 'en',
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -115,16 +125,23 @@ export async function ensureSchema() {
     name_en    TEXT NOT NULL,
     name_am    TEXT,
     icon       TEXT NOT NULL DEFAULT '🍽️',
+    section    TEXT NOT NULL DEFAULT 'food' CHECK (section IN ('food', 'drink')),
+    hidden     BOOLEAN NOT NULL DEFAULT FALSE,
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   );
+  -- Migrations for DBs created before section/hidden existed (idempotent).
+  ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS section TEXT NOT NULL DEFAULT 'food';
+  ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS hidden  BOOLEAN NOT NULL DEFAULT FALSE;
+  ALTER TABLE menu_categories DROP CONSTRAINT IF EXISTS menu_categories_section_check;
+  ALTER TABLE menu_categories ADD  CONSTRAINT menu_categories_section_check CHECK (section IN ('food', 'drink'));
 
-  INSERT INTO menu_categories (id, name_en, name_am, icon, sort_order)
+  INSERT INTO menu_categories (id, name_en, name_am, icon, section, sort_order)
   VALUES
-    ('breakfast',  'Breakfast',  'ቁርስ',    '🌅', 1),
-    ('hot_drinks', 'Hot Drinks', 'ትኩስ መጠጦች', '☕', 2),
-    ('drinks',     'Drinks',     'መጠጦች',    '🥤', 3),
-    ('snacks',     'Snacks',     'መክሰስ',    '🥟', 4)
+    ('breakfast',  'Breakfast',  'ቁርስ',    '🌅', 'food',  1),
+    ('snacks',     'Snacks',     'መክሰስ',    '🥟', 'food',  2),
+    ('hot_drinks', 'Hot Drinks', 'ትኩስ መጠጦች', '☕', 'drink', 3),
+    ('drinks',     'Drinks',     'መጠጦች',    '🥤', 'drink', 4)
   ON CONFLICT (id) DO NOTHING;
   
 
@@ -270,3 +287,98 @@ export async function countTodaysOrdersForUser(tgUserId) {
   )
   return rows[0]?.n || 0
 }
+
+// ── Blocked users (scammer protection, Task 4) ──────────────────────────
+/**
+ * True when the Telegram user is on the blocklist. Called BEFORE any order
+ * is created (bot web_app_data path and POST /api/miniapp/orders), so a
+ * blocked user can never get an order saved — not just hidden client-side.
+ * DB errors fail OPEN (return false) so a transient DB blip never blocks
+ * all ordering.
+ */
+export async function isUserBlocked(tgUserId) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM blocked_users WHERE tg_user_id = $1 LIMIT 1`,
+      [Number(tgUserId)]
+    )
+    return rows.length > 0
+  } catch (e) {
+    console.warn('[db] isUserBlocked failed (fail-open):', e.message)
+    return false
+  }
+}
+
+/** Resolve a blocklist row from a numeric ID or an exact @username. */
+export async function findBlockedUser(idOrUsername) {
+  const raw = String(idOrUsername || '').trim().replace(/^@/, '')
+  if (/^\d+$/.test(raw)) {
+    const { rows } = await pool.query(
+      `SELECT * FROM blocked_users WHERE tg_user_id = $1`, [Number(raw)]
+    )
+    return rows[0] || null
+  }
+  const { rows } = await pool.query(
+    `SELECT * FROM blocked_users WHERE lower(tg_username) = lower($1) LIMIT 1`, [raw]
+  )
+  return rows[0] || null
+}
+
+/** Find a user's Telegram ID (and names) from past orders by ID or @username. */
+export async function findUserRef(idOrUsername) {
+  const raw = String(idOrUsername || '').trim().replace(/^@/, '')
+  if (/^\d+$/.test(raw)) {
+    const { rows } = await pool.query(
+      `SELECT tg_user_id, tg_username, tg_first_name
+         FROM orders WHERE tg_user_id::text = $1
+         ORDER BY created_at DESC LIMIT 1`, [raw]
+    )
+    if (rows[0]) return rows[0]
+    return { tg_user_id: Number(raw), tg_username: null, tg_first_name: null }
+  }
+  const { rows } = await pool.query(
+    `SELECT tg_user_id, tg_username, tg_first_name
+       FROM orders WHERE lower(tg_username) = lower($1)
+       ORDER BY created_at DESC LIMIT 1`, [raw]
+  )
+  return rows[0] || null
+}
+
+/** Block a Telegram user. Returns false when the ID is unusable. */
+export async function blockUser({ tgUserId, tgUsername = null, tgFirstName = null, reason = null, blockedBy = null }) {
+  const id = Number(tgUserId)
+  if (!Number.isSafeInteger(id) || id <= 0) return false
+  await pool.query(
+    `INSERT INTO blocked_users (tg_user_id, tg_username, tg_first_name, reason, blocked_by)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (tg_user_id)
+     DO UPDATE SET tg_username = EXCLUDED.tg_username,
+                   tg_first_name = EXCLUDED.tg_first_name,
+                   reason = COALESCE(EXCLUDED.reason, blocked_users.reason)`,
+    [id, tgUsername, tgFirstName, reason, blockedBy]
+  )
+  return true
+}
+
+export async function unblockUser(idOrUsername) {
+  const ref = await findBlockedUser(idOrUsername)
+  if (!ref) return null
+  await pool.query(`DELETE FROM blocked_users WHERE tg_user_id = $1`, [ref.tg_user_id])
+  return ref
+}
+
+export async function listBlockedUsers() {
+  const { rows } = await pool.query(
+    `SELECT b.*, o.order_count, o.last_order_at
+       FROM blocked_users b
+       LEFT JOIN (
+         SELECT tg_user_id,
+                COUNT(*)::int AS order_count,
+                MAX(created_at) AS last_order_at
+           FROM orders GROUP BY tg_user_id
+       ) o ON o.tg_user_id = b.tg_user_id
+      ORDER BY b.blocked_at DESC`
+  )
+  return rows
+}
+

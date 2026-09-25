@@ -42,10 +42,11 @@ export default function LocationName({ bgProps }) {
     successfulPayments,
   } = useCart()
   const { tg, initData, hapticFeedback } = useTelegram()
-  const { t } = useLang()
+  const { t, lang } = useLang()
 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [blocked, setBlocked] = useState(false)
   const [locating, setLocating] = useState(false)
   const [manualAddress, setManualAddress] = useState(
     customerLocation?.address || ''
@@ -61,7 +62,7 @@ export default function LocationName({ bgProps }) {
   const handleShareLocation = () => {
     if (!navigator?.geolocation) {
       // eslint-disable-next-line no-alert
-      alert('Geolocation is not available on this device.')
+      alert(t('geolocationUnavailable'))
       return
     }
     setLocating(true)
@@ -80,7 +81,7 @@ export default function LocationName({ bgProps }) {
         setLocating(false)
         hapticFeedback.notificationOccurred('error')
         // eslint-disable-next-line no-alert
-        alert('Could not get your location. Please enter your address manually.')
+        alert(t('geolocationFailed'))
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     )
@@ -118,6 +119,7 @@ export default function LocationName({ bgProps }) {
         price: i.price,
         quantity: i.quantity,
       })),
+      // Server re-checks availability; items already localized.
       total,
       trustLevel: successfulPayments,
     }
@@ -129,6 +131,15 @@ export default function LocationName({ bgProps }) {
         body: JSON.stringify({ initData, order: payload }),
       })
       const data = await res.json().catch(() => ({}))
+
+      // Task 4: server-side blocklist gate — show the "restricted" screen
+      // instead of a generic error. The order was NOT saved.
+      if (res.status === 403 && data.blocked) {
+        setBlocked(true)
+        setSubmitting(false)
+        hapticFeedback.notificationOccurred('error')
+        return
+      }
 
       if (!res.ok || !data.ok) {
         throw new Error(data.error || `Order failed (${res.status})`)
@@ -160,7 +171,7 @@ export default function LocationName({ bgProps }) {
       }, 800)
     } catch (e) {
       console.error('[order] submit failed:', e)
-      setSubmitError(e.message || 'Something went wrong. Please try again.')
+      setSubmitError(e.message || t('submitFailed'))
       setSubmitting(false)
       hapticFeedback.notificationOccurred('error')
     }
@@ -171,6 +182,67 @@ export default function LocationName({ bgProps }) {
   useEffect(() => {
     nameRef.current?.focus()
   }, [])
+
+  // Blocked screen (Task 4): replaces the ordering flow with a clear
+  // "restricted, contact support" message in the user's language.
+  if (blocked) {
+    return (
+      <div style={{ position: 'absolute', inset: 0 }}>
+        <SmartCafeBg {...bgProps} blur={4} brightness={0.3} />
+        <div
+          className="frame-scroll no-bottom-bar"
+          style={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100%',
+            textAlign: 'center',
+            padding: 24,
+          }}
+        >
+          <div
+            style={{
+              width: 90,
+              height: 90,
+              borderRadius: '50%',
+              background: 'rgba(196,69,54,0.12)',
+              border: '2px solid var(--accent-red, #c44536)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 40,
+            }}
+          >
+            ⛔
+          </div>
+          <h1
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 24,
+              fontWeight: 800,
+              margin: '16px 0 8px',
+              color: 'var(--accent-red, #c44536)',
+            }}
+          >
+            {t('blockedTitle')}
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, maxWidth: 300, margin: 0 }}>
+            {t('blockedMessage')}
+          </p>
+          <button
+            className="btn btn-secondary btn-block"
+            style={{ maxWidth: 280, marginTop: 24 }}
+            onClick={() => { try { tg?.close?.() } catch { /* no-op */ } }}
+          >
+            {t('contactSupport')}
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
@@ -184,11 +256,9 @@ export default function LocationName({ bgProps }) {
       <div className="frame-scroll no-bottom-bar" style={{ position: 'relative', zIndex: 2 }}>
         <div className="frame-header" style={{ paddingTop: 12 }}>
           <div className="title-block">
-            <h1>Almost There!</h1>
+            <h1>{t('almostThere')}</h1>
             <p>
-              {isDelivery
-                ? 'Where should we bring your order?'
-                : 'Just need your name to finish up'}
+              {isDelivery ? t('deliveryWhere') : t('nameOnly')}
             </p>
           </div>
         </div>
@@ -196,14 +266,14 @@ export default function LocationName({ bgProps }) {
         {/* Name */}
         <div style={{ marginBottom: 20 }}>
           <label className="input-label" htmlFor="cust-name">
-            Your name
+            {t('yourName')}
           </label>
           <input
             id="cust-name"
             ref={nameRef}
             type="text"
             className="input-field"
-            placeholder="e.g. Selam or Abebe"
+            placeholder={t('namePlaceholder')}
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
             maxLength={60}
@@ -214,7 +284,7 @@ export default function LocationName({ bgProps }) {
         {/* Location (delivery only) */}
         {isDelivery && (
           <div style={{ marginBottom: 20 }}>
-            <label className="input-label">Delivery location</label>
+            <label className="input-label">{t('deliveryLocation')}</label>
 
             <button
               type="button"
@@ -223,7 +293,7 @@ export default function LocationName({ bgProps }) {
               disabled={locating}
               style={{ marginBottom: 12 }}
             >
-              {locating ? '📍 Locating…' : '📍 Share my location'}
+              {locating ? t('locating') : t('shareLocation')}
             </button>
 
             {customerLocation?.lat && (
@@ -237,7 +307,7 @@ export default function LocationName({ bgProps }) {
                   gap: 6,
                 }}
               >
-                ✓ Location captured ({customerLocation.lat.toFixed(4)},{' '}
+                {t('locationCaptured')} ({customerLocation.lat.toFixed(4)},{' '}
                 {customerLocation.lon.toFixed(4)})
               </div>
             )}
@@ -245,7 +315,7 @@ export default function LocationName({ bgProps }) {
             <input
               type="text"
               className="input-field"
-              placeholder="Or enter your address manually (e.g. Bole Rd, Friendship Bldg)"
+              placeholder={t('addressPlaceholder')}
               value={manualAddress}
               onChange={handleAddressChange}
               maxLength={200}
@@ -272,9 +342,15 @@ export default function LocationName({ bgProps }) {
             }}
           >
             <span>
-              {items.length} {items.length === 1 ? 'item' : 'items'}
+              {items.length} {items.length === 1 ? t('item') : t('items')}
             </span>
-            <span>{serviceType === 'delivery' ? 'Delivery' : serviceType === 'dine_in' ? 'Dine in' : 'Takeaway'}</span>
+            <span>
+              {serviceType === 'delivery'
+                ? t('deliveryShort')
+                : serviceType === 'dine_in'
+                ? t('dineInShort')
+                : t('takeawayShort')}
+            </span>
           </div>
           <div
             style={{
@@ -285,7 +361,7 @@ export default function LocationName({ bgProps }) {
               paddingTop: 8,
             }}
           >
-            <span style={{ fontWeight: 600, fontSize: 14 }}>Total</span>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>{t('total')}</span>
             <span
               style={{
                 color: 'var(--accent-gold)',
@@ -307,10 +383,10 @@ export default function LocationName({ bgProps }) {
           style={{ minHeight: 54 }}
         >
           {submitting
-            ? 'Placing order…'
+            ? t('placingOrder')
             : isDelivery
-            ? '🚗 Place Delivery Order'
-            : '✓ Place Order'}
+            ? t('placeDeliveryOrder')
+            : t('placeOrder')}
         </button>
 
         {submitError && (
@@ -339,7 +415,7 @@ export default function LocationName({ bgProps }) {
             marginTop: 12,
           }}
         >
-          By placing this order you confirm the details above.
+          {t('byConfirming')}
         </p>
       </div>
     </div>

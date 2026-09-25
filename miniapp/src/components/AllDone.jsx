@@ -2,6 +2,7 @@ import React from 'react'
 import SmartCafeBg from './SmartCafeBg.jsx'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
+import { useLang } from '../context/LangContext.jsx'
 
 /**
  * AllDone (Frame 4)
@@ -12,10 +13,16 @@ import { useTelegram } from '../hooks/useTelegram.js'
  * - Summary list: name, ×qty, line total (gold)
  * - Total line with gold border-top
  * - Bottom buttons: [← Add More]  [All Done ✓]
+ *
+ * Locale: single source of truth — useLang() (Task 3).
  */
 export default function AllDone({ onAddMore, onDone, bgProps }) {
   const { items, total, itemCount } = useCart()
   const { hapticFeedback } = useTelegram()
+  const { t, lang } = useLang()
+
+  const localizedItemName = (item) => (lang === 'am' && item.nameAm ? item.nameAm : item.nameEn)
+  const secondaryName = (item) => (lang === 'am' ? item.nameEn : item.nameAm)
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
@@ -31,10 +38,9 @@ export default function AllDone({ onAddMore, onDone, bgProps }) {
       >
         <div className="frame-header" style={{ paddingTop: 12 }}>
           <div className="title-block">
-            <h1>Your Order</h1>
+            <h1>{t('yourOrder')}</h1>
             <p>
-              {itemCount} {itemCount === 1 ? 'item' : 'items'} · review before
-              confirming
+              {itemCount} {itemCount === 1 ? t('item') : t('items')} · {t('reviewBeforeConfirming')}
             </p>
           </div>
         </div>
@@ -50,7 +56,7 @@ export default function AllDone({ onAddMore, onDone, bgProps }) {
           >
             <div style={{ fontSize: 40, marginBottom: 8 }}>🛒</div>
             <p style={{ margin: 0, fontSize: 14 }}>
-              Your cart is empty. Add some items first!
+              {t('cartEmpty')}
             </p>
           </div>
         ) : (
@@ -62,7 +68,7 @@ export default function AllDone({ onAddMore, onDone, bgProps }) {
                 style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="sum-name">
-                  {item.nameEn}
+                  {localizedItemName(item)}
                   <div
                     style={{
                       fontSize: 12,
@@ -70,7 +76,7 @@ export default function AllDone({ onAddMore, onDone, bgProps }) {
                       fontWeight: 400,
                     }}
                   >
-                    {item.nameAm}
+                    {secondaryName(item)}
                   </div>
                 </div>
                 <div className="sum-qty">×{item.quantity}</div>
@@ -81,7 +87,7 @@ export default function AllDone({ onAddMore, onDone, bgProps }) {
             ))}
 
             <div className="total-line">
-              <div className="total-label">Total</div>
+              <div className="total-label">{t('total')}</div>
               <div className="total-value">{total} Br</div>
             </div>
           </>
@@ -96,7 +102,7 @@ export default function AllDone({ onAddMore, onDone, bgProps }) {
             onAddMore?.()
           }}
         >
-          ← Add More
+          {t('addMore')}
         </button>
         <button
           className="btn btn-primary"
@@ -106,7 +112,7 @@ export default function AllDone({ onAddMore, onDone, bgProps }) {
             onDone?.()
           }}
         >
-          All Done ✓
+          {t('allDone')}
         </button>
       </div>
     </div>

@@ -41,6 +41,7 @@ import ordersRoutes from './routes/orders.js'
 import menuRoutes from './routes/menu.js'
 import paymentRoutes from './routes/payment.js'
 import miniappRoutes from './routes/miniapp.js'
+import blockedUsersRoutes from './routes/blocked-users.js'
 
 const PORT = process.env.PORT || 3000
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -82,6 +83,9 @@ app.use('/api/menu', menuRoutes)
 
 // Public order submission from the Mini App (auth via Telegram initData)
 app.use('/api/miniapp', miniappRoutes)
+
+// Blocklist management (Task 4) — web admin panel + customer directory
+app.use('/api/blocked-users', blockedUsersRoutes)
 
 // Public auth routes (login flow)
 app.use('/api/auth', authRoutes)

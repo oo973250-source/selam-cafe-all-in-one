@@ -8,11 +8,17 @@ export default function OrderDetail({ orderId, onBack }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isBlocked, setIsBlocked] = useState(false)
 
   async function refresh() {
     try {
       const r = await api.getOrder(orderId)
       setData(r)
+      // Task 4: reflect the customer's block status on the order record.
+      try {
+        const bl = await api.listBlockedUsers()
+        setIsBlocked((bl.users || []).some((b) => b.tg_user_id === r.order?.tg_user_id))
+      } catch { /* blocklist unavailable — leave as-is */ }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -23,6 +29,29 @@ export default function OrderDetail({ orderId, onBack }) {
   useEffect(() => {
     refresh()
   }, [orderId])
+
+  async function toggleBlock() {
+    const order = data?.order
+    const idOrUsername = order?.tg_user_id
+      ? String(order.tg_user_id)
+      : order?.tg_username
+      ? `@${order.tg_username}`
+      : null
+    if (!idOrUsername) { alert('No Telegram identity on this order.'); return }
+    try {
+      if (isBlocked) {
+        if (!confirm(`Unblock ${idOrUsername}? They can place orders again.`)) return
+        await api.unblockUser(order.tg_user_id)
+        setIsBlocked(false)
+      } else {
+        if (!confirm(`Block ${idOrUsername}? They will not be able to place new orders (bot or Mini App).`)) return
+        await api.blockUser({ idOrUsername, reason: 'blocked from order record' })
+        setIsBlocked(true)
+      }
+    } catch (e) {
+      alert('Failed: ' + e.message)
+    }
+  }
 
   async function changeStatus(newStatus) {
     try {
@@ -102,6 +131,15 @@ export default function OrderDetail({ orderId, onBack }) {
             </div>
           )}
           <p><strong>Trust level:</strong> {order.trust_level} past payments</p>
+          <p>
+            <strong>Ordering:</strong>{' '}
+            <span className={`pill ${isBlocked ? 'cancelled' : 'served'}`}>
+              {isBlocked ? '⛔ blocked' : '✅ allowed'}
+            </span>{' '}
+            <button onClick={toggleBlock}>
+              {isBlocked ? 'Unblock user' : 'Block user'}
+            </button>
+          </p>
         </div>
 
         <div className="card">
