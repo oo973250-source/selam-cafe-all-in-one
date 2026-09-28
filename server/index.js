@@ -42,6 +42,7 @@ import menuRoutes from './routes/menu.js'
 import paymentRoutes from './routes/payment.js'
 import miniappRoutes from './routes/miniapp.js'
 import blockedUsersRoutes from './routes/blocked-users.js'
+import adminMiniappRoutes from './routes/admin-miniapp.js'
 
 const PORT = process.env.PORT || 3000
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -89,6 +90,9 @@ app.use('/api/blocked-users', blockedUsersRoutes)
 
 // Public auth routes (login flow)
 app.use('/api/auth', authRoutes)
+
+// Admin Mini App auth (Telegram initData → JWT; mounted dist will live at /amadmin)
+app.use('/api/admin-miniapp', adminMiniappRoutes)
 
 // Internal endpoint — bot can POST here (but in all-in-one, the bot is in the
 // same process, so it can just call io.emit directly. This is kept for external use.)

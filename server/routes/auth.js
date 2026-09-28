@@ -87,7 +87,7 @@ router.post('/login-code', async (req, res) => {
       tgUserId,
       username: pending.username,
       firstName: pending.firstName,
-      role: 'staff',
+      role: 'owner',
     })
 
     res.cookie('selam_token', token, {
@@ -104,7 +104,7 @@ router.post('/login-code', async (req, res) => {
         tgUserId,
         username: pending.username,
         firstName: pending.firstName,
-        role: 'staff',
+        role: 'owner',
       },
     })
   } catch (e) {
@@ -141,7 +141,7 @@ router.post('/telegram-callback', async (req, res) => {
     tgUserId,
     username: auth.username || null,
     firstName: auth.first_name || null,
-    role: 'staff',
+    role: 'owner',
   })
 
   res.cookie('selam_token', token, {
@@ -158,7 +158,7 @@ router.post('/telegram-callback', async (req, res) => {
       username: auth.username,
       firstName: auth.first_name,
       photoUrl: auth.photo_url,
-      role: 'staff',
+      role: 'owner',
     },
   })
 })
