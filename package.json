@@ -12,7 +12,8 @@
     "build:miniapp": "cd miniapp && npm install && npm run build",
     "build:admin": "cd admin && npm install && npm run build",
     "build:all": "npm run build:miniapp && npm run build:admin",
-    "db:init": "node server/scripts/init-db.js"
+    "db:init": "node server/scripts/init-db.js",
+    "test:admin-auth": "node server/scripts/test-admin-miniapp-auth.mjs"
   },
   "dependencies": {
     "express": "^4.21.0",
