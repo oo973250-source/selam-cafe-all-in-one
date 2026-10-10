@@ -1,0 +1,1727 @@
+/* Selam Cafe admin miniapp — dark, touch-first, pill-based design (per mocks) */
+
+:root {
+  --bg: #141414;
+  --card: #242424;
+  --card-inner: #1a1a1a;
+  --border: #5a5a5a;
+  --border-soft: #3a3a3a;
+  --text: #ffffff;
+  --muted: #cfcfcf;
+  --hint: #9a9a9a;
+  --gold: #a8922e;
+  --gold-bright: #ffe14d; /* Page 1 v3: "started" state — bright yellow */
+  --gold-green: #8fa318;
+  --red: #c0272d;
+  --red-dim-bg: #4e2b2b;
+  --red-dim-border: #8a4a4a;
+  --red-dim-text: #e8a0a0;
+  --slate: #44586c;
+  --back-bg: #39424c;
+  --back-fg: #9fc3d8;
+  --green: #47a35c;
+  --green-bright: #66c07a;
+  --purple: #6d5af8; /* Page 9 profile actions (pin / change / update) */
+  --radius-card: 26px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #000; /* outside the app frame */
+}
+
+/* phones: the frame fills the width — keep scrolled areas seamless */
+@media (max-width: 479px) {
+  html,
+  body {
+    background: #141414;
+  }
+}
+
+body {
+  font-family: var(--font);
+  color: var(--text);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.app {
+  max-width: 470px;
+  height: 100vh; /* definite height: Page 4's scroll area fills the exact leftover */
+  height: 100dvh;
+  margin: 0 auto;
+  background: var(--bg);
+  padding-bottom: 40px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* plain pages scroll with the body — never compress; Page 4 opts into flexing */
+.app > * {
+  flex-shrink: 0;
+}
+
+/* ---------- header ---------- */
+.header {
+  padding: 14px 14px 6px;
+}
+
+.header-top {
+  position: relative;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back-btn {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid #56606a;
+  background: var(--back-bg);
+  color: var(--back-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.brand-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.brand {
+  font-size: 42px;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: 0.5px;
+}
+
+.brand-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+/* segmented switcher (root tabs) */
+.seg {
+  display: flex;
+  gap: 4px;
+  background: #202020;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px;
+  margin-top: 10px;
+  flex-shrink: 0;
+}
+
+.seg button {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 17px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.seg button.active {
+  background: #ffffff;
+  color: #111;
+  border: 1px solid #d8d8d8;
+}
+
+/* deep-page badge variant */
+.header-side {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: 58%;
+  flex-shrink: 0;
+}
+
+.badge-menu {
+  background: #202020;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 22px 10px;
+  text-align: center;
+  font-size: 26px;
+}
+
+/* icon glyph inside a badge pill (Page 9: 👤 Profile) */
+.badge-ico {
+  font-size: 22px;
+  margin-right: 8px;
+  vertical-align: -2px;
+}
+
+.seg-sub {
+  margin-top: 0;
+  justify-content: center;
+}
+
+.seg-sub button {
+  font-size: 15px;
+  padding: 9px 14px;
+}
+
+/* ---------- separator ---------- */
+.hr {
+  height: 3px;
+  background: var(--border-soft);
+  margin: 12px 0 20px;
+}
+
+/* ---------- filter bar (Page 1) ---------- */
+.filters {
+  display: flex;
+  gap: 4px;
+  background: #202020;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px;
+  margin: 0 14px;
+}
+
+.filters button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  padding: 11px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.filters button.active {
+  background: #ffffff;
+  color: #111;
+  font-weight: 600;
+}
+
+/* ---------- order cards (Page 1) ---------- */
+.card {
+  position: relative;
+  margin: 0 14px 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 16px 14px 14px;
+}
+
+.badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #3a3a3a;
+  border: 1px solid #6a6a6a;
+  color: var(--text);
+  font-size: 12.5px;
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+
+/* Page 1 v3 — staff/cooker name pill, TOP-LEFT corner of a started order.
+   Light blue like the mock; white-ish border per the global white-outline rule. */
+.staff-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #cfe4f8;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  color: #10283c;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 4px 13px;
+}
+
+/* push the title below the staff pill so the top-left badge never overlaps it */
+.card.has-staff .card-title {
+  margin-top: 24px;
+}
+
+.card-title {
+  font-size: 22px;
+  line-height: 1.35;
+  margin: 4px 0 10px;
+  padding-right: 90px;
+  white-space: pre-line;
+  text-align: left;
+}
+
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  margin: 10px 0;
+  color: var(--text);
+}
+
+.meta-emoji {
+  flex-shrink: 0;
+}
+
+.meta-text {
+  overflow: hidden;
+}
+
+.loc-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: #ffffff;
+  color: #111;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-size: 14px;
+}
+
+.actions {
+  margin-top: 14px;
+  background: var(--card-inner);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.btn {
+  border-radius: 999px;
+  border: 1px solid #7a7a7a;
+  background: #2e2e2e;
+  color: var(--text);
+  font-size: 13.5px;
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.85;
+  cursor: default;
+}
+
+.btn-gold {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.btn-goldgreen {
+  background: var(--gold-green);
+  border-color: var(--gold-green);
+}
+
+/* Page 1 v3 — "started" = bright yellow (was golden-green). Stays disabled:
+   status only moves forward (Finished / Cancel). */
+.btn-started {
+  background: var(--gold-bright);
+  border-color: var(--gold-bright);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn-cancel {
+  background: #232323;
+}
+
+.btn-details {
+  background: var(--slate);
+  border-color: var(--slate);
+  font-size: 12px;
+  padding: 10px 11px;
+}
+
+/* ---------- manager hub (Page 2) ---------- */
+.mpill {
+  display: block;
+  width: calc(100% - 28px);
+  margin: 0 14px 24px;
+  padding: 22px 16px;
+  border-radius: 999px;
+  background: #2a2a2a;
+  border: 1px solid #6a6a6a;
+  color: var(--text);
+  font-size: 23px;
+  text-align: center;
+}
+
+.mpill:active {
+  transform: scale(0.985);
+}
+
+.mpill-danger {
+  color: #ff5a5a;
+  border-color: #8a3a3a;
+}
+
+.mpill-active {
+  background: var(--red-dim-bg);
+  color: #ffd7d7;
+}
+
+/* ---------- menu categories (Page 3) ---------- */
+.cat-card {
+  padding: 18px 14px 14px;
+}
+
+.cat-title {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 24px;
+  text-align: left;
+  padding: 0 0 12px;
+  margin: 0;
+}
+
+.ipanel {
+  background: var(--card-inner);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 10px;
+}
+
+.tg {
+  border-radius: 999px;
+  border: 1px solid #7a7a7a;
+  background: #2e2e2e;
+  color: #d8d8d8;
+  font-size: 13.5px;
+  padding: 8px 14px;
+}
+
+.tg-unavail.on {
+  background: var(--red-dim-bg);
+  border-color: var(--red-dim-border);
+  color: var(--red-dim-text);
+}
+
+.tg-nodel.on {
+  background: var(--red);
+  border-color: var(--red);
+  color: #ffffff;
+}
+
+/* ---------- states ---------- */
+.spinner-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 0;
+}
+
+.spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid #3a3a3a;
+  border-top-color: #cfcfcf;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner-label {
+  color: var(--hint);
+  font-size: 14px;
+}
+
+.empty {
+  text-align: center;
+  color: var(--hint);
+  padding: 50px 20px;
+  font-size: 16px;
+}
+
+.banner {
+  margin: 0 14px 18px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  text-align: center;
+  font-size: 14.5px;
+}
+
+.banner-red {
+  background: var(--red-dim-bg);
+  border: 1px solid var(--red-dim-border);
+  color: var(--red-dim-text);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  background: #2e2e2e;
+  border: 1px solid #6a6a6a;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 11px 20px;
+  font-size: 14px;
+  max-width: 86vw;
+  z-index: 50;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  animation: toast-in 0.18s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* ---------- boot screens ---------- */
+.boot-screen {
+  min-height: calc(100vh - 40px); /* .app pads 40px — keep boot screens scroll-free */
+  min-height: calc(100dvh - 40px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 30px;
+  gap: 6px;
+}
+
+.boot-icon {
+  font-size: 44px;
+  margin-bottom: 8px;
+}
+
+.boot-screen h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.boot-screen p {
+  margin: 6px 0 18px;
+  color: var(--hint);
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+/* plain pages scroll with the body — never compress; list pages (3/4/5) opt into flexing */
+.page-items,
+.page-scroll {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* allows the inner list to scroll instead of stretching the page */
+  overflow: hidden;
+}
+
+/* custom scrollbar: capsule track far left + white pill thumb */
+.vscroll {
+  flex: 1 1 auto;
+  min-height: 340px;
+  display: flex;
+  gap: 12px;
+  padding: 2px 14px 6px;
+  overflow: hidden;
+}
+
+.vscroll-track {
+  position: relative;
+  width: 30px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #1d1d1d;
+}
+
+.vscroll-thumb {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 9px;
+  margin-left: -4.5px;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.vscroll-view {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-right: 2px;
+}
+
+.vscroll-view::-webkit-scrollbar {
+  display: none;
+}
+
+.item-card {
+  margin: 0 0 18px;
+}
+
+.item-card:last-child {
+  margin-bottom: 8px;
+}
+
+.item-off {
+  opacity: 0.55;
+}
+
+.item-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.item-name {
+  font-size: 23px;
+  line-height: 1.3;
+  padding-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.item-ico {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ico-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.ico-btn:disabled {
+  opacity: 0.5;
+}
+
+.item-price {
+  font-size: 19px;
+  margin-top: 14px;
+}
+
+.item-price-val {
+  margin-left: 34px;
+}
+
+.item-unflag {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--red-dim-text);
+}
+
+/* long category names in the header badge */
+.badge-menu {
+  word-break: break-word;
+  line-height: 1.2;
+}
+
+.badge-menu-sm {
+  font-size: 19px;
+  padding: 16px 10px;
+}
+
+/* ---------- item edit modal (Page 4) ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 60;
+}
+
+.modal {
+  width: 100%;
+  max-width: 470px;
+  background: #1c1c1c;
+  border: 1px solid var(--border);
+  border-radius: 26px 26px 0 0;
+  padding: 18px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+  max-height: 88vh;
+  overflow-y: auto;
+  animation: sheet-up 0.22s ease-out;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(48px);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.modal-title {
+  margin: 0 0 4px;
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.f-label {
+  font-size: 13px;
+  color: var(--hint);
+  margin: 14px 0 6px;
+}
+
+.f-input,
+.f-area {
+  width: 100%;
+  background: #141414;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  color: var(--text);
+  font-size: 16px;
+  font-family: inherit;
+  padding: 12px 14px;
+}
+
+.f-input:focus,
+.f-area:focus {
+  outline: none;
+  border-color: #8a8a8a;
+}
+
+.f-area {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.f-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.f-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid var(--border-soft);
+  background: #242424;
+  flex-shrink: 0;
+}
+
+/* availability pill inside the modal — white = available (standard active pill) */
+.tg-avail.on {
+  background: #ffffff;
+  border-color: #d8d8d8;
+  color: #111111;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-actions .btn {
+  flex: 1;
+  padding: 13px;
+  font-size: 15px;
+}
+
+/* ---------- Page 5: Categorize (search + add + category pills) ---------- */
+.controls-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 14px 20px;
+  flex-shrink: 0;
+}
+
+.search-pill {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #202020;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 12px 16px;
+}
+
+.search-ico {
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 17px;
+  font-family: inherit;
+  padding: 0;
+}
+
+.search-input::placeholder {
+  color: var(--hint);
+}
+
+.add-btn {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: #c9c9c9;
+  color: #1c1c1c;
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.add-btn:active {
+  transform: scale(0.94);
+}
+
+.cat-pill {
+  display: block;
+  width: 100%;
+  background: #2f2f2f;
+  border: 1px solid #7d7d7d;
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 22px;
+  text-align: center;
+  padding: 21px 18px;
+  margin: 0 0 20px;
+  overflow-wrap: anywhere;
+}
+
+.cat-pill:last-child {
+  margin-bottom: 8px;
+}
+
+.cat-pill:active {
+  transform: scale(0.985);
+}
+
+/* thin scrollbar variant — APP-WIDE standard (Page 8 directive): ultra-thin
+   native-overlay-style rail (2–4px), subtle white thumb. Replaces the wide
+   capsule track on every scroll container (Pages 3/4/6 switched, 5 already thin). */
+.vscroll-thin .vscroll-track {
+  width: 3px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vscroll-thin .vscroll-thumb {
+  width: 3px;
+  margin-left: 0;
+  background: rgba(255, 255, 255, 0.55);
+  opacity: 1;
+}
+
+/* cards inside any scroll view sit flush (the view already has side padding) */
+.vscroll-view .card {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.vscroll-view .metric-card {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* edit-category modal extras */
+.btn-danger {
+  background: var(--red);
+  border-color: var(--red);
+  color: #ffffff;
+}
+
+.f-section {
+  display: inline-block;
+  background: #2e2e2e;
+  border: 1px solid #7a7a7a;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-size: 14.5px;
+  color: var(--text);
+}
+
+.pos-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: #141414;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  padding: 8px 12px;
+}
+
+.pos-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: #2e2e2e;
+  color: var(--text);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.pos-btn:disabled {
+  opacity: 0.35;
+}
+
+.pos-val {
+  font-size: 16px;
+  min-width: 64px;
+  text-align: center;
+}
+
+/* ---------- Page 6: Admins (metrics toggle + staff cards) ---------- */
+.period-bar {
+  display: flex;
+  justify-content: center;
+  padding: 0 14px 18px;
+  flex-shrink: 0;
+}
+
+.period-bar .seg {
+  width: 100%;
+  max-width: 360px;
+  margin-top: 0;
+}
+
+.period-bar .seg button {
+  flex: 1;
+}
+
+/* the + button row sits INSIDE the scroll region (rail extends up beside it) */
+.add-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0 16px;
+}
+
+.admin-card {
+  margin: 0 0 22px;
+}
+
+.admin-card:last-child {
+  margin-bottom: 8px;
+}
+
+.admin-suspended {
+  opacity: 0.55;
+}
+
+.admin-flex {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.admin-avatar {
+  width: 92px;
+  height: 92px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: #2f2f2f;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.admin-avatar-fb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  color: var(--muted);
+}
+
+.admin-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-name {
+  font-size: 21px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.admin-id {
+  font-size: 13px;
+  color: var(--hint);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.admin-metric-label {
+  font-size: 16.5px;
+  margin-top: 12px;
+}
+
+.admin-metric-val {
+  font-size: 16.5px;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.admin-actions {
+  flex-direction: column;
+}
+
+.admin-unflag {
+  margin-top: 10px;
+}
+
+/* chips (role / permissions / shift) inside the modals */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  border-radius: 999px;
+  border: 1px solid #7a7a7a;
+  background: #2e2e2e;
+  color: #d8d8d8;
+  font-size: 13.5px;
+  padding: 8px 14px;
+}
+
+.chip.on {
+  background: #ffffff;
+  border-color: #d8d8d8;
+  color: #111;
+}
+
+/* Telegram ID verification (add modal + profile strip in edit sheet) */
+.verify-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.verify-row .f-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-verify {
+  flex-shrink: 0;
+  padding: 11px 16px;
+}
+
+.verify-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #141414;
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+}
+
+.verify-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #2f2f2f;
+  border: 1px solid var(--border);
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.verify-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.verify-name {
+  font-size: 15.5px;
+  overflow-wrap: anywhere;
+}
+
+.verify-sub {
+  font-size: 12.5px;
+  color: var(--hint);
+  overflow-wrap: anywhere;
+}
+
+.verify-ok {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  color: var(--gold-green);
+}
+
+@media (min-width: 480px) {
+  .app {
+    border-radius: 0;
+  }
+}
+
+/* ---------- Page 7: Admin panel (emergency pause / store status) ---------- */
+
+/* kill-switch button — replaces the badge pill in the brand row */
+.ep-btn {
+  width: 100%;
+  border: 1.5px solid #e8e8e8;
+  background: transparent;
+  color: var(--text);
+  border-radius: 22px;
+  padding: 21px 8px;
+  font-size: 17.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.ep-btn:active {
+  transform: scale(0.98);
+}
+
+.ep-btn-on {
+  background: var(--red);
+  border-color: var(--red);
+  color: #ffffff;
+}
+
+.ap-wrap {
+  padding: 0 14px;
+}
+
+.ap-h {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  margin: 6px 0 12px;
+}
+
+.ap-h2 {
+  margin-top: 24px;
+}
+
+.ap-panel {
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 5px 14px;
+}
+
+.ap-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 11px 0;
+}
+
+.ap-label {
+  flex: 1 1 auto;
+  min-width: 118px;
+  font-size: 15.5px;
+  line-height: 1.3;
+}
+
+.ap-sep {
+  height: 1px;
+  background: var(--border-soft);
+  margin: 3px 0;
+}
+
+.ap-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ap-unit {
+  font-size: 15px;
+}
+
+/* stepper: − value + */
+.ap-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ap-step-btn {
+  width: 29px;
+  height: 29px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: #2e2e2e;
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.ap-step-btn:disabled {
+  opacity: 0.35;
+}
+
+.ap-val {
+  background: #141414;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 17px;
+  font-family: inherit;
+  text-align: center;
+  padding: 8px 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ap-val:focus {
+  outline: none;
+  border-color: #9a9a9a;
+}
+
+/* delivery service switch */
+.ap-tgl-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.ap-tgl {
+  width: 58px;
+  height: 32px;
+  border-radius: 999px;
+  border: none;
+  background: #4a4a4a;
+  position: relative;
+  padding: 0;
+  transition: background 0.18s ease;
+  flex-shrink: 0;
+}
+
+.ap-tgl.on {
+  background: var(--green);
+}
+
+.ap-tgl-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform 0.18s ease;
+}
+
+.ap-tgl.on .ap-tgl-knob {
+  transform: translateX(26px);
+}
+
+.ap-avail {
+  color: var(--green-bright);
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.ap-unavail {
+  color: #ff6b6b;
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+/* ✓ apply buttons (pause / close rows) */
+.ap-apply {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid #d8d8d8;
+  background: #ffffff;
+  color: #111111;
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.ap-apply:disabled {
+  opacity: 0.3;
+}
+
+.ap-reason {
+  margin: 4px 0 12px;
+  min-height: 150px;
+}
+
+.ap-hint {
+  color: var(--muted);
+  font-size: 14.5px;
+  line-height: 1.45;
+  margin: 10px 2px 0;
+}
+
+.ap-hr {
+  margin: 24px 0 18px;
+}
+
+/* countdown status box */
+.ap-count {
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 18px 14px;
+  text-align: center;
+}
+
+.ap-count-on {
+  border-color: var(--red-dim-border);
+}
+
+.ap-count-label {
+  font-size: 19px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.ap-count-idle {
+  color: var(--hint);
+  font-size: 16px;
+}
+
+.ap-count-timer {
+  display: inline-block;
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 26px;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ap-count-dim {
+  color: var(--hint);
+}
+
+.ap-count-chip {
+  margin-top: 14px;
+  border-radius: 999px;
+  border: 1px solid var(--red-dim-border);
+  background: var(--red-dim-bg);
+  color: var(--red-dim-text);
+  font-size: 14px;
+  padding: 8px 24px;
+}
+
+.ap-count-chip:disabled {
+  opacity: 0.5;
+}
+
+/* bottom quick-nav (Menu shortcut only — Star/Announcements/REPORTS removed;
+   single button centered so the bar doesn't look lopsided) */
+.ap-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 14px 2px 8px;
+}
+
+.ap-nav .ico-btn {
+  color: var(--muted);
+}
+
+.banner-reason {
+  display: block;
+  font-size: 13px;
+  margin-top: 4px;
+  color: #f2c9c9;
+}
+
+/* ---------- Page 8: Revenue (financial analytics) ---------- */
+/* metric cards — clean thin WHITE outline per user directive: pops against the
+   dark background (border 1px solid rgba(255,255,255,0.8)), centered stack */
+.metric-card {
+  margin: 0 0 18px;
+  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-card);
+  padding: 28px 18px 22px;
+  text-align: center;
+}
+
+.metric-value {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1.15;
+}
+
+.metric-label {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+/* ---------- Page 9: Profile (cafe profile & business settings) ---------- */
+/* One white-outlined panel (global directive: border 1px rgba(255,255,255,0.8))
+   with a legend pill overlapping its top edge; content scrolls in the app-wide
+   ultra-thin rail (VScroll thin). */
+
+.profile-panel {
+  position: relative;
+  margin: 30px 0 12px;
+  background: #1d1d1d;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-card);
+  padding: 30px 8px 16px;
+}
+
+.profile-legend {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: #202020;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 15.5px;
+  font-weight: 600;
+}
+
+.pf-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+}
+
+/* description row: label top-aligned with the textarea text */
+.pf-row-top {
+  align-items: flex-start;
+}
+
+.pf-row-top .pf-label {
+  padding-top: 13px;
+}
+
+.pf-row-top .pf-ctl {
+  gap: 8px;
+}
+
+.pf-ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.pf-ico-red {
+  background: rgba(224, 72, 62, 0.22);
+}
+
+.pf-ico-green {
+  background: rgba(52, 168, 83, 0.24);
+}
+
+.pf-ico-blue {
+  background: rgba(66, 133, 244, 0.22);
+}
+
+.pf-ico-purple {
+  background: rgba(109, 90, 248, 0.26);
+}
+
+.pf-ico-yellow {
+  background: rgba(251, 188, 5, 0.2);
+}
+
+.pf-label {
+  flex: 0 0 auto;
+  width: 90px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap; /* mock: labels on one line */
+}
+
+.pf-ctl {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pf-input {
+  width: 100%;
+  min-width: 0;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+  padding: 11px 12px;
+}
+
+.pf-input:focus {
+  outline: none;
+  border-color: #ffffff;
+}
+
+/* purple map-pin button on the Location row (interim: opens a maps search) */
+.pf-pin {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  border: none;
+  background: var(--purple);
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* picture row: preview + two compact buttons must fit one line on 430px */
+.pf-row .pf-ctl {
+  gap: 4px;
+}
+
+.pf-row .pf-ctl.pf-wrap {
+  flex-wrap: wrap; /* safety: wrap instead of clip on very narrow screens */
+  row-gap: 8px;
+}
+
+.pf-preview {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: #141414;
+  color: var(--hint);
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pf-btn-change {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  border-radius: 999px;
+  background: var(--purple);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 8px 9px;
+  white-space: nowrap;
+}
+
+.pf-btn-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #161616;
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 8px 9px;
+  white-space: nowrap;
+}
+
+/* fixed-metric inline icons inside the picture-row buttons (emoji width varies) */
+.pf-bi {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* opening hours: two selects + "–", native dropdown, custom white chevron */
+.pf-times {
+  gap: 8px;
+}
+
+.pf-select {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: #141414
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%23ffffff' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>")
+    no-repeat right 10px center / 12px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 11px 26px 11px 10px;
+}
+
+.pf-select:focus {
+  outline: none;
+  border-color: #ffffff;
+}
+
+.pf-dash {
+  color: var(--hint);
+  flex-shrink: 0;
+}
+
+/* description: textarea + live N/200 counter bottom-right inside the field */
+.pf-ta {
+  position: relative;
+  align-items: stretch;
+}
+
+.pf-area {
+  width: 100%;
+  min-height: 86px;
+  resize: vertical;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+  line-height: 1.4;
+  padding: 11px 12px 24px;
+}
+
+.pf-area:focus {
+  outline: none;
+  border-color: #ffffff;
+}
+
+.pf-count {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-size: 11.5px;
+  color: var(--hint);
+  pointer-events: none;
+}
+
+/* bottom primary action — full-width purple pill (💾 Update) */
+.pf-update {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  margin-top: 20px;
+  padding: 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--purple);
+  color: #ffffff;
+  font-size: 16.5px;
+  font-weight: 600;
+}
+
+.pf-update:disabled {
+  opacity: 0.6;
+}

@@ -1,0 +1,196 @@
+// API client — implements EXACTLY the documented contract (RULES #1, #2, #4).
+// Relative paths only, Bearer token on every call, 401 → re-auth once → "session expired",
+// 403 → access denied, 503 → toast (never crash). Backend routes go live at integration
+// time; until then the sandbox preview harness serves contract-identical stubs.
+
+const TOKEN_KEY = 'selam_admin_token'
+
+let memToken = null
+let currentInitData = ''
+let toastFn = null
+
+export function bindToast(fn) {
+  toastFn = fn
+}
+
+function toast(msg) {
+  try {
+    if (toastFn) toastFn(msg)
+  } catch {
+    /* noop */
+  }
+}
+
+export function getToken() {
+  return memToken
+}
+
+export function setToken(t) {
+  memToken = t || null
+  try {
+    if (t) sessionStorage.setItem(TOKEN_KEY, t)
+    else sessionStorage.removeItem(TOKEN_KEY)
+  } catch {
+    /* storage unavailable — memory only, per rules "in memory" is the requirement */
+  }
+}
+
+export function setInitData(d) {
+  currentInitData = d || ''
+}
+
+export class AccessDenied extends Error {
+  constructor() {
+    super('access denied')
+  }
+}
+export class SessionExpired extends Error {
+  constructor() {
+    super('session expired')
+  }
+}
+
+async function raw(path, { method = 'GET', body, auth = true, quiet = false } = {}) {
+  const headers = {}
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (auth && memToken) headers['Authorization'] = `Bearer ${memToken}`
+
+  let res
+  try {
+    res = await fetch(path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined })
+  } catch {
+    toast('Network error — check your connection')
+    throw { kind: 'network' }
+  }
+
+  if (res.status === 401) throw { kind: 'unauthorized' }
+  if (res.status === 403) throw { kind: 'forbidden' }
+  if (res.status === 503) {
+    let j = null
+    try {
+      j = await res.json()
+    } catch {
+      /* no body */
+    }
+    toast((j && j.error) || 'Service temporarily unavailable — try again')
+    throw { kind: 'server' }
+  }
+  if (!res.ok) {
+    let msg = `Request failed (${res.status})`
+    let data = null
+    try {
+      const j = await res.json()
+      data = j
+      if (j && j.error) msg = j.error
+    } catch {
+      /* no body */
+    }
+    // `quiet` lets a caller own the error UX (e.g. the category 409 → force flow);
+    // 503 ALWAYS toasts (RULES: never crash silently on service down).
+    if (!quiet) toast(msg)
+    throw { kind: 'http', status: res.status, message: msg, data }
+  }
+  return res.json()
+}
+
+// POST { initData } → { token, user } — RULES #1, nothing else.
+export async function authenticate(idt) {
+  const data = await raw('/api/admin-miniapp/auth', { method: 'POST', body: { initData: idt }, auth: false })
+  setToken(data.token)
+  setInitData(idt)
+  return data.user
+}
+
+async function call(path, opts = {}) {
+  try {
+    return await raw(path, opts)
+  } catch (err) {
+    if (err && err.kind === 'unauthorized') {
+      // 401 → re-auth with initData and retry ONCE; if it fails again → session expired
+      try {
+        await authenticate(currentInitData)
+        return await raw(path, opts)
+      } catch {
+        setToken(null)
+        throw new SessionExpired()
+      }
+    }
+    if (err && err.kind === 'forbidden') throw new AccessDenied()
+    throw err
+  }
+}
+
+function qs(params) {
+  const q = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== '') q.set(k, String(v))
+  }
+  const s = q.toString()
+  return s ? `?${s}` : ''
+}
+
+export const api = {
+  // ---- ORDERS ----
+  getOrders: ({ status, limit = 50 } = {}) => call(`/api/orders${qs({ status, limit })}`),
+  getOrderStats: () => call('/api/orders/stats/today'),
+  getOrder: (id) => call(`/api/orders/${id}`),
+  patchOrder: (id, body) => call(`/api/orders/${id}`, { method: 'PATCH', body }),
+
+  // ---- MENU ITEMS (POST requires client-generated unique slug id) ----
+  getMenu: ({ category, available } = {}) => call(`/api/menu${qs({ category, available })}`),
+  postMenu: (body) => call('/api/menu', { method: 'POST', body }),
+  patchMenu: (id, body) => call(`/api/menu/${id}`, { method: 'PATCH', body }),
+  deleteMenu: (id) => call(`/api/menu/${id}`, { method: 'DELETE' }),
+
+  // ---- CATEGORIES (sections: 'food' | 'drink') ----
+  getCategories: () => call('/api/menu/categories'),
+  postCategory: (body) => call('/api/menu/categories', { method: 'POST', body }),
+  patchCategory: (id, body) => call(`/api/menu/categories/${id}`, { method: 'PATCH', body }),
+  reorderCategories: (ids) => call('/api/menu/categories/reorder', { method: 'POST', body: { ids } }),
+  deleteCategory: (id, force = false) =>
+    call(`/api/menu/categories/${id}${force ? '?force=true' : ''}`, { method: 'DELETE', quiet: !force }),
+
+  // ---- BLOCKED USERS ----
+  getBlockedUsers: () => call('/api/blocked-users'),
+  blockUser: (body) => call('/api/blocked-users', { method: 'POST', body }),
+  unblockUser: (tgUserId) => call(`/api/blocked-users/${tgUserId}`, { method: 'DELETE' }),
+  getDirectory: (q) => call(`/api/blocked-users/customers/directory${qs({ q })}`),
+
+  // ---- STAFF ADMINS (Page 6) — ⚠️ INTEGRATION POINT ----
+  // The RULES contract has NO staff-admin endpoints yet (ADMIN_TELEGRAM_IDS is a
+  // server env var). Interface below is what the Admins screen needs; the sandbox
+  // harness serves contract-shaped stubs so the UI is fully clickable. When the
+  // main AI ships real endpoints, only these paths/payloads change.
+  // Metrics arrive per-admin as stats: { day, week, month } (server-computed).
+  getAdmins: () => call('/api/admin-miniapp/admins'),
+  adminVerify: (id) => call(`/api/admin-miniapp/admins/verify${qs({ id })}`),
+  postAdmin: (body) => call('/api/admin-miniapp/admins', { method: 'POST', body }),
+  patchAdmin: (tgUserId, body) => call(`/api/admin-miniapp/admins/${tgUserId}`, { method: 'PATCH', body }),
+  deleteAdmin: (tgUserId) => call(`/api/admin-miniapp/admins/${tgUserId}`, { method: 'DELETE' }),
+
+  // ---- STORE SETTINGS (Page 7 admin panel) — ⚠️ INTEGRATION POINT ----
+  // The RULES contract has NO store-settings endpoints yet. Shape (suggested):
+  // { order_limit, pickup_throttle_min, delivery_available, paused,
+  //   pause_until, close_until, closure_reason }
+  // The server must own: real intake blocking, closure_reason broadcast to the
+  // customer app, and auto-resume when pause_until/close_until expire.
+  getSettings: () => call('/api/admin-miniapp/settings'),
+  patchSettings: (body) => call('/api/admin-miniapp/settings', { method: 'PATCH', body }),
+}
+
+// Generate a unique slug id for POST /api/menu (e.g. "doro_wat_1")
+export function slugify(name, existingIds = []) {
+  const base =
+    String(name || 'item')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'item'
+  let id = base
+  let n = 1
+  while (existingIds.includes(id)) {
+    n += 1
+    id = `${base}_${n}`
+  }
+  return id
+}
