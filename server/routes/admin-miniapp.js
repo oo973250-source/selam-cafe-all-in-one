@@ -215,6 +215,48 @@ router.get('/admins', async (_req, res) => {
   }
 })
 
+// Instant verification (Page 6 add-admin modal): resolve a Telegram user
+// profile from a numeric user ID via the real Bot API (getChat), so the admin
+// sees the username/name BEFORE the row is created.
+router.get('/admins/verify', async (req, res) => {
+  try {
+    const raw = String(req.query.id || '').trim().replace(/^@/, '')
+    if (!/^\d+$/.test(raw)) return res.status(400).json({ error: 'a numeric Telegram User ID is required' })
+    const chatId = Number(raw)
+    const token = process.env.BOT_TOKEN
+    if (!token) return res.status(503).json({ error: 'bot is not configured on the server' })
+
+
+    let profile = null
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${token}/getChat?chat_id=${chatId}`, {
+        method: 'GET',
+      })
+      const j = await r.json().catch(() => null)
+      if (j?.ok && j.result) {
+        profile = {
+          tg_user_id: chatId,
+          username: j.result.username || null,
+          first_name: j.result.first_name || j.result.title || null,
+          name: [j.result.first_name, j.result.last_name].filter(Boolean).join(' ') || j.result.title || null,
+        }
+      }
+    } catch (e) {
+      console.warn('[admin-miniapp] getChat lookup failed:', e.message)
+    }
+
+    if (!profile) {
+      return res.status(404).json({
+        error: 'Telegram has no chat with this ID — the user must message the bot first (/start), then verify again',
+      })
+    }
+    res.json({ profile })
+  } catch (e) {
+    console.error('[admin-miniapp] verify failed:', e.message)
+    res.status(503).json({ error: 'verification failed' })
+  }
+})
+
 router.post('/admins', async (req, res) => {
   try {
     const { tg_user_id, name } = req.body || {}
