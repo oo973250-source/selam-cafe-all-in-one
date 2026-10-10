@@ -55,7 +55,7 @@ function Boot() {
         setBoot('ok')
         initSocket((order) => pushNewOrder(order))
       } catch {
-        /* boot state already set by doAuth (denied | expired) */
+        /* boot state already set by doAuth (gate | denied | expired) */
       }
     })()
 

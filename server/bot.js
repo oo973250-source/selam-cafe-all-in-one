@@ -622,9 +622,12 @@ function adminMenuButtons(lang = 'en') {
 // and the new Admin Mini App. Non-admins never get this message (handled in
 // the /admin command below).
 function adminChooserButtons(lang = 'en') {
+  // NOTE: the miniapp MUST open as a web_app button, not a url button —
+  // plain url buttons launch the in-app browser, where Telegram.WebApp.initData
+  // is empty and admin auth would always fail with "session expired".
   const btns = [[{ text: '🤖 ' + t('inBotAdminLabel', lang), callback_data: 'admin_choice_ib' }]]
   if (WEBAPP_URL) {
-    btns.push([{ text: '📲 ' + t('adminOpenPanel', lang), url: WEBAPP_URL + '/admin-miniapp' }])
+    btns.push([{ text: '📲 ' + t('adminOpenPanel', lang), web_app: { url: WEBAPP_URL + '/admin-miniapp' } }])
   }
   return { reply_markup: { inline_keyboard: btns } }
 }

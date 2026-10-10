@@ -63,16 +63,12 @@ export function AppProvider({ children }) {
   const doAuth = useCallback(async () => {
     const idt = initData()
     if (!idt) {
-      // SDK present but no initData (opened outside Telegram) → still try; server decides
-      try {
-        const user = await authenticate('')
-        setAdminUser(user)
-        return user
-      } catch (e) {
-        if (e instanceof AccessDenied) setBoot('denied')
-        else setBoot('expired')
-        throw e
-      }
+      // No initData = the page was opened outside a Mini App context (e.g.
+      // in the in-app browser or refresh-from-browser). Auth can never succeed
+      // here (server requires Telegram initData), so show the dedicated
+      // "Open in Telegram" gate instead of a misleading session-expired screen.
+      setBoot('gate')
+      throw new Error('no telegram initData')
     }
     try {
       const user = await authenticate(idt)
