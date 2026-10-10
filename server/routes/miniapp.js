@@ -19,7 +19,7 @@ import { Router } from 'express'
 import crypto from 'node:crypto'
 import 'dotenv/config'
 
-import { createOrder, countTodaysOrdersForUser, getUserLang, isUserBlocked } from '../db.js'
+import { createOrder, countTodaysOrdersForUser, getUserLang, isUserBlocked, getIntakeStatus, getCafeProfile, publicBrand } from '../db.js'
 import { sendOrderConfirmation, notifyStaff } from '../bot.js'
 
 const router = Router()
@@ -74,6 +74,24 @@ export function verifyTelegramInitData(initData) {
 }
 
 router.post('/orders', async (req, res) => {
+  // Store-intake gate (admin miniapp Page 7): emergency pause, duration
+  // pause (countdown) or multi-day closure blocks ALL new customer orders
+  // server-side. Expired timers auto-resume (getIntakeStatus clears them).
+  try {
+    const intake = await getIntakeStatus()
+    if (intake.kind !== 'open') {
+      return res.status(503).json({
+        error: 'store closed',
+        closed: true,
+        kind: intake.kind, // 'emergency' | 'countdown' | 'closed'
+        until: intake.until || null,
+        reason: intake.reason || '',
+      })
+    }
+  } catch (e) {
+    console.warn('[miniapp] intake gate failed (fail-open):', e.message)
+  }
+
   const { initData, order: payload } = req.body || {}
 
   const tgUser = verifyTelegramInitData(initData)
@@ -122,15 +140,32 @@ router.post('/orders', async (req, res) => {
   // 1) Real-time push to the admin dashboard
   const fullOrder = {
     id: order.id,
+    tg_user_id: tgUser.id,
+    tg_username: tgUser.username || null,
+    tg_first_name: tgUser.first_name || null,
     service_type: payload.serviceType,
     customer_name: payload.customer?.name || 'Unknown',
     customer_loc: payload.customer?.location || null,
-    items: payload.items,
+    items: (Array.isArray(payload.items) ? payload.items : []).map((i) => ({
+      id: i.id,
+      name: i.nameEn || i.name || i.nameAm || i.id,
+      price: i.price,
+      qty: i.quantity ?? i.qty ?? 1,
+    })),
     total: payload.total,
+    trust_level: payload.trustLevel || 0,
     status: 'new',
+    payment_status: 'pending',
+    tx_ref: payload.txRef || null,
+    note: payload.note || payload.customer?.note || null,
+    customer_phone: payload.customer?.phone || null,
+    started_by: null,
+    served_at: null,
+    dismissed_at: null,
+    created_at: new Date().toISOString(),
   }
   if (req.app.get('io')) {
-    req.app.get('io').emit('order:new', fullOrder)
+    req.app.get('io').to('admins').emit('order:new', fullOrder)
   }
 
   // 2) Confirmation message to the customer through the bot

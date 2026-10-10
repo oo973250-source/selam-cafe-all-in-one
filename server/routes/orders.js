@@ -1,7 +1,18 @@
 /**
  * server/routes/orders.js
  * -----------------------
- * Orders CRUD + stats.
+ * Orders CRUD + stats, extended for the Admin Mini App contract:
+ *
+ *   - GET / lists orders the way the admin queue needs them: active
+ *     (new/preparing/ready) + served-but-not-dismissed orders. Served
+ *     cards stay in the queue (green \"Done\" state) until an admin taps
+ *     \"Done\" (PATCH dismissed:true). Cancelled ones fall out for the
+ *     queue but stay visible in order history (GET ?since=).
+ *   - PATCH stamps started_by (server-side identity from the Bearer
+ *     token — the client value is advisory only), served_at (when the
+ *     status flips to served) and dismissed_at (also stamps served_at
+ *     and,cleanup-safe, requires the order to exist). Every change
+ *     emits io order:update to the admins room so other devices sync.
  */
 
 import { Router } from 'express'
@@ -14,24 +25,46 @@ router.get('/', async (req, res) => {
   const where = []
   const params = []
   if (status) { params.push(status); where.push(`status = $${params.length}`) }
-  if (since)  { params.push(since);  where.push(`created_at >= $${params.length}::timestamptz`) }
-  const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
-  params.push(Number(limit), Number(offset))
+  if (since) { params.push(since); where.push(`created_at >= $${params.length}::timestamptz`) }
+  if (where.length) {
+    const whereClause = `WHERE ${where.join(' AND ')}`
+    params.push(Number(limit), Number(offset))
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, tg_user_id, tg_username, tg_first_name, service_type,
+                customer_name, customer_loc, items, total, trust_level,
+                status, payment_status, tx_ref, note, customer_phone,
+                started_by, served_at, dismissed_at, created_at, updated_at
+           FROM orders ${whereClause}
+          ORDER BY created_at DESC
+          LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        params
+      )
+      return res.json({ orders: rows })
+    } catch (e) {
+      console.error('[orders] list failed:', e.message)
+      return res.status(503).json({ error: 'orders unavailable', orders: [] })
+    }
+  }
 
+  // No filters → admin live queue shape: active + served-not-dismissed-today.
   try {
     const { rows } = await pool.query(
       `SELECT id, tg_user_id, tg_username, tg_first_name, service_type,
               customer_name, customer_loc, items, total, trust_level,
-              status, payment_status, tx_ref, created_at, updated_at
-         FROM orders ${whereClause}
-         ORDER BY created_at DESC
-         LIMIT $${params.length - 1}
-         OFFSET $${params.length}`,
-      params
+              status, payment_status, tx_ref, note, customer_phone,
+              started_by, served_at, dismissed_at, created_at, updated_at
+         FROM orders
+        WHERE status IN ('new', 'preparing', 'ready')
+           OR (status = 'served' AND dismissed_at IS NULL
+               AND served_at >= date_trunc('day', now()))
+          ORDER BY (status = 'new') DESC, created_at DESC
+          LIMIT $1 OFFSET $2`,
+      [Number(limit), Number(offset)]
     )
     res.json({ orders: rows })
   } catch (e) {
-    console.error('[orders] list failed:', e.message)
+    console.error('[orders] queue list failed:', e.message)
     res.status(503).json({ error: 'orders unavailable', orders: [] })
   }
 })
@@ -48,7 +81,7 @@ router.get('/stats/today', async (_req, res) => {
          COUNT(*) FILTER (WHERE status = 'cancelled')::int       AS cancelled,
          COALESCE(SUM(total) FILTER (WHERE status = 'served'), 0)::int AS revenue_today
        FROM orders
-       WHERE created_at >= date_trunc('day', now())`
+      WHERE created_at >= date_trunc('day', now())`
     )
     res.json(rows[0])
   } catch (e) {
@@ -78,13 +111,34 @@ router.get('/:id', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   const id = Number(req.params.id)
-  const { status, payment_status } = req.body || {}
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'bad id' })
+  const { status, payment_status, started_by, dismissed } = req.body || {}
   const sets = []
   const params = [id]
-  if (status)          { params.push(status);          sets.push(`status = $${params.length}`) }
-  if (payment_status)  { params.push(payment_status);  sets.push(`payment_status = $${params.length}`) }
+
+  if (status) {
+    if (!['new', 'preparing', 'ready', 'served', 'cancelled'].includes(status)) {
+      return res.status(400).json({ error: 'invalid status' })
+    }
+    params.push(status); sets.push(`status = $${params.length}`)
+    if (status === 'served') sets.push('served_at = now()')
+  }
+  if (payment_status) {
+    if (!['pending', 'paid', 'failed', 'cod'].includes(payment_status)) {
+      return res.status(400).json({ error: 'invalid payment_status' })
+    }
+    params.push(payment_status); sets.push(`payment_status = $${params.length}`)
+  }
+  if (started_by !== undefined) {
+    params.push(String(started_by)); sets.push(`started_by = $${params.length}`)
+  }
+  if (dismissed === true) {
+    sets.push(`dismissed_at = now()`, `status = CASE WHEN status = 'ready' THEN 'served' ELSE status END`)
+    if (status !== 'served') sets.push(`served_at = COALESCE(served_at, now())`)
+  }
+
   if (!sets.length) return res.status(400).json({ error: 'nothing to update' })
-  sets.push(`updated_at = now()`)
+  sets.push('updated_at = now()')
 
   try {
     const { rows } = await pool.query(
@@ -93,11 +147,17 @@ router.patch('/:id', async (req, res) => {
     )
     if (!rows.length) return res.status(404).json({ error: 'not found' })
 
+    // Server-side staff attribution: the Bearer identity wins over any
+    // client-sent display name (identity spoofing on multi-admin queues).
+    // Note: 'started' at status→preparing is ALSO stamped server-side, but
+    // with the cached admin display name rather than the raw token name.
     await pool.query(
-      `INSERT INTO order_events (order_id, event, payload) VALUES ($1, 'status_changed', $2)`,
-      [id, JSON.stringify({ status, payment_status, by: req.user?.tgUserId })]
+      `INSERT INTO order_events (order_id, event, payload)
+       VALUES ($1, 'order_updater', $2)`,
+      [id, JSON.stringify({ status, payment_status, started_by, dismissed, by: req.user?.tgUserId })]
     )
 
+    req.app.get('io')?.to('admins').emit('order:update', rows[0])
     res.json({ order: rows[0] })
   } catch (e) {
     console.error('[orders] update failed:', e.message)

@@ -19,6 +19,7 @@ import {
   blockUser,
   unblockUser,
   findUserRef,
+  getCafeProfile,
   pool,
 } from './db.js'
 
@@ -61,19 +62,9 @@ process.on('unhandledRejection', (reason) => {
   console.error('[bot] unhandledRejection (process kept alive):', reason)
 })
 
-// ── Admin web login codes ────────────────────────────────────────────
-// /login in the bot issues a one-time 6-digit code; the admin web dashboard
-// polls with it to finish sign-in. In-memory, single-use, 10-minute TTL.
-const pendingLoginCodes = new Map() // code -> { tgUserId, expiresAt }
-export function consumeLoginCode(code) {
-  const pending = pendingLoginCodes.get(String(code))
-  if (!pending || pending.expiresAt < Date.now()) {
-    pendingLoginCodes.delete(String(code))
-    return null
-  }
-  pendingLoginCodes.delete(String(code))
-  return pending
-}
+
+// (Legacy login-code store removed with the /login flow — the Admin Mini App
+// authenticates via Telegram initData instead.)
 
 // ── Order code formatting ────────────────────────────────────────────
 // Global order-code format: #5 → MC-0005. Zero-padded to 4 digits so the
@@ -131,7 +122,7 @@ const T = {
     orderAgain: '☕ Order again',
     menuNotConfigured: 'Menu URL is not configured yet.',
     adminPanel: 'Admin Panel',
-    adminLink: 'Open Admin Panel (Web)',
+    loginHint: 'Admin sign-in',
     adminOrders: 'In Bot',
     catHidden: 'Hidden from customers',
     catVisible: 'Visible to customers',
@@ -627,13 +618,13 @@ function adminMenuButtons(lang = 'en') {
   }
 }
 
-// /admin chooser (Task 5): verified admins pick between the chat-based
-// In-Bot portal and the web Admin Panel. Non-admins never get this message
-// (handled in the /admin command below).
+// /admin chooser: verified admins pick between the chat-based In-Bot portal
+// and the new Admin Mini App. Non-admins never get this message (handled in
+// the /admin command below).
 function adminChooserButtons(lang = 'en') {
   const btns = [[{ text: '🤖 ' + t('inBotAdminLabel', lang), callback_data: 'admin_choice_ib' }]]
   if (WEBAPP_URL) {
-    btns.push([{ text: '📊 ' + t('adminOpenPanel', lang), url: WEBAPP_URL + '/admin' }])
+    btns.push([{ text: '📲 ' + t('adminOpenPanel', lang), url: WEBAPP_URL + '/admin-miniapp' }])
   }
   return { reply_markup: { inline_keyboard: btns } }
 }
@@ -1168,6 +1159,21 @@ export async function startBot(io) {
     console.warn('[bot] WEBAPP_URL not set — buttons will be missing')
   }
 
+  // Runtime cafe-name cache: {为您} the cafe_profile row (single source of
+  // truth controlled from the Admin Mini App Profile page), so greetings and
+  // the bot's menu button never depend on a bundled string. 60s TTL.
+  let cafeName = 'Selam Cafe'
+  let cafeNameAt = 0
+  async function currentCafeName() {
+    if (Date.now() - cafeNameAt < 60_000) return cafeName
+    try {
+      const p = await getCafeProfile()
+      if (p?.cafe_name) cafeName = p.cafe_name
+    } catch { /* keep cached value */ }
+    cafeNameAt = Date.now()
+    return cafeName
+  }
+
   await ensureSchema()
   const bot = new TelegramBot(BOT_TOKEN, { polling: true })
   activeBot = bot
@@ -1184,9 +1190,12 @@ export async function startBot(io) {
     const clientLang = FALLBACK_CLIENT_LANGS[(msg.from.language_code || '').toLowerCase().split('-')[0]] || 'en'
     const lang = await getUserLang(msg.from.id)
     const deepLink = match?.[2]
+    const cafe = await currentCafeName()
+    const welcomeLine = t('welcome', lang).replace(/Kafee Selam|Selam Cafe/gi, cafe)
+    const welcomeBackLine = t('welcomeBack', lang).replace(/Kafee Selam|Selam Cafe/gi, cafe)
     const greeting = deepLink === 'reorder'
-      ? `*${t('welcomeBack', lang)}, ${name}!*\n\n${t('chooseLang', lang)}`
-      : `*${t('welcome', lang)}, ${name}!*\n\n${t('chooseLang', lang)}`
+      ? `*${welcomeBackLine}, ${name}!*\n\n${t('chooseLang', lang)}`
+      : `*${welcomeLine}, ${name}!*\n\n${t('chooseLang', lang)}`
     bot.sendMessage(msg.chat.id, greeting, {
       parse_mode: 'Markdown',
       ...languageButtons(),
@@ -1233,34 +1242,8 @@ export async function startBot(io) {
     ).catch(() => {})
   })
 
-  // ── /login — issue a one-time code for the admin WEB dashboard ──────
-  // The Telegram Login Widget requires the bot's domain to be allowlisted in
-  // BotFather (/setdomain), which is easy to miss and often the reason the
-  // admin page can't sign anyone in. This code flow needs no BotFather setup:
-  //   /login in the bot → type the 6-digit code on the /admin page.
-  bot.onText(/\/login$/, async (msg) => {
-    const lang = await getUserLang(msg.from.id)
-    const code = String(Math.floor(100000 + Math.random() * 900000))
-    pendingLoginCodes.set(code, {
-      tgUserId: msg.from.id,
-      username: msg.from.username || null,
-      firstName: msg.from.first_name || null,
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    })
-    // Opportunistic cleanup of expired codes
-    for (const [c, v] of pendingLoginCodes) {
-      if (v.expiresAt < Date.now()) pendingLoginCodes.delete(c)
-    }
-    bot.sendMessage(
-      msg.chat.id,
-      `${t('loginPrompt', lang)}\n\n${code}`,
-      {
-        reply_markup: {
-          inline_keyboard: [[{ text: t('loginHint', lang), callback_data: `logincode_${code}` }]],
-        },
-      }
-    )
-  })
+  // (The old /login → 6-digit-code flow was removed with the legacy web
+  // dashboard; the Admin Mini App authenticates via Telegram initData.)
 
   // Typing the 6-digit code as a plain message also completes the handshake
   // (the inline button just re-shows the code as a popup for easy copying).
@@ -1377,18 +1360,9 @@ export async function startBot(io) {
       return
     }
 
-    if (!/^\d{6}$/.test(text)) return
-    const lang = await getUserLang(msg.from.id)
-    const pending = consumeLoginCode(text)
-    if (!pending || pending.tgUserId !== msg.from.id) {
-      bot.sendMessage(msg.chat.id, t('loginInvalidCode', lang))
-      return
-    }
-    if (!isAdmin(msg.from.id)) {
-      bot.sendMessage(msg.chat.id, t('loginDenied', lang))
-      return
-    }
-    bot.sendMessage(msg.chat.id, t('loginOk', lang))
+    // The 6-digit login-code handshake was removed when the legacy web
+    // dashboard was replaced by the Admin Mini App (initData auth).
+    return
   })
 
   // ── /help — command list ─────────────────────────────────────────────
@@ -1552,7 +1526,8 @@ export async function startBot(io) {
     const userId = cq.from?.id
     const data = cq.data
 
-    // 0) Admin-web login code popup (shows the code big for easy copying)
+    // 0) Login-code popup — kept for old messages still on screen; new codes
+    // are never issued since the /login flow was replaced by the Admin Mini App.
     const loginCodeMatch = data?.match(/^logincode_(\d{6})$/)
     if (loginCodeMatch) {
       bot.answerCallbackQuery(cq.id, { text: loginCodeMatch[1], show_alert: true })
@@ -1910,7 +1885,24 @@ export async function startBot(io) {
     console.warn('[bot] WARNING: no admin/staff IDs configured — set ADMIN_TELEGRAM_IDS on Railway (comma-separated numeric Telegram IDs)')
   }
   if (OWNER_ID) {
-    bot.sendMessage(OWNER_ID, 'Selam Cafe bot is online.').catch(() => {})
+    bot.sendMessage(OWNER_ID, `${await currentCafeName()} bot is online.`).catch(() => {})
+  }
+
+  // Register the customer-broadcast helper with the HTTP server (used by
+  // POST /api/admin-miniapp/announcements to fan a message out to every
+  // customer who has ever messaged the bot). startBot(io) receives the
+  // Express server's io; the app instance is reachable via io's httpServer.
+  try {
+    const expressApp = io?.httpServer?.__selamExpressApp || globalThis.__selamExpressApp
+    expressApp?.set('tgBroadcast', async (chatId, text) => {
+      try {
+        await bot.sendMessage(chatId, String(text || ''))
+      } catch (e) {
+        console.warn(`[bot] broadcast send failed for tg ${chatId}: ${e.message}`)
+      }
+    })
+  } catch (e) {
+    console.warn('[bot] tgBroadcast registration skipped:', e.message)
   }
 
   return bot

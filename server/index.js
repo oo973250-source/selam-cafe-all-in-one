@@ -33,8 +33,8 @@ import { existsSync } from 'node:fs'
 import { Server as IoServer } from 'socket.io'
 import 'dotenv/config'
 
-import { ensureSchema, pool } from './db.js'
-import { requireAuth } from './middleware/auth.js'
+import { ensureSchema, pool, getCafeProfile, publicBrand } from './db.js'
+import { requireAuth, verifyToken } from './middleware/auth.js'
 import { startBot } from './bot.js'
 import authRoutes from './routes/auth.js'
 import ordersRoutes from './routes/orders.js'
@@ -48,6 +48,7 @@ const PORT = process.env.PORT || 3000
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const miniappDist = join(__dirname, '..', 'miniapp', 'dist')
 const adminDist = join(__dirname, '..', 'admin', 'dist')
+const adminMiniappDist = join(__dirname, '..', 'admin-panel', 'selam-admin-miniapp', 'dist')
 
 const ALLOWED_ORIGINS = [
   process.env.WEBAPP_URL?.replace(/\/$/, ''),
@@ -91,6 +92,17 @@ app.use('/api/blocked-users', blockedUsersRoutes)
 // Public auth routes (login flow)
 app.use('/api/auth', authRoutes)
 
+// Public cafe identity for the customer miniapp (+ anything else) — served
+// from the SAME profile row the admin Profile page controls.
+app.get('/api/brand', async (_req, res) => {
+  try {
+    res.json(publicBrand(await getCafeProfile()))
+  } catch (e) {
+    console.error('[brand] read failed:', e.message)
+    res.json({ name: 'Selam Cafe', logo_url: null, updated_at: null })
+  }
+})
+
 // Admin Mini App auth (Telegram initData → JWT; mounted dist will live at /amadmin)
 app.use('/api/admin-miniapp', adminMiniappRoutes)
 
@@ -113,7 +125,20 @@ app.post('/api/internal/order-created', async (req, res) => {
 // Protected admin routes
 app.use('/api/orders', requireAuth, ordersRoutes)
 
-// ─── Static: Admin UI (at /admin) ────────────────────────────────────────────
+// ─── Static: Admin Mini App UI (at /admin-miniapp) ─────────────────────────
+if (existsSync(adminMiniappDist)) {
+  app.use('/admin-miniapp', express.static(adminMiniappDist))
+  app.get(/^\/admin-miniapp(\/.*)?$/, (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next()
+    if (req.path.startsWith('//')) return res.redirect(301, req.path.replace(/^\/+/, '/'))
+    res.sendFile(join(adminMiniappDist, 'index.html'))
+  })
+  console.log('[server] admin MINI APP UI mounted at /admin-miniapp')
+} else {
+  console.warn('[server] admin miniapp not built (admin-panel/selam-admin-miniapp/dist missing). Run: npm run build:all')
+}
+
+// ─── Static: legacy web admin dashboard (at /admin) ────────────────────────
 if (existsSync(adminDist)) {
   app.use('/admin', express.static(adminDist))
   app.get(/^\/admin(\/.*)?$/, (req, res, next) => {
@@ -153,6 +178,9 @@ app.use((err, _req, res, _next) => {
 
 // ─── HTTP server + Socket.io ─────────────────────────────────────────────────
 const httpServer = createServer(app)
+// Expose the app instance so the bot (same process) can register its send
+// helper for customer broadcasts (announcements fan-out).
+httpServer.__selamExpressApp = app
 const io = new IoServer(httpServer, {
   cors: {
     origin: ALLOWED_ORIGINS,
@@ -163,8 +191,43 @@ const io = new IoServer(httpServer, {
 // Make io reachable from request handlers (req.app.get('io'))
 app.set('io', io)
 
+// Broadcast a plain-text message to every Telegram customer (all users who
+// have ever messaged the bot, from user_langs) — used by Announcements.
+app.set('broadcastToCustomers', async (message) => {
+  // The bot registers its send helper as 'tgBroadcast' when it starts.
+  const send = app.get('tgBroadcast')
+  if (!send) {
+    console.warn('[broadcast] bot not started — announcement stored but not delivered')
+    return
+  }
+  try {
+    const { rows } = await pool.query(`SELECT tg_user_id FROM user_langs`)
+    console.log(`[broadcast] sending to ${rows.length} customers: ${String(message).slice(0, 80)}…`)
+    for (const r of rows) {
+      try { await send(r.tg_user_id, message) } catch (e) {
+        console.warn(`[broadcast] failed for tg ${r.tg_user_id}: ${e.message}`)
+      }
+    }
+  } catch (e) {
+    console.error('[broadcast] list customers failed:', e.message)
+  }
+})
+
 io.on('connection', (socket) => {
   console.log('[io] client connected:', socket.id)
+  // Socket rooms: only verified admin devices may join the `admins` room
+  // (guarded by the same JWT the HTTP APIs use). Customers go in the
+  // `customers` room for brand/closure/announcement pushes via io.broadcastToCustomers.
+  socket.on('admins', (token) => {
+    const decoded = verifyToken(String(token || ''))
+    if (decoded?.tgUserId && ['owner', 'manager', 'staff'].includes(decoded.role)) {
+      socket.join('admins')
+      socket.data.isAdmin = true
+    } else {
+      console.warn('[io] admin join with invalid token')
+    }
+  })
+  socket.on('customers', () => socket.join('customers'))
   socket.on('disconnect', () => console.log('[io] client disconnected:', socket.id))
 })
 

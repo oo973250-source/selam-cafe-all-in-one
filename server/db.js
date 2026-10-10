@@ -120,6 +120,58 @@ export async function ensureSchema() {
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
   );
 
+  CREATE TABLE IF NOT EXISTS store_settings (
+    id                    INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    order_limit           INTEGER NOT NULL DEFAULT 0,
+    pickup_throttle_min   INTEGER NOT NULL DEFAULT 0,
+    delivery_available    BOOLEAN NOT NULL DEFAULT TRUE,
+    paused                BOOLEAN NOT NULL DEFAULT FALSE,
+    pause_until           TIMESTAMPTZ,
+    close_until           TIMESTAMPTZ,
+    closure_reason        TEXT NOT NULL DEFAULT '',
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  CREATE TABLE IF NOT EXISTS cafe_profile (
+    id           INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    cafe_name    TEXT NOT NULL DEFAULT 'Selam Cafe',
+    phone        TEXT,
+    location     TEXT,
+    logo_url     TEXT,
+    hours_open   TEXT DEFAULT '08:00',
+    hours_close  TEXT DEFAULT '22:00',
+    description  TEXT,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  CREATE TABLE IF NOT EXISTS pause_events (
+    id          SERIAL PRIMARY KEY,
+    kind        TEXT NOT NULL CHECK (kind IN ('emergency', 'countdown', 'closed')),
+    reason      TEXT,
+    started_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ended_at    TIMESTAMPTZ
+  );
+
+  CREATE TABLE IF NOT EXISTS announcements (
+    id          SERIAL PRIMARY KEY,
+    message     TEXT NOT NULL,
+    author      TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  CREATE TABLE IF NOT EXISTS staff_admins (
+    tg_user_id    BIGINT PRIMARY KEY,
+    username      TEXT,
+    name          TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'cashier',
+    shift         TEXT NOT NULL DEFAULT 'morning',
+    branch        TEXT NOT NULL DEFAULT 'Main',
+    active        BOOLEAN NOT NULL DEFAULT TRUE,
+    refund_limit  INTEGER NOT NULL DEFAULT 0,
+    done          JSONB NOT NULL DEFAULT '[]',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
   CREATE TABLE IF NOT EXISTS menu_categories (
     id         TEXT PRIMARY KEY,
     name_en    TEXT NOT NULL,
@@ -135,6 +187,17 @@ export async function ensureSchema() {
   ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS hidden  BOOLEAN NOT NULL DEFAULT FALSE;
   ALTER TABLE menu_categories DROP CONSTRAINT IF EXISTS menu_categories_section_check;
   ALTER TABLE menu_categories ADD  CONSTRAINT menu_categories_section_check CHECK (section IN ('food', 'drink'));
+
+  -- Migrations for DBs created before the admin-miniapp surfaces existed.
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS started_by   TEXT;
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS served_at    TIMESTAMPTZ;
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS dismissed_at TIMESTAMPTZ;
+  CREATE INDEX IF NOT EXISTS idx_orders_served ON orders(served_at);
+
+  -- Columns the new admin queue/receipt surfaces rely on (orders were created
+  -- before the admin miniapp existed; idempotent).
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS note            TEXT;
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_phone  TEXT;
 
   INSERT INTO menu_categories (id, name_en, name_am, icon, section, sort_order)
   VALUES
@@ -380,5 +443,107 @@ export async function listBlockedUsers() {
       ORDER BY b.blocked_at DESC`
   )
   return rows
+}
+
+// ── Store settings (admin miniapp, Page 7) ─────────────────────────────
+export async function getStoreSettings() {
+  const { rows } = await pool.query(`SELECT * FROM store_settings WHERE id = 1`)
+  if (rows[0]) return rows[0]
+  const { rows: created } = await pool.query(
+    `INSERT INTO store_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING RETURNING *`
+  )
+  return created[0]
+}
+
+/**
+ * Intake status derived from settings: open | emergency | countdown | closed.
+ * Expired timers auto-resume: writing NULLs to the DB so every process sees
+ * the resumed state authoritatively (not just the reading one).
+ */
+export async function getIntakeStatus() {
+  const s = await getStoreSettings()
+  const now = Date.now()
+  const pu = s.pause_until ? new Date(s.pause_until).getTime() : 0
+  const cu = s.close_until ? new Date(s.close_until).getTime() : 0
+  if (s.paused) return { kind: 'emergency', reason: s.closure_reason || '', settings: s, expired: false }
+  let expired = false
+  if (pu && pu <= now) { expired = true }
+  else if (pu) return { kind: 'countdown', until: pu, reason: s.closure_reason || '', settings: s, expired: false }
+  if (cu && cu <= now) { expired = true }
+  else if (cu) return { kind: 'closed', until: cu, reason: s.closure_reason || '', settings: s, expired: false }
+  if (expired) {
+    // Some timer elapsed — clear ALL pause/closure state (matches the admin
+    // miniapp's own resume semantics seen by every device).
+    const { rows } = await pool.query(
+      `UPDATE store_settings
+          SET paused = FALSE, pause_until = NULL, close_until = NULL, updated_at = now()
+        WHERE id = 1
+        RETURNING *`
+    )
+    closeOpenPauseEvents()
+    return { kind: 'open', reason: '', settings: rows[0] || s, expired: true }
+  }
+  return { kind: 'open', reason: '', settings: s, expired: false }
+}
+
+// ── Cafe profile (admin miniapp, Page 9 — cafe-identity controller) ────
+export async function getCafeProfile() {
+  const { rows } = await pool.query(`SELECT * FROM cafe_profile WHERE id = 1`)
+  if (rows[0]) return rows[0]
+  const { rows: created } = await pool.query(
+    `INSERT INTO cafe_profile (id, cafe_name) VALUES (1, 'Selam Cafe')
+     ON CONFLICT (id) DO NOTHING RETURNING *`
+  )
+  return created[0]
+}
+
+export function publicBrand(profile) {
+  return {
+    name: profile?.cafe_name || 'Selam Cafe',
+    logo_url: profile?.logo_url || null,
+    updated_at: profile?.updated_at || null,
+  }
+}
+
+// ── Pause / closure history (Reports page) ─────────────────────────────
+export async function logPauseEvent(kind, reason) {
+  const { rows } = await pool.query(
+    `INSERT INTO pause_events (kind, reason, started_at)
+     VALUES ($1, $2, now()) RETURNING *`,
+    [kind, String(reason || '').trim()]
+  )
+  return rows[0]
+}
+
+export async function listPauseEvents(limit = 100) {
+  const { rows } = await pool.query(
+    `SELECT * FROM pause_events ORDER BY started_at DESC LIMIT $1`, [limit]
+  )
+  return rows
+}
+
+/** Stamp ended_at on the newest still-ongoing pause event of any kind. */
+export async function closeOpenPauseEvents() {
+  await pool.query(
+    `UPDATE pause_events SET ended_at = now()
+      WHERE id = (SELECT id FROM pause_events
+                   WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1)`
+  )
+}
+
+// ── Announcements (customer broadcast) ─────────────────────────────────
+export async function listAnnouncements(limit = 50) {
+  const { rows } = await pool.query(
+    `SELECT * FROM announcements ORDER BY created_at DESC LIMIT $1`, [limit]
+  )
+  return rows
+}
+
+export async function createAnnouncement(message, author) {
+  const { rows } = await pool.query(
+    `INSERT INTO announcements (message, author) VALUES ($1, $2) RETURNING *`,
+    [String(message || '').trim().slice(0, 300), author || 'Owner']
+  )
+  return rows[0]
 }
 
