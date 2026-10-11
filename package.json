@@ -11,7 +11,8 @@
     "dev": "node --watch server/index.js",
     "build:miniapp": "cd miniapp && npm install && npm run build",
     "build:admin": "cd admin && npm install && npm run build",
-    "build:all": "npm run build:miniapp && npm run build:admin",
+    "build:admin-miniapp": "cd admin-panel/selam-admin-miniapp && npm install && npm run build",
+    "build:all": "npm run build:miniapp && npm run build:admin && npm run build:admin-miniapp",
     "db:init": "node server/scripts/init-db.js",
     "test:admin-auth": "node server/scripts/test-admin-miniapp-auth.mjs"
   },
