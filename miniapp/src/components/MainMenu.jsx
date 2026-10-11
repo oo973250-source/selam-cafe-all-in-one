@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import CafeLogo from './CafeLogo.jsx'
-import { menuData, syncMenuFromServer } from '../data/menuData.js'
+import { menuData } from '../data/menuData.js'
+import { useLiveMenu } from '../hooks/useLiveMenu.js'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
 import { useLang } from '../context/LangContext.jsx'
@@ -70,19 +71,10 @@ export default function MainMenu({ onAdvance, bgProps }) {
   const { hapticFeedback } = useTelegram()
   const { t, lang } = useLang()
   const [activeMeal, setActiveMeal] = useState('all')
-  // Live menu sync: bump a version counter when the DB-backed menu arrives so
-  // category lists re-render. Items/categories edited in the In-Bot admin
-  // portal or web admin panel then appear in the Mini App.
-  const [menuVersion, setMenuVersion] = useState(0)
-  useEffect(() => {
-    let cancelled = false
-    syncMenuFromServer().then(() => {
-      if (!cancelled) setMenuVersion((v) => v + 1)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  // Live menu sync: realtime `menu:update` socket pushes (emitted after every
+  // admin/in-bot write) + a 20s polling fallback refetch the DB-backed menu
+  // and bump a version counter so the category lists re-render instantly.
+  const menuVersion = useLiveMenu()
   // Two-tap pattern: 1st tap expands the pill to show full category name,
   // 2nd tap on the same pill confirms selection and advances to Frame 3.
   // Tapping a different pill collapses the previous one and expands the new.

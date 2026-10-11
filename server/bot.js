@@ -55,6 +55,49 @@ export function getBot() {
   return activeBot
 }
 
+// ── Admin Mini App sync helper ────────────────────────────────────────
+// Same-process Socket.io: whenever an admin acts on an order FROM the bot
+// (start / ready / cancel), emit order:update to the `admins` room so every
+// Admin Mini App device updates instantly — the two surfaces stay in lockstep
+// (start in the bot → miniapp shows the Started state with the same name,
+// cancel in the bot → miniapp drops the card, ready in the bot → done state).
+// The Express app is reachable through the IoServer's httpServer bridge
+// (server/index.js attaches __selamExpressApp), with a global fallback.
+function emitOrderUpdate(order) {
+  try {
+    const expressApp = globalThis.__selamExpressApp
+    const io = expressApp?.get('io') || getIoFallback()
+    if (io && order) {
+      io.to('admins').emit('order:update', {
+        ...order,
+        items: (Array.isArray(order.items) ? order.items : []).map((i) => ({
+          id: i.id, name: i.nameEn || i.name || i.nameAm || i.id, price: i.price, qty: i.quantity || i.qty || 1,
+        })),
+      })
+    }
+  } catch (e) {
+    console.warn('[bot] order:update emit failed:', e.message)
+  }
+}
+let ioFallback = null
+function setIoFallback(io) { ioFallback = io || null }
+function getIoFallback() { return ioFallback }
+
+// Realtime menu sync from the in-bot admin portal: any category/item write
+// made through bot buttons nudges every open customer Mini App (and other
+// admin devices) to refetch /api/menu + /api/menu/categories immediately.
+function emitMenuUpdate() {
+  try {
+    const io = getIoFallback()
+    if (!io) return
+    const rev = { type: 'menu', rev: Date.now() }
+    io.to('customers').emit('menu:update', rev)
+    io.to('admins').emit('menu:update', rev)
+  } catch (e) {
+    console.warn('[bot] menu:update emit failed:', e.message)
+  }
+}
+
 // Safety net: an unhandled rejection (e.g. a bug in one Telegram handler) must
 // never take down the whole Railway service — previously it crash-looped the
 // deploy and even /start stopped responding.
@@ -171,6 +214,7 @@ const T = {
     ordersTableHeader: 'Name        Code     Price   Item',
     alertDismissed: 'Notification dismissed — order unchanged.',
     startedWord: 'Started',
+    startedByWord: 'Started by',
     finishedWord: 'Finished',
     adminNoOrders: 'No orders yet.',
     adminNotConfigured: 'Admin panel URL not configured.',
@@ -314,6 +358,7 @@ const T = {
     itemNowOutOfStock: 'አሁን የለም ❌',
     alertDismissed: 'ማሳወቂያው ተዘግቷል — ትዕዛዙ አልተቀየረም።',
     startedWord: 'ተጀምሯል',
+    startedByWord: 'ጀምሯል፣ በ',
     finishedWord: 'ተጠናቋል',
     adminNoOrders: 'እስካሁን ትዕዛዝ የለም።',
     adminNotConfigured: 'የአስተዳደር ክፍል አድራሻ አልተዋቀረም።',
@@ -457,6 +502,7 @@ const T = {
     itemNowOutOfStock: 'amma hin jiru ❌',
     alertDismissed: 'Ergaan beeksisaa cufame — ajaja hin jijjiiramne.',
     startedWord: 'Jalqeffame',
+    startedByWord: 'Jalqeffame, nama',
     finishedWord: 'Xumurame',
     inBotTitle: '🤖 Bulchiinsa Keessatti',
     inBotMenuItems: '📦 Meeshaalee Maajii',
@@ -485,6 +531,7 @@ const T = {
     ordersTableHeader: 'Maqaa        Koodii     Gatiin   Meeshaa',
     alertDismissed: "Ergaan beeksisaa cufame — ajaja hin jijjiiramne.",
     startedWord: 'Jalqeffame',
+    startedByWord: 'Jalqeffame, nama',
     finishedWord: 'Xumurame',
     adminNoOrders: 'Amma ajaja hin jiru.',
     adminNotConfigured: "Teessoo panel bulchaa hin qindaa'in.",
@@ -1181,6 +1228,11 @@ export async function startBot(io) {
   const bot = new TelegramBot(BOT_TOKEN, { polling: true })
   activeBot = bot
 
+  // The io handle (same-process Socket.io server) is kept so bot order
+  // actions (start/ready/cancel) can push order:update to every Admin
+  // Mini App device via emitOrderUpdate().
+  setIoFallback(io)
+
   // Polling backoff state
   let pollingBackoffMs = 0
   const POLLING_BACKOFF_BASE = 5000
@@ -1268,8 +1320,10 @@ export async function startBot(io) {
             return
           }
           await pool.query(`UPDATE menu_items SET price = $1, updated_at = now() WHERE id = $2`, [price, awaiting.itemId])
+          emitMenuUpdate()
         } else if (awaiting.field === 'name_en') {
           await pool.query(`UPDATE menu_items SET name_en = $1, updated_at = now() WHERE id = $2`, [text.slice(0, 120), awaiting.itemId])
+          emitMenuUpdate()
         } else if (awaiting.field === 'description') {
           await pool.query(`UPDATE menu_items SET description = $1, updated_at = now() WHERE id = $2`, [text.slice(0, 500), awaiting.itemId])
         } else if (awaiting.field === 'newcat') {
@@ -1283,8 +1337,10 @@ export async function startBot(io) {
              ON CONFLICT (id) DO NOTHING`,
             [id, text.slice(0, 60), section]
           )
+          emitMenuUpdate()
         } else if (awaiting.field === 'renamecat') {
           await pool.query(`UPDATE menu_categories SET name_en = $1 WHERE id = $2`, [text.slice(0, 60), awaiting.itemId])
+          emitMenuUpdate()
         } else if (awaiting.field === 'blockuser') {
           // Task 4: block by numeric Telegram ID or exact @username. When a
           // username is given, we resolve the ID from past orders so the
@@ -1350,6 +1406,7 @@ export async function startBot(io) {
              ON CONFLICT (id) DO NOTHING`,
             [id, awaiting.itemId, awaiting.pendingName, price]
           )
+          emitMenuUpdate()
           bot.sendMessage(msg.chat.id, '✅ ' + t('itemAdded', lang))
           await renderAdminView(msg.chat.id, 'catitems', lang, awaiting.itemId)
           return
@@ -1630,6 +1687,7 @@ export async function startBot(io) {
               WHERE id = $1 RETURNING name_en, available`,
             [itemId]
           )
+          emitMenuUpdate()
           if (rows[0]) {
             bot.answerCallbackQuery(cq.id, {
               text: `${rows[0].name_en} ${rows[0].available ? t('itemNowInStock', lang) : t('itemNowOutOfStock', lang)}`,
@@ -1685,10 +1743,10 @@ export async function startBot(io) {
         } else if (data.startsWith('ib_togglecat_')) {
           // Hide/show WITHOUT deleting — items and ordering are untouched.
           const catId = data.slice('ib_togglecat_'.length)
-          const { rows } = await pool.query(
-            `UPDATE menu_categories SET hidden = NOT hidden WHERE id = $1 RETURNING name_en, hidden`,
+          const { rows } =          await pool.query(`UPDATE menu_categories SET hidden = NOT hidden WHERE id = $1 RETURNING name_en, hidden`,
             [catId]
           )
+          emitMenuUpdate()
           if (rows[0]) {
             bot.answerCallbackQuery(cq.id, {
               text: rows[0].hidden ? t('catHidden', lang) : t('catVisible', lang),
@@ -1712,6 +1770,7 @@ export async function startBot(io) {
               for (let k = 0; k < ids.length; k++) {
                 await pool.query(`UPDATE menu_categories SET sort_order = $1 WHERE id = $2`, [k + 1, ids[k]])
               }
+              emitMenuUpdate()
             }
           }
           bot.answerCallbackQuery(cq.id)
@@ -1752,7 +1811,7 @@ export async function startBot(io) {
             return
           }
           const { rowCount } = await pool.query(`DELETE FROM menu_categories WHERE id = $1`, [catId])
-          if (rowCount) bot.answerCallbackQuery(cq.id, { text: t('categoryDeleted', lang) })
+          if (rowCount) { bot.answerCallbackQuery(cq.id, { text: t('categoryDeleted', lang) }); emitMenuUpdate() }
           await renderAdminView(chatId, 'cats', lang)
           return
         }
@@ -1783,9 +1842,41 @@ export async function startBot(io) {
       }
       const statusMap = { prep: 'preparing', ready: 'ready', cancel: 'cancelled' }
       const newStatus = statusMap[action]
+
+      // Stamp WHO acted so the Admin Mini App shows the same staff badge it
+      // shows when the action happens inside the miniapp (start → started_by,
+      // ready → finished/ready state, cancel → cancelled anywhere).
+      let actorName = 'Staff'
+      try {
+        actorName = String(cq.from?.first_name || cq.from?.username || 'Staff').trim() || 'Staff'
+      } catch (_) { /* keep default */ }
+
       let updated
       try {
-        updated = await updateOrderStatus(id, newStatus, { by: userId })
+        if (action === 'prep') {
+          // Same contract as the Admin Mini App's "start" tap:
+          // PATCH /api/orders/:id { status: 'preparing', started_by: name }
+          const { rows } = await pool.query(
+            `UPDATE orders
+                SET status = 'preparing',
+                    started_by = COALESCE($2, started_by),
+                    updated_at = now()
+              WHERE id = $1
+              RETURNING tg_user_id, tg_username, tg_first_name, total, service_type,
+                        status, started_by, served_at, dismissed_at, items, created_at, updated_at`,
+            [id, actorName]
+          )
+          if (rows.length) {
+            await pool.query(
+              `INSERT INTO order_events (order_id, event, payload)
+               VALUES ($1, 'status_changed', $2)`,
+              [id, JSON.stringify({ status: 'preparing', by: userId })]
+            )
+          }
+          updated = rows[0] || null
+        } else {
+          updated = await updateOrderStatus(id, newStatus, { by: userId })
+        }
       } catch (e) {
         console.error('[bot] status update failed:', e.message)
         bot.answerCallbackQuery(cq.id, { text: t('orderNotFoundAdmin', 'en') })
@@ -1795,19 +1886,28 @@ export async function startBot(io) {
         bot.answerCallbackQuery(cq.id, { text: t('orderNotFoundAdmin', 'en') })
         return
       }
-      bot.answerCallbackQuery(cq.id, { text: `${t('marked', 'en')}: ${newStatus}` })
+
+      // Realtime: push the new state to every Admin Mini App device so the bot
+      // and the miniapp are always in lockstep (same status everywhere).
+      emitOrderUpdate({ id, ...updated, started_by: action === 'prep' ? (updated.started_by || actorName) : updated.started_by })
 
       // Update the staff alert card in place: replace the status line and
       // swap the buttons to reflect the new state (Started / Finished),
-      // with Cancel always styled and available for dismissal.
+      // with Cancel always styled and available for dismissal. When the
+      // START came from a bot button, the card shows WHO started it so other
+      // staff on their own copies see the same name the miniapp will show.
       try {
+        const statusWordLine = STATUS_BADGES[newStatus] || ''
+        const whoSuffix = newStatus === 'preparing'
+          ? ` — ${t('startedByWord', 'en')}: ${updated.started_by || actorName}`
+          : (newStatus === 'ready' ? ` — ${t('finishedWord', 'en')}` : '')
         const staffMsg = buildOrderMessage('alert', {
           ...fullOrderForStaff({ items: updated.items || [], serviceType: updated.service_type, total: updated.total }, id),
           status: newStatus,
         }, await getUserLang(userId), {
           username: updated.tg_username,
           firstName: updated.tg_first_name,
-        })
+        }) + `\n${statusWordLine} ${statusWord(newStatus, 'en')}${whoSuffix}`
         const newKb = newStatus === 'preparing'
           ? { reply_markup: { inline_keyboard: [
               [{ text: `✅ ${t('markReady', 'en')}`, callback_data: `ready_${id}` }],
@@ -1828,11 +1928,19 @@ export async function startBot(io) {
         console.warn('[bot] alert card edit failed:', e.message)
       }
 
-      // Tell the customer their order status changed — in THEIR language
+      // Tell the customer their order status changed — in THEIR language.
+      // For 'preparing' we also include the named preparer (the same started_by
+      // the admin miniapp shows) when the change was made from a bot button.
       const custLang = await getUserLang(updated.tg_user_id)
       const readyText = updated.service_type === 'delivery' ? t('statusReadyDelivery', custLang) : t('statusReadyPickup', custLang)
       let custMsg
-      if (newStatus === 'preparing') custMsg = `Order ${orderCode(id)} ${t('statusPreparing', custLang)}`
+      if (newStatus === 'preparing') {
+        const preparer = updated.started_by || actorName
+        custMsg = `Order ${orderCode(id)} ${t('statusPreparing', custLang)}` +
+          (newStatus === 'preparing' && preparer
+            ? ` (${t('startedByWord', custLang)}: ${preparer})`
+            : '')
+      }
       else if (newStatus === 'ready') custMsg = `Order ${orderCode(id)} ${t('statusReady', custLang)} ${readyText}`
       else custMsg = `Order ${orderCode(id)} ${t('statusCancelled', custLang)}`
       try { bot.sendMessage(updated.tg_user_id, custMsg) } catch (e) {
