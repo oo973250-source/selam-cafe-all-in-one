@@ -202,11 +202,25 @@ export async function ensureSchema() {
   INSERT INTO menu_categories (id, name_en, name_am, icon, section, sort_order)
   VALUES
     ('breakfast',  'Breakfast',  'ቁርስ',    '🌅', 'food',  1),
-    ('snacks',     'Snacks',     'መክሰስ',    '🥟', 'food',  2),
-    ('hot_drinks', 'Hot Drinks', 'ትኩስ መጠጦች', '☕', 'drink', 3),
-    ('drinks',     'Drinks',     'መጠጦች',    '🥤', 'drink', 4)
+    ('lunch',      'Lunch',      'ምሳ',      '☀️', 'food',  2),
+    ('dinner',     'Dinner',     'እራት',     '🌙', 'food',  3),
+    ('yehone_neger','Yehone Neger','የሆነ ነገር','🍲', 'food',  4),
+    ('atakelt',    'Atakelt',    'አተኬልት',   '🥗', 'food',  5),
+    ('snacks',     'Snacks',     'መክሰስ',    '🥟', 'food',  6),
+    ('foods_5',    'Category 5', NULL,       '🍽️', 'food',  7),
+    ('foods_6',    'Category 6', NULL,       '🥘', 'food',  8),
+    ('foods_7',    'Category 7', NULL,       '🧆', 'food',  9),
+    ('hot_drinks', 'Hot Drinks', 'ትኩስ መጠጦች', '☕', 'drink', 1),
+    ('cold_drinks','Cold Drinks','ቀዝቃዛ መጠጦች','🧊', 'drink', 2),
+    ('drinks_3',   'Category 3', NULL,       '🍹', 'drink', 3),
+    ('drinks_4',   'Category 4', NULL,       '🧃', 'drink', 4),
+    ('drinks_5',   'Category 5', NULL,       '🥤', 'drink', 5),
+    ('drinks_6',   'Category 6', NULL,       '🥛', 'drink', 6),
+    ('drinks_7',   'Category 7', NULL,       '🍷', 'drink', 7)
   ON CONFLICT (id) DO NOTHING;
-  
+  -- Category 5 turns up in BOTH sections above; the second insert already
+  -- conflicts on that id, so food keeps 'foods_5' and drink shifts to
+  -- 'drinks_5'. (Idempotent re-run: nothing changes.)
 
   INSERT INTO menu_items (id, category, name_en, name_am, price, description, sort_order)
   VALUES
@@ -306,7 +320,8 @@ export async function updateOrderStatus(orderId, status, extra = {}) {
         SET status = $2,
             updated_at = now()
       WHERE id = $1
-      RETURNING tg_user_id, total, service_type`,
+      RETURNING id, tg_user_id, tg_username, tg_first_name, total, service_type,
+                status, started_by, served_at, dismissed_at, items, created_at, updated_at`,
     [orderId, status]
   )
 

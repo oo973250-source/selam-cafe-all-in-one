@@ -16,6 +16,23 @@ import { requireAuth, requireRole } from '../middleware/auth.js'
 
 const router = Router()
 
+// Realtime menu sync: after any successful menu write (item or category
+// create/update/delete/reorder — from the admin miniapp OR the in-bot portal)
+// emit `menu:update` to the customers room so every open customer Mini App
+// refetches instantly, plus a nudge to the admins room so other admin devices
+// stay in sync. Payload is a tiny revision marker; the client refetches.
+export function emitMenuUpdate(req) {
+  try {
+    const io = req.app.get('io')
+    if (!io) return
+    const rev = { type: 'menu', rev: Date.now() }
+    io.to('customers').emit('menu:update', rev)
+    io.to('admins').emit('menu:update', rev)
+  } catch (e) {
+    console.warn('[menu] menu:update emit failed:', e.message)
+  }
+}
+
 // Public — categories for the Mini App (includes section/hidden so the app
 // can group Food vs Drink and hide disabled categories).
 router.get('/categories', async (_req, res) => {
@@ -75,6 +92,7 @@ router.post('/categories', requireAuth, requireRole('manager', 'owner'), async (
        RETURNING *`,
       [slug, name_en, name_am || null, icon || '🍽️', section, sort_order != null ? Number(sort_order) : null]
     )
+    emitMenuUpdate(req)
     res.status(201).json({ category: rows[0] })
   } catch (e) {
     console.error('[menu] category create failed:', e.message)
@@ -107,6 +125,7 @@ router.patch('/categories/:id', requireAuth, requireRole('manager', 'owner'), as
       params
     )
     if (!rows.length) return res.status(404).json({ error: 'not found' })
+    emitMenuUpdate(req)
     res.json({ category: rows[0] })
   } catch (e) {
     console.error('[menu] category update failed:', e.message)
@@ -132,6 +151,7 @@ router.post('/categories/reorder', requireAuth, requireRole('manager', 'owner'),
       )
     }
     await client.query('COMMIT')
+    emitMenuUpdate(req)
     res.json({ ok: true })
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})
@@ -161,6 +181,7 @@ router.delete('/categories/:id', requireAuth, requireRole('manager', 'owner'), a
     if (req.query.force === 'true') {
       await pool.query(`DELETE FROM menu_items WHERE category = $1`, [id])
     }
+    emitMenuUpdate(req)
     res.json({ ok: true, deletedItems: req.query.force === 'true' ? itemCount : 0 })
   } catch (e) {
     console.error('[menu] category delete failed:', e.message)
@@ -181,13 +202,13 @@ router.post('/', requireAuth, requireRole('manager', 'owner'), async (req, res) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [id, category, name_en, name_am || null, Number(price), description || null, image_url || null, Number(sort_order)]
     )
+    emitMenuUpdate(req)
     res.status(201).json({ item: rows[0] })
   } catch (e) {
     console.error('[menu] create failed:', e.message)
     res.status(503).json({ error: 'could not create item' })
   }
 })
-
 router.patch('/:id', requireAuth, requireRole('manager', 'owner'), async (req, res) => {
   const id = req.params.id
   const fields = ['category', 'name_en', 'name_am', 'price', 'description', 'image_url', 'available', 'sort_order']
@@ -209,6 +230,7 @@ router.patch('/:id', requireAuth, requireRole('manager', 'owner'), async (req, r
       params
     )
     if (!rows.length) return res.status(404).json({ error: 'not found' })
+    emitMenuUpdate(req)
     res.json({ item: rows[0] })
   } catch (e) {
     console.error('[menu] update failed:', e.message)
@@ -219,6 +241,7 @@ router.patch('/:id', requireAuth, requireRole('manager', 'owner'), async (req, r
 router.delete('/:id', requireAuth, requireRole('manager', 'owner'), async (req, res) => {
   try {
     await pool.query(`DELETE FROM menu_items WHERE id = $1`, [req.params.id])
+    emitMenuUpdate(req)
     res.json({ ok: true })
   } catch (e) {
     console.error('[menu] delete failed:', e.message)
