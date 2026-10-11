@@ -35,7 +35,12 @@ export default function Categorize() {
     return categories
       .filter((c) => c.section === section)
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-      .filter((c) => !needle || String(c.name_en || '').toLowerCase().includes(needle))
+      .filter(
+        (c) =>
+          !needle ||
+          String(c.name_en || '').toLowerCase().includes(needle) ||
+          String(c.name_am || '').toLowerCase().includes(needle),
+      )
   }, [categories, section, q])
 
   return (
@@ -93,6 +98,7 @@ export default function Categorize() {
               }}
             >
               {cat.name_en}
+              {cat.name_am ? <span className="am-line am-pill">{cat.name_am}</span> : null}
             </button>
           ))}
         </VScroll>

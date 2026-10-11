@@ -5,6 +5,7 @@
 // the server must fan the message out to the customer app / bot channel).
 import React, { useEffect, useState } from 'react'
 import Header from '../components/Header.jsx'
+import VScroll from '../components/VScroll.jsx'
 import { EmptyState, Spinner } from '../components/ui.jsx'
 import { useApp } from '../store.jsx'
 import { haptic } from '../telegram.js'
@@ -44,6 +45,9 @@ export default function Announcements() {
 
       <div className="hr" />
 
+      {/* app-standard scroller — .page-scroll alone CLIPS (overflow hidden);
+          a growing SENT list would become unreachable without it */}
+      <VScroll variant="thin">
       {/* ----- compose panel ----- */}
       <div className="an-compose">
         <textarea
@@ -83,6 +87,7 @@ export default function Announcements() {
           ))}
         </div>
       )}
+      </VScroll>
     </div>
   )
 }

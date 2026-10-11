@@ -1,6 +1,7 @@
 // Page 5 — "New category" modal (the circular "+" button).
-// Name (required) + section = active Foods/Drinks toggle (shown as a static
-// pill). POST /api/menu/categories { name_en, section } → parent refetches.
+// Name (required) + optional Amharic name (name_am) + section = active
+// Foods/Drinks toggle (shown as a static pill).
+// POST /api/menu/categories { name_en, name_am, section } → parent refetches.
 import React, { useState } from 'react'
 import { useApp } from '../store.jsx'
 import { haptic } from '../telegram.js'
@@ -8,6 +9,7 @@ import { haptic } from '../telegram.js'
 export default function CategoryAddModal({ section, onClose, onErr }) {
   const { toast, addCategory } = useApp()
   const [name, setName] = useState('')
+  const [nameAm, setNameAm] = useState('')
   const [saving, setSaving] = useState(false)
 
   async function save() {
@@ -19,7 +21,7 @@ export default function CategoryAddModal({ section, onClose, onErr }) {
     }
     setSaving(true)
     try {
-      await addCategory(name, section)
+      await addCategory(name, section, nameAm)
       haptic('success')
       toast('Category created ✓')
       onClose()
@@ -46,6 +48,15 @@ export default function CategoryAddModal({ section, onClose, onErr }) {
           maxLength={40}
           placeholder="e.g. Vegetarian"
           autoFocus
+        />
+
+        <div className="f-label">Name (Amharic)</div>
+        <input
+          className="f-input"
+          value={nameAm}
+          onChange={(e) => setNameAm(e.target.value)}
+          maxLength={40}
+          placeholder="ለምሳሌ አትክልት"
         />
 
         <div className="modal-actions">

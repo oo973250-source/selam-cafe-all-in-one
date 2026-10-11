@@ -1,15 +1,11 @@
 // Page 6 — edit sheet (pencil). Per user spec: RBAC permissions, Active
 // ON/OFF toggle (suspend WITHOUT deleting), shift assignment + refund limit.
+// Revision (user): role classifiers (Cashier/Kitchen/Delivery) removed —
+// the sheet no longer offers role selection; permissions remain editable.
 // PATCH → store refetches (optimistic on, revert on failure). No double submit.
 import React, { useState } from 'react'
 import { useApp } from '../store.jsx'
 import { haptic } from '../telegram.js'
-
-const ROLES = [
-  { key: 'cashier', label: 'Cashier' },
-  { key: 'kitchen', label: 'Kitchen' },
-  { key: 'delivery', label: 'Delivery' },
-]
 
 const PERMS = [
   { key: 'orders', label: 'Orders' },
@@ -27,7 +23,6 @@ const SHIFTS = [
 
 export default function AdminEditModal({ admin, onClose }) {
   const { toast, updateAdmin } = useApp()
-  const [role, setRole] = useState(admin.role || 'cashier')
   const [perms, setPerms] = useState(Array.isArray(admin.permissions) ? admin.permissions : ['orders'])
   const [active, setActive] = useState(admin.active !== false)
   const [shift, setShift] = useState(admin.shift || 'morning')
@@ -52,7 +47,6 @@ export default function AdminEditModal({ admin, onClose }) {
     }
     setSaving(true)
     const ok = await updateAdmin(admin, {
-      role,
       permissions: perms,
       active,
       shift,
@@ -85,20 +79,6 @@ export default function AdminEditModal({ admin, onClose }) {
               {admin.username ? `@${admin.username} · ` : ''}ID {admin.tg_user_id}
             </div>
           </div>
-        </div>
-
-        <div className="f-label">Role</div>
-        <div className="chip-row">
-          {ROLES.map((r) => (
-            <button
-              key={r.key}
-              className={`chip ${role === r.key ? 'on' : ''}`}
-              aria-pressed={role === r.key}
-              onClick={() => { haptic('select'); setRole(r.key) }}
-            >
-              {r.label}
-            </button>
-          ))}
         </div>
 
         <div className="f-label">Permissions</div>

@@ -1,8 +1,9 @@
 // Page 7 — Admin panel (opened from Manager hub → Emergency pause).
 // Order management (limit / throttle / delivery toggle), temporary store status
 // (pause-for countdown, close-for-days, closure reason broadcast), live countdown
-// box, emergency kill-switch, and the bottom quick-nav bar (Star / Menu / Add / REPORTS).
-// Settings persistence = ⚠️ INTEGRATION POINT (no contract endpoints yet).
+// box, emergency kill-switch, and the bottom quick-nav (Menu / Announcements /
+// REPORTS — all functional; Star removed per user). Reports + Announcements pages
+// = ⚠️ INTEGRATION POINTS (harness-stubbed).
 import React, { useEffect, useRef, useState } from 'react'
 import Header from '../components/Header.jsx'
 import { settingsStatus, useApp } from '../store.jsx'
@@ -128,14 +129,6 @@ function fmtClock(iso) {
 
 // ---------- icons (bottom quick-nav) ----------
 
-function StarIcon() {
-  return (
-    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 3.2l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9L3.5 9.4l5.9-.8L12 3.2z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 function QueueIcon() {
   return (
     <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -180,6 +173,9 @@ export default function AdminPanel() {
   const reasonInit = useRef(false)
 
   const status = settingsStatus(settings, now)
+
+  // the Save button is only enabled when the textarea differs from server truth
+  const reasonDirty = reason.trim() !== ((settings && settings.closure_reason) || '').trim()
 
   // countdown ticker — informational only; the server owns the authoritative auto-resume
   useEffect(() => {
@@ -267,7 +263,9 @@ export default function AdminPanel() {
         <div className="ap-panel">
           <div className="ap-row">
             <span className="ap-label">Limit incoming orders to:</span>
-            <NumStep value={(settings && settings.order_limit) || 0} onCommit={setOrderLimit} ariaLabel="Order limit" />
+            {/* No arbitrary cap (user directive): the ADMIN decides the maximum.
+                0 = no cap; 9999 is only a sanity bound against typos. */}
+            <NumStep value={(settings && settings.order_limit) || 0} onCommit={setOrderLimit} max={9999} ariaLabel="Order limit" />
           </div>
           <div className="ap-row">
             <span className="ap-label">Throttle pickup times to (+min):</span>
@@ -319,6 +317,20 @@ export default function AdminPanel() {
             onChange={(e) => setReason(e.target.value)}
             onBlur={saveReason}
           />
+          {/* Explicit save button — blur-autosave alone was undiscoverable: admins
+              had nothing to click after typing the reason (user report). */}
+          <div className="ap-reason-row">
+            <button
+              type="button"
+              className="ap-reason-save"
+              onClick={saveReason}
+              disabled={busy || !reasonDirty}
+              aria-label="Save closure reason"
+            >
+              ✓ Save reason
+            </button>
+            {!reasonDirty && <span className="ap-reason-saved">Saved ✓</span>}
+          </div>
         </div>
         <p className="ap-hint">This reason will be visible to all users attempting to order during closure.</p>
 
@@ -350,23 +362,16 @@ export default function AdminPanel() {
           )}
         </div>
 
-        {/* ----- bottom quick-nav ----- */}
+        {/* ----- bottom quick-nav: Menu / Announcements / REPORTS (Star removed
+              per user; all remaining buttons open working pages) ----- */}
         <div className="ap-nav">
-          <button type="button" className="ico-btn" aria-label="Favorites" onClick={() => { haptic('light'); push('soon', 'Favorites') }}>
-            <StarIcon />
-          </button>
           <button type="button" className="ico-btn" aria-label="Order queues" onClick={() => { haptic('light'); switchTab('orders') }}>
             <QueueIcon />
           </button>
-          <button
-            type="button"
-            className="ico-btn"
-            aria-label="Emergency items and announcements"
-            onClick={() => { haptic('light'); push('soon', 'Announcements') }}
-          >
+          <button type="button" className="ico-btn" aria-label="Announcements" onClick={() => { haptic('light'); push('announcements') }}>
             <PlusIcon />
           </button>
-          <button type="button" className="ap-reports" onClick={() => { haptic('light'); push('soon', 'Reports') }}>
+          <button type="button" className="ap-reports" onClick={() => { haptic('light'); push('reports') }}>
             REPORTS
           </button>
         </div>

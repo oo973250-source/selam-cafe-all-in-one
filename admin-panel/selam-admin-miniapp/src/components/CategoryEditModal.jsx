@@ -1,7 +1,7 @@
 // Page 5 — "Edit category" overlay (bottom sheet), opened from a category pill.
-// Rename (PATCH { name_en }), reorder (position stepper → POST /reorder with the
-// full ordered id list for the section) and delete (confirm → 409 { itemCount }
-// → confirm → DELETE ?force=true) — all flows live in store.jsx.
+// Rename (PATCH { name_en, name_am }), reorder (position stepper → POST /reorder
+// with the full ordered id list for the section) and delete (confirm → 409
+// { itemCount } → confirm → DELETE ?force=true) — all flows live in store.jsx.
 import React, { useMemo, useState } from 'react'
 import { useApp } from '../store.jsx'
 import { haptic } from '../telegram.js'
@@ -9,6 +9,7 @@ import { haptic } from '../telegram.js'
 export default function CategoryEditModal({ cat, onClose, onErr }) {
   const { toast, categories, renameCategory, moveCategory, removeCategory } = useApp()
   const [name, setName] = useState(cat.name_en || '')
+  const [nameAm, setNameAm] = useState(cat.name_am || '')
   const [saving, setSaving] = useState(false) // rename in flight
   const [busy, setBusy] = useState(false) // reorder/delete in flight
 
@@ -34,7 +35,7 @@ export default function CategoryEditModal({ cat, onClose, onErr }) {
     }
     setSaving(true)
     try {
-      const ok = await renameCategory(cat, name)
+      const ok = await renameCategory(cat, name, nameAm)
       if (ok) {
         haptic('success')
         toast('Category renamed ✓')
@@ -80,6 +81,15 @@ export default function CategoryEditModal({ cat, onClose, onErr }) {
 
         <div className="f-label">Name</div>
         <input className="f-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
+
+        <div className="f-label">Name (Amharic)</div>
+        <input
+          className="f-input"
+          value={nameAm}
+          onChange={(e) => setNameAm(e.target.value)}
+          maxLength={40}
+          placeholder="ለምሳሌ አትክልት"
+        />
 
         <div className="f-label">Position</div>
         <div className="pos-row">

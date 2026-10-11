@@ -1,17 +1,13 @@
 // Page 6 — "Add admin" modal (the circular + button). Per user spec:
-// 1. Telegram User ID (or @username)  2. Role chips (Cashier/Kitchen/Delivery)
-// 3. Assigned shift / branch. Instant verification shows the Telegram photo +
-// name before granting (Bot-API lookup = INTEGRATION POINT; the sandbox harness
-// resolves a demo profile). POST → parent refetches.
+// 1. Telegram User ID (or @username)  2. Assigned shift / branch.
+// Revision (user): role classifiers (Cashier/Kitchen/Delivery) removed —
+// new admins get the default permission set, editable later in the edit sheet.
+// Instant verification shows the Telegram photo + name before granting
+// (Bot-API lookup = INTEGRATION POINT; the sandbox harness resolves a demo
+// profile). POST → parent refetches.
 import React, { useState } from 'react'
 import { useApp } from '../store.jsx'
 import { haptic } from '../telegram.js'
-
-const ROLES = [
-  { key: 'cashier', label: 'Cashier' },
-  { key: 'kitchen', label: 'Kitchen' },
-  { key: 'delivery', label: 'Delivery' },
-]
 
 const SHIFTS = [
   { key: 'morning', label: 'Morning' },
@@ -19,19 +15,11 @@ const SHIFTS = [
   { key: 'night', label: 'Night' },
 ]
 
-// Sensible RBAC defaults per role (editable later in the edit sheet)
-const DEFAULT_PERMS = {
-  cashier: ['orders', 'refunds'],
-  kitchen: ['orders'],
-  delivery: ['orders'],
-}
-
 export default function AdminAddModal({ onClose, onErr }) {
   const { toast, verifyAdmin, addAdmin } = useApp()
   const [idInput, setIdInput] = useState('')
   const [profile, setProfile] = useState(null) // verified Telegram profile
   const [verifying, setVerifying] = useState(false)
-  const [role, setRole] = useState('cashier')
   const [shift, setShift] = useState('morning')
   const [branch, setBranch] = useState('Main')
   const [saving, setSaving] = useState(false)
@@ -72,8 +60,7 @@ export default function AdminAddModal({ onClose, onErr }) {
         username: profile.username || null,
         name: profile.name,
         photo_url: profile.photo_url || null,
-        role,
-        permissions: DEFAULT_PERMS[role] || ['orders'],
+        permissions: ['orders'], // default set — fine-tune per admin in the edit sheet
         shift,
         branch: branch.trim() || 'Main',
       })
@@ -120,20 +107,6 @@ export default function AdminAddModal({ onClose, onErr }) {
             <div className="verify-ok">Verified ✓</div>
           </div>
         )}
-
-        <div className="f-label">Role</div>
-        <div className="chip-row">
-          {ROLES.map((r) => (
-            <button
-              key={r.key}
-              className={`chip ${role === r.key ? 'on' : ''}`}
-              aria-pressed={role === r.key}
-              onClick={() => { haptic('select'); setRole(r.key) }}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
 
         <div className="f-label">Assigned shift</div>
         <div className="chip-row">

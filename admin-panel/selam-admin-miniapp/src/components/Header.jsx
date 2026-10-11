@@ -1,6 +1,8 @@
 // App header — two variants per mocks:
 //  - "tabs": root pages (Orders / Manager) → segmented switcher top-right
 //  - "badge": deeper pages → large section badge pill top-right (+ optional sub-toggle below)
+// `onHistory` (Orders root only) renders a list-note icon button in the TOP-RIGHT
+// corner → opens the Order History screen (today + yesterday).
 import React from 'react'
 import { useApp } from '../store.jsx'
 import { haptic } from '../telegram.js'
@@ -16,7 +18,17 @@ function BackBtn() {
   )
 }
 
-export default function Header({ variant = 'tabs', active = 'orders', badge = '', children }) {
+// list-note glyph: page with ruled lines (history entry point)
+function HistoryIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="4.5" y="3.5" width="15" height="17" rx="3" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export default function Header({ variant = 'tabs', active = 'orders', badge = '', badgeIcon = '', onHistory, children }) {
   const { switchTab, brandName } = useApp()
 
   const onSwitch = (tab) => {
@@ -30,6 +42,19 @@ export default function Header({ variant = 'tabs', active = 'orders', badge = ''
       <div className="header-top">
         <BackBtn />
         <span className="header-title">admin</span>
+        {onHistory ? (
+          <button
+            type="button"
+            className="hist-btn"
+            aria-label="Order history"
+            onClick={() => {
+              haptic('light')
+              onHistory()
+            }}
+          >
+            <HistoryIcon />
+          </button>
+        ) : null}
       </div>
 
       <div className="brand-row">
@@ -50,7 +75,14 @@ export default function Header({ variant = 'tabs', active = 'orders', badge = ''
         ) : (
           <div className="header-side">
             {badge ? (
-              <div className={`badge-menu ${String(badge).length > 12 ? 'badge-menu-sm' : ''}`}>{badge}</div>
+              <div className={`badge-menu ${String(badge).length > 12 ? 'badge-menu-sm' : ''}`}>
+                {badgeIcon ? (
+                  <span className="badge-ico" aria-hidden="true">
+                    {badgeIcon}
+                  </span>
+                ) : null}
+                {badge}
+              </div>
             ) : null}
             {children}
           </div>

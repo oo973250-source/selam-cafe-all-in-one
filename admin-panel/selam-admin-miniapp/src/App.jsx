@@ -10,8 +10,14 @@ import CategoryItems from './pages/CategoryItems.jsx'
 import Categorize from './pages/Categorize.jsx'
 import Admins from './pages/Admins.jsx'
 import AdminPanel from './pages/AdminPanel.jsx'
+import Revenue from './pages/Revenue.jsx'
+import Profile from './pages/Profile.jsx'
+import Reports from './pages/Reports.jsx'
+import Announcements from './pages/Announcements.jsx'
+import History from './pages/History.jsx'
 import ComingSoon from './pages/ComingSoon.jsx'
 import { Spinner, Toast } from './components/ui.jsx'
+import OrderDetailsModal from './components/OrderDetailsModal.jsx'
 
 function Screen() {
   const { stack } = useApp()
@@ -31,17 +37,32 @@ function Screen() {
       return <Admins />
     case 'adminpanel':
       return <AdminPanel />
+    case 'revenue':
+      return <Revenue />
+    case 'profile':
+      return <Profile />
+    case 'reports':
+      return <Reports />
+    case 'announcements':
+      return <Announcements />
+    case 'history':
+      return <History />
     default:
       return <ComingSoon label={page.label} />
   }
 }
 
 function Boot() {
-  const { boot, setBoot, doAuth, reloadOrders, reloadSettings, pushNewOrder, back } = useApp()
+  const {
+    boot, setBoot, doAuth, reloadOrders, reloadSettings, reloadProfile, pushNewOrder, telegramBack,
+    patchOrderLocal, applyServerSettings, applyProfile, applyServerAnnouncement,
+  } = useApp()
 
   useEffect(() => {
     initTelegram()
-    bindBackButton(() => back())
+    // Telegram hardware-back / swipe (Page 8): modal open → close it, else pop
+    // the history-synced stack. Visibility is synced by NavDepthTracker below.
+    bindBackButton(telegramBack)
 
     let mounted = true
     ;(async () => {
@@ -52,10 +73,23 @@ function Boot() {
         if (!mounted) return
         await reloadSettings() // Page 7 store settings (emergency pause / countdown state)
         if (!mounted) return
+        await reloadProfile() // Page 9 cafe profile — primes brandName for the header
+        if (!mounted) return
         setBoot('ok')
-        initSocket((order) => pushNewOrder(order))
+        // Realtime wire-up (super-speed sync): order / settings / profile /
+        // announcement pushes from the server mutate the store directly —
+        // polling refetches are only the fallback (see socket.js catalog).
+        initSocket({
+          onNewOrder: (order) => pushNewOrder(order),
+          onOrderUpdate: ({ id, ...patch }) => {
+            if (id != null) patchOrderLocal(id, patch)
+          },
+          onSettingsUpdate: (s) => applyServerSettings(s),
+          onProfileUpdate: (p) => applyProfile(p),
+          onAnnouncement: (a) => applyServerAnnouncement(a),
+        })
       } catch {
-        /* boot state already set by doAuth (gate | denied | expired) */
+        /* boot state already set by doAuth (denied | expired) */
       }
     })()
 
@@ -121,6 +155,8 @@ export default function App() {
       <NavDepthTracker />
       <main className="app">
         <Boot />
+        {/* one shared order-details sheet — queue "Details" button + history rows */}
+        <OrderDetailsModal />
         <ToastSlot />
       </main>
     </AppProvider>

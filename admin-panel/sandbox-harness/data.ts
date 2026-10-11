@@ -1,5 +1,5 @@
 // SANDBOX PREVIEW HARNESS — NOT part of the deliverable.
-// Contract-identical in-memory stubs of the Selam Cafe backend so every admin
+// Contract-identical in-memory stubs of the Medi Cafe backend so every admin
 // screen is clickable before integration. Lives only in this sandbox.
 type Item = { id: string; name: string; price: number; qty: number; note?: string }
 type OrderEvent = { id: number; event: string; payload: unknown; created_at: string }
@@ -127,28 +127,28 @@ function genDone(day: number, week: number, month: number): string[] {
 
 function createDemo() {
   const categories: Category[] = [
-    { id: 'breakfast', name_en: 'Breakfast', icon: '🍳', section: 'food', hidden: false, sort_order: 0 },
-    { id: 'snacks', name_en: 'Snacks', icon: '🥟', section: 'food', hidden: false, sort_order: 1 },
-    { id: 'fast_food', name_en: 'Fast Food', icon: '🍔', section: 'food', hidden: false, sort_order: 2 },
-    { id: 'hot_drinks', name_en: 'Hot Drinks', icon: '☕', section: 'drink', hidden: false, sort_order: 0 },
-    { id: 'drinks', name_en: 'Drinks', icon: '🥤', section: 'drink', hidden: false, sort_order: 1 },
+    { id: 'breakfast', name_en: 'Breakfast', name_am: 'ቁርስ', icon: '🍳', section: 'food', hidden: false, sort_order: 0 },
+    { id: 'snacks', name_en: 'Snacks', name_am: 'መክሰስ', icon: '🥟', section: 'food', hidden: false, sort_order: 1 },
+    { id: 'fast_food', name_en: 'Fast Food', name_am: 'ፈጣን ምግብ', icon: '🍔', section: 'food', hidden: false, sort_order: 2 },
+    { id: 'hot_drinks', name_en: 'Hot Drinks', name_am: 'ትኩስ መጠጥ', icon: '☕', section: 'drink', hidden: false, sort_order: 0 },
+    { id: 'drinks', name_en: 'Drinks', name_am: 'መጠጦች', icon: '🥤', section: 'drink', hidden: false, sort_order: 1 },
   ]
 
   const menu: MenuItem[] = [
-    { id: 'doro_wat_1', category: 'breakfast', name_en: 'Doro Wat', price: 450, available: true, sort_order: 0, description: 'Spicy chicken stew with injera' },
-    { id: 'shiro_1', category: 'breakfast', name_en: 'Shiro Fitfit', price: 220, available: true, sort_order: 1 },
-    { id: 'beyaynetu_1', category: 'breakfast', name_en: 'Beyaynetu', price: 300, available: true, sort_order: 2 },
-    { id: 'firfir_1', category: 'breakfast', name_en: 'Firfir', price: 240, available: true, sort_order: 3 },
-    { id: 'chechebsa_1', category: 'breakfast', name_en: 'Chechebsa', price: 260, available: true, sort_order: 4 },
-    { id: 'fuul_1', category: 'breakfast', name_en: 'Fuul', price: 200, available: true, sort_order: 5 },
-    { id: 'injera_1', category: 'breakfast', name_en: 'Injera (3 pcs)', price: 90, available: true, sort_order: 6 },
-    { id: 'special_brek_1', category: 'breakfast', name_en: 'Special Breakfast Combo', price: 550, available: true, sort_order: 7 },
-    { id: 'sambusa_1', category: 'snacks', name_en: 'Sambusa (3 pcs)', price: 150, available: true, sort_order: 0 },
-    { id: 'tibs_1', category: 'fast_food', name_en: 'Special Tibs', price: 520, available: true, sort_order: 0 },
-    { id: 'macchiato_1', category: 'hot_drinks', name_en: 'Macchiato', price: 80, available: true, sort_order: 0 },
-    { id: 'buna_1', category: 'hot_drinks', name_en: 'Buna (Coffee)', price: 60, available: true, sort_order: 1 },
-    { id: 'coke_1', category: 'drinks', name_en: 'Coca Cola', price: 50, available: true, sort_order: 0 },
-    { id: 'sprk_1', category: 'drinks', name_en: 'Sprite', price: 50, available: true, sort_order: 1 },
+    { id: 'doro_wat_1', category: 'breakfast', name_en: 'Doro Wat', name_am: 'ዶሮ ወጥ', price: 450, available: true, sort_order: 0, description: 'Spicy chicken stew with injera' },
+    { id: 'shiro_1', category: 'breakfast', name_en: 'Shiro Fitfit', name_am: 'ሽሮ ፍትፍት', price: 220, available: true, sort_order: 1 },
+    { id: 'beyaynetu_1', category: 'breakfast', name_en: 'Beyaynetu', name_am: 'በያይነቱ', price: 300, available: true, sort_order: 2 },
+    { id: 'firfir_1', category: 'breakfast', name_en: 'Firfir', name_am: 'ፍርፍር', price: 240, available: true, sort_order: 3 },
+    { id: 'chechebsa_1', category: 'breakfast', name_en: 'Chechebsa', name_am: 'ጨጨብሳ', price: 260, available: true, sort_order: 4 },
+    { id: 'fuul_1', category: 'breakfast', name_en: 'Fuul', name_am: 'ፉል', price: 200, available: true, sort_order: 5 },
+    { id: 'injera_1', category: 'breakfast', name_en: 'Injera (3 pcs)', name_am: 'እንጀራ (3)', price: 90, available: true, sort_order: 6 },
+    { id: 'special_brek_1', category: 'breakfast', name_en: 'Special Breakfast Combo', name_am: 'ልዩ የቁርስ ምርጫ', price: 550, available: true, sort_order: 7 },
+    { id: 'sambusa_1', category: 'snacks', name_en: 'Sambusa (3 pcs)', name_am: 'ሳምቡሳ (3)', price: 150, available: true, sort_order: 0 },
+    { id: 'tibs_1', category: 'fast_food', name_en: 'Special Tibs', name_am: 'ልዩ ጥብስ', price: 520, available: true, sort_order: 0 },
+    { id: 'macchiato_1', category: 'hot_drinks', name_en: 'Macchiato', name_am: 'ማኪያቶ', price: 80, available: true, sort_order: 0 },
+    { id: 'buna_1', category: 'hot_drinks', name_en: 'Buna (Coffee)', name_am: 'ቡና', price: 60, available: true, sort_order: 1 },
+    { id: 'coke_1', category: 'drinks', name_en: 'Coca Cola', name_am: 'ኮካ ኮላ', price: 50, available: true, sort_order: 0 },
+    { id: 'sprk_1', category: 'drinks', name_en: 'Sprite', name_am: 'ስፕራይት', price: 50, available: true, sort_order: 1 },
   ]
 
   const orders: Order[] = [
@@ -265,7 +265,7 @@ function createDemo() {
   // Page 9 cafe profile — demo values mirror the mock (cafe name feeds brandName).
   const LOGO_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' rx='14' fill='#2a2118'/><text x='32' y='42' font-size='30' text-anchor='middle'>☕</text></svg>`
   const profile: CafeProfile = {
-    cafe_name: 'UniCafe',
+    cafe_name: 'Medi Cafe',
     phone: '+251 91 234 5678',
     location: 'Addis Ababa, Bole',
     logo_url: `data:image/svg+xml;utf8,${encodeURIComponent(LOGO_SVG)}`,

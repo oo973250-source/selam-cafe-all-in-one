@@ -1,4 +1,4 @@
-# Selam Cafe — Admin Telegram Mini App (AI Handoff)
+# Medi Cafe — Admin Telegram Mini App (AI Handoff)
 
 This package contains EVERYTHING needed to integrate the finished admin Mini App
 frontend with the real backend — and to connect it to the Telegram bot and the
@@ -45,6 +45,9 @@ with a `⚠️ INTEGRATION POINT` comment in `src/api.js` and detailed in `SPEC.
 1. **Store settings** — `GET|PATCH /api/admin-miniapp/settings`
    `{ order_limit, pickup_throttle_min, delivery_available, paused, pause_until, close_until, closure_reason }`.
    Server must own: intake blocking, closure-reason broadcast to customers, authoritative auto-resume.
+   ORDER LIMIT: enforce only non-negative integers — NO business cap (the admin decides the
+   maximum; 0 = unlimited; 9999 sanity bound at most). The cafe's real name is "Medi Cafe";
+   the bot must read it at runtime from the profile row (see the identity-controller section).
 2. **Staff admins** — `GET|POST /api/admin-miniapp/admins`, `GET /admins/verify?id=`,
    `PATCH|DELETE /admins/:tgUserId`. Per-admin stats `{ day, week, month }` server-computed.
 3. **Revenue** — `GET /api/admin-miniapp/revenue?period=day|week|month` → `{ orders, revenue (int ETB), delivered }`.
@@ -75,7 +78,18 @@ with a `⚠️ INTEGRATION POINT` comment in `src/api.js` and detailed in `SPEC.
     KEEP returning served-but-not-dismissed orders (the queue shows them in a green
     done state until an admin taps "Done"; done cards only stay in the queue for
     the current day); dismissed orders must still reach the order-history screen.
-12. **Cafe identity (`GET /api/brand`, public)** — `{ name, logo_url, updated_at }`,
+12. **Amharic translations (name_am)** — menu items AND categories carry an
+    optional `name_am` (Amharic name, e.g. Doro Wat → ዶሮ ወጥ). `POST /api/menu`,
+    `PATCH /api/menu/:id`, `POST /api/menu/categories` and
+    `PATCH /api/menu/categories/:id` all accept it; add the column to both tables
+    and include it in every read payload. The admin UI edits it ("Name (Amharic)"
+    field) and renders it as a second line; the customer app / bot should show
+    the right name per the user's language.
+13. **Cache headers on the SPA** — serve the mini app's `index.html` with
+    `Cache-Control: no-store, must-revalidate` (hashed `/assets/*` may stay
+    `immutable`). Telegram webviews cache aggressively: without this, devices
+    keep running an OLD bundle after every redeploy ("the fix isn't there").
+14. **Cafe identity (`GET /api/brand`, public)** — `{ name, logo_url, updated_at }`,
     backed by the SAME row as the profile endpoint. Every surface (customer miniapp,
     bot templates, receipts) reads the cafe name from here — see the controller section below.
 

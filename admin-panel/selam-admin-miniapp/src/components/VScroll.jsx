@@ -1,6 +1,8 @@
 // Shared internal-scroll container with a far-left scroll indicator (per mocks).
-//   variant="capsule" → wide outlined rail + white pill thumb (Pages 3 & 4)
-//   variant="thin"    → slim rail + small subtle thumb, browser-style (Page 5)
+//   variant="thin"    → ultra-thin native-overlay-style rail (3px) + subtle white
+//                       thumb — the APP-WIDE standard (Page 8 directive)
+//   variant="capsule" → RETIRED (was: wide outlined rail + white pill thumb);
+//                       kept only as a rollback path — no call site uses it
 // The thumb is hidden when content fits; size = visible/total ratio; position
 // tracks scrollTop; ResizeObserver keeps it correct after refetches.
 import React, { useCallback, useEffect, useRef, useState } from 'react'

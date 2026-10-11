@@ -1,4 +1,4 @@
-/* Selam Cafe admin miniapp — dark, touch-first, pill-based design (per mocks) */
+/* Medi Cafe admin miniapp — dark, touch-first, pill-based design (per mocks) */
 
 :root {
   --bg: #141414;
@@ -10,6 +10,7 @@
   --muted: #cfcfcf;
   --hint: #9a9a9a;
   --gold: #a8922e;
+  --gold-bright: #ffe14d; /* Page 1 v3: "started" state — bright yellow */
   --gold-green: #8fa318;
   --red: #c0272d;
   --red-dim-bg: #4e2b2b;
@@ -20,6 +21,7 @@
   --back-fg: #9fc3d8;
   --green: #47a35c;
   --green-bright: #66c07a;
+  --purple: #6d5af8; /* Page 9 profile actions (pin / change / update) */
   --radius-card: 26px;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
@@ -172,6 +174,13 @@ button {
   font-size: 26px;
 }
 
+/* icon glyph inside a badge pill (Page 9: 👤 Profile) */
+.badge-ico {
+  font-size: 22px;
+  margin-right: 8px;
+  vertical-align: -2px;
+}
+
 .seg-sub {
   margin-top: 0;
   justify-content: center;
@@ -237,6 +246,30 @@ button {
   font-size: 12.5px;
   border-radius: 999px;
   padding: 4px 12px;
+}
+
+/* Page 1 v3 — staff/cooker name pill, TOP-LEFT corner of a started order.
+   Light blue like the mock; white-ish border per the global white-outline rule. */
+.staff-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #cfe4f8;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  color: #10283c;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 4px 13px;
+}
+
+/* push the title below the staff pill so the top-left badge never overlaps it */
+.card.has-staff .card-title {
+  margin-top: 24px;
 }
 
 .card-title {
@@ -311,6 +344,36 @@ button {
 .btn-goldgreen {
   background: var(--gold-green);
   border-color: var(--gold-green);
+}
+
+/* Page 1 v3 — "started" = bright yellow (was golden-green). Stays disabled:
+   status only moves forward (Finished / Cancel). */
+.btn-started {
+  background: var(--gold-bright);
+  border-color: var(--gold-bright);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Page 1 v5 — two-step completion: a finished (served) order STAYS in the queue
+   in a green-tinted done state until an admin explicitly taps "Done". */
+.card.is-done {
+  border-color: rgba(102, 192, 122, 0.55);
+}
+
+.done-note {
+  margin: 2px 0 6px;
+  color: var(--green-bright);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* the final dismissal button — green like the confirmed/success family */
+.btn-done {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+  font-weight: 700;
 }
 
 .btn-cancel {
@@ -825,21 +888,44 @@ button {
   transform: scale(0.985);
 }
 
-/* thin scrollbar variant (Page 5): slim rail, small subtle thumb */
+/* Amharic translation line (name_am) — secondary line under the English name
+   on Page 3 category cards, Page 4 item cards and Page 5 category pills */
+.am-line {
+  display: block;
+  font-size: 14.5px;
+  line-height: 1.35;
+  color: #9aa3ad;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+
+.am-pill {
+  margin-top: 1px;
+}
+
+/* thin scrollbar variant — APP-WIDE standard (Page 8 directive): ultra-thin
+   native-overlay-style rail (2–4px), subtle white thumb. Replaces the wide
+   capsule track on every scroll container (Pages 3/4/6 switched, 5 already thin). */
 .vscroll-thin .vscroll-track {
-  width: 14px;
-  background: #191919;
+  width: 3px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .vscroll-thin .vscroll-thumb {
-  width: 5px;
-  margin-left: -2.5px;
-  background: #d9d9d9;
-  opacity: 0.85;
+  width: 3px;
+  margin-left: 0;
+  background: rgba(255, 255, 255, 0.55);
+  opacity: 1;
 }
 
 /* cards inside any scroll view sit flush (the view already has side padding) */
 .vscroll-view .card {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.vscroll-view .metric-card {
   margin-left: 0;
   margin-right: 0;
 }
@@ -1290,6 +1376,35 @@ button {
   min-height: 150px;
 }
 
+/* explicit save affordance for the closure reason (blur-autosave alone was
+   undiscoverable — admins had nothing to click after typing) */
+.ap-reason-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 2px;
+}
+
+.ap-reason-save {
+  background: var(--green);
+  border: 1px solid var(--green);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14.5px;
+  border-radius: 999px;
+  padding: 10px 18px;
+}
+
+.ap-reason-save:disabled {
+  opacity: 0.45;
+}
+
+.ap-reason-saved {
+  color: var(--green-bright);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
 .ap-hint {
   color: var(--muted);
   font-size: 14.5px;
@@ -1352,7 +1467,8 @@ button {
   opacity: 0.5;
 }
 
-/* bottom quick-nav (Star / Menu / Add / REPORTS) */
+/* bottom quick-nav (Menu / Announcements / REPORTS — Star removed per user;
+   all remaining buttons open working pages) */
 .ap-nav {
   display: flex;
   align-items: center;
@@ -1382,4 +1498,645 @@ button {
   font-size: 13px;
   margin-top: 4px;
   color: #f2c9c9;
+}
+
+/* ---------- Page 8: Revenue (financial analytics) ---------- */
+/* metric cards — clean thin WHITE outline per user directive: pops against the
+   dark background (border 1px solid rgba(255,255,255,0.8)), centered stack */
+.metric-card {
+  margin: 0 0 18px;
+  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-card);
+  padding: 28px 18px 22px;
+  text-align: center;
+}
+
+.metric-value {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1.15;
+}
+
+.metric-label {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+/* ---------- Page 9: Profile (cafe profile & business settings) ---------- */
+/* One white-outlined panel (global directive: border 1px rgba(255,255,255,0.8))
+   with a legend pill overlapping its top edge; content scrolls in the app-wide
+   ultra-thin rail (VScroll thin). */
+
+.profile-panel {
+  position: relative;
+  margin: 30px 0 12px;
+  background: #1d1d1d;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-card);
+  padding: 30px 8px 16px;
+}
+
+.profile-legend {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: #202020;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 15.5px;
+  font-weight: 600;
+}
+
+.pf-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+}
+
+/* description row: label top-aligned with the textarea text */
+.pf-row-top {
+  align-items: flex-start;
+}
+
+.pf-row-top .pf-label {
+  padding-top: 13px;
+}
+
+.pf-row-top .pf-ctl {
+  gap: 8px;
+}
+
+.pf-ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.pf-ico-red {
+  background: rgba(224, 72, 62, 0.22);
+}
+
+.pf-ico-green {
+  background: rgba(52, 168, 83, 0.24);
+}
+
+.pf-ico-blue {
+  background: rgba(66, 133, 244, 0.22);
+}
+
+.pf-ico-purple {
+  background: rgba(109, 90, 248, 0.26);
+}
+
+.pf-ico-yellow {
+  background: rgba(251, 188, 5, 0.2);
+}
+
+.pf-label {
+  flex: 0 0 auto;
+  width: 90px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap; /* mock: labels on one line */
+}
+
+.pf-ctl {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pf-input {
+  width: 100%;
+  min-width: 0;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+  padding: 11px 12px;
+}
+
+.pf-input:focus {
+  outline: none;
+  border-color: #ffffff;
+}
+
+/* purple map-pin button on the Location row (interim: opens a maps search) */
+.pf-pin {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  border: none;
+  background: var(--purple);
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* picture row: preview + two compact buttons must fit one line on 430px */
+.pf-row .pf-ctl {
+  gap: 4px;
+}
+
+.pf-row .pf-ctl.pf-wrap {
+  flex-wrap: wrap; /* safety: wrap instead of clip on very narrow screens */
+  row-gap: 8px;
+}
+
+.pf-preview {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: #141414;
+  color: var(--hint);
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pf-btn-change {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  border-radius: 999px;
+  background: var(--purple);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 8px 9px;
+  white-space: nowrap;
+}
+
+.pf-btn-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #161616;
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 8px 9px;
+  white-space: nowrap;
+}
+
+/* fixed-metric inline icons inside the picture-row buttons (emoji width varies) */
+.pf-bi {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* opening hours: two selects + "–", native dropdown, custom white chevron */
+.pf-times {
+  gap: 8px;
+}
+
+.pf-select {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: #141414
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%23ffffff' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>")
+    no-repeat right 10px center / 12px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 11px 26px 11px 10px;
+}
+
+.pf-select:focus {
+  outline: none;
+  border-color: #ffffff;
+}
+
+.pf-dash {
+  color: var(--hint);
+  flex-shrink: 0;
+}
+
+/* description: textarea + live N/200 counter bottom-right inside the field */
+.pf-ta {
+  position: relative;
+  align-items: stretch;
+}
+
+.pf-area {
+  width: 100%;
+  min-height: 86px;
+  resize: vertical;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+  line-height: 1.4;
+  padding: 11px 12px 24px;
+}
+
+.pf-area:focus {
+  outline: none;
+  border-color: #ffffff;
+}
+
+.pf-count {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-size: 11.5px;
+  color: var(--hint);
+  pointer-events: none;
+}
+
+/* bottom primary action — full-width purple pill (💾 Update) */
+.pf-update {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  margin-top: 20px;
+  padding: 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--purple);
+  color: #ffffff;
+  font-size: 16.5px;
+  font-weight: 600;
+}
+
+.pf-update:disabled {
+  opacity: 0.6;
+}
+
+/* ---------- history icon (Orders root header, top-right corner) ---------- */
+.hist-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: #2e2e2e;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+/* ---------- Reports / Announcements / History shared section header ---------- */
+.rp-h {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: var(--muted);
+  margin: 6px 16px 14px;
+}
+
+/* ---------- Reports: metric cards + pause history ---------- */
+.rp-cards {
+  padding: 0 14px;
+}
+
+.rp-hist {
+  padding: 0 14px;
+}
+
+.rp-hist-card {
+  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 18px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+.rp-hist-card.kind-emergency {
+  border-color: #8a4a4a;
+}
+
+.rp-hist-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rp-hist-kind {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.rp-hist-card.kind-emergency .rp-hist-kind { color: #ff8a8a; }
+.rp-hist-card.kind-countdown .rp-hist-kind { color: #ffd76a; }
+.rp-hist-card.kind-closed .rp-hist-kind { color: #9fc3d8; }
+
+.rp-hist-dur {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.rp-hist-reason {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.rp-hist-when {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--hint);
+}
+
+/* ---------- Announcements ---------- */
+.an-compose {
+  margin: 0 14px 18px;
+  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-card);
+  padding: 14px;
+}
+
+.an-input {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  margin: 0;
+}
+
+.an-counter {
+  text-align: right;
+  font-size: 12px;
+  color: var(--hint);
+  margin: 6px 2px 10px;
+}
+
+.an-send {
+  display: block;
+  width: 100%;
+  background: var(--purple);
+  border: 1px solid var(--purple);
+  color: #fff;
+  border-radius: 999px;
+  padding: 13px;
+  font-size: 15.5px;
+  font-weight: 600;
+}
+
+.an-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.an-list {
+  padding: 0 14px;
+}
+
+.an-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+.an-msg {
+  font-size: 15px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.an-when {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--hint);
+}
+
+/* ---------- Order History (today + yesterday) ---------- */
+.hist-list {
+  padding: 0 14px;
+}
+
+.hist-row {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 13px 16px;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+.hist-row.st-cancelled {
+  opacity: 0.72;
+}
+
+.hist-row-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hist-id {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.hist-time {
+  font-size: 12.5px;
+  color: var(--hint);
+}
+
+.hist-status {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.hist-status.s-new { background: #4a3d15; color: #ffd76a; }
+.hist-status.s-preparing { background: #2c2a55; color: #b3aaff; }
+.hist-status.s-ready { background: #1f3d2a; color: #7fd694; }
+.hist-status.s-served { background: #1f3d2a; color: #7fd694; }
+.hist-status.s-cancelled { background: #4e2b2b; color: #ff9d9d; }
+
+.hist-items {
+  margin-top: 8px;
+  font-size: 14.5px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.hist-meta {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--hint);
+}
+
+.hist-total {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* rows are tappable → shared order-details sheet (customer info) */
+.hist-row {
+  cursor: pointer;
+}
+
+.hist-row:active {
+  background: #2e2e2e;
+}
+
+.hist-row:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
+}
+
+.hist-chev {
+  margin-left: auto;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--hint);
+}
+
+/* ---------- order details sheet (queue Details button + history rows) ---------- */
+.od-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.od-top .modal-title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.od-close {
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: #141414;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.od-when {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--hint);
+}
+
+.od-card {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 14px;
+  background: #141414;
+  padding: 2px 14px;
+}
+
+.od-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: 15px;
+}
+
+.od-row + .od-row {
+  border-top: 1px solid var(--border-soft);
+}
+
+.od-ico {
+  width: 22px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.od-wrap {
+  overflow-wrap: anywhere;
+}
+
+.od-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 15px;
+}
+
+.od-line + .od-line {
+  border-top: 1px solid var(--border-soft);
+}
+
+.od-price {
+  color: var(--hint);
+  white-space: nowrap;
+}
+
+.od-note {
+  border-top: 1px solid var(--border-soft);
+  padding: 10px 0;
+  font-size: 13.5px;
+  color: var(--hint);
+}
+
+.od-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding: 13px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 14px;
+  font-size: 15px;
 }

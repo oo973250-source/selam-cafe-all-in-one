@@ -2,6 +2,8 @@
 // Day|Week|Month metrics toggle (instant per-card recalc), circular "+" (add-admin
 // modal), CAPSULE scrollbar per mock, numbered admin cards "1,Name" with
 // ✏️ pencil (edit sheet) + ❌ red X (revoke, confirm-guarded).
+// Revision (user): role classifiers (Cashier/Kitchen/Delivery) removed —
+// cards show only the Telegram ID; add/edit modals no longer offer role chips.
 import React, { useCallback, useEffect, useState } from 'react'
 import Header from '../components/Header.jsx'
 import VScroll from '../components/VScroll.jsx'
@@ -17,8 +19,6 @@ const PERIODS = [
   { key: 'week', label: 'Week' },
   { key: 'month', label: 'Month' },
 ]
-
-const ROLE_LABELS = { cashier: 'Cashier', kitchen: 'Kitchen', delivery: 'Delivery' }
 
 function Avatar({ name, url }) {
   if (url) return <img className="admin-avatar" src={url} alt="" />
@@ -72,7 +72,7 @@ export default function Admins() {
       {admins === null ? (
         <Spinner label="Loading admins…" />
       ) : (
-        <VScroll variant="capsule">
+        <VScroll variant="thin">
           <div className="add-row">
             <button className="add-btn" aria-label="Add admin" onClick={() => { haptic('light'); setAdding(true) }}>
               +
@@ -93,9 +93,7 @@ export default function Admins() {
 
                     <div className="admin-body">
                       <div className="admin-name">{i + 1},{a.name}</div>
-                      <div className="admin-id">
-                        ID {a.tg_user_id} · {ROLE_LABELS[a.role] || 'Staff'}
-                      </div>
+                      <div className="admin-id">ID {a.tg_user_id}</div>
                       <div className="admin-metric-label">#total order done</div>
                       <div className="admin-metric-val">--- {count}</div>
                     </div>

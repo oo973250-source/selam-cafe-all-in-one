@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Selam Cafe — Telegram admin Mini App (frontend only; mounts at a subpath of the existing Railway service)",
+  "description": "Medi Cafe — Telegram admin Mini App (frontend only; mounts at a subpath of the existing Railway service)",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

@@ -5,6 +5,7 @@
 // the store-settings PATCH appends entries when pause/close/emergency is applied).
 import React, { useEffect } from 'react'
 import Header from '../components/Header.jsx'
+import VScroll from '../components/VScroll.jsx'
 import { EmptyState, Spinner } from '../components/ui.jsx'
 import { useApp } from '../store.jsx'
 import { haptic } from '../telegram.js'
@@ -61,6 +62,9 @@ export default function Reports() {
 
       <div className="hr" />
 
+      {/* app-standard scroller — .page-scroll alone CLIPS (overflow hidden);
+          without this, long pause histories are unreachable (user report) */}
+      <VScroll variant="thin">
       <div className="rp-h">SALES METRICS</div>
 
       {/* Time range toggle — same data source as the Revenue screen */}
@@ -128,6 +132,7 @@ export default function Reports() {
           ))}
         </div>
       )}
+      </VScroll>
     </div>
   )
 }

@@ -1,4 +1,6 @@
 // Page 1 — "orders" root view: filter pills, paused/closed banner, live order cards.
+// v5: done (served) orders STAY in the queue — highlighted with a green "Done"
+// button — until an admin explicitly taps Done (dismissed_at set → disappears).
 import React, { useMemo } from 'react'
 import Header from '../components/Header.jsx'
 import OrderCard from '../components/OrderCard.jsx'
@@ -19,21 +21,38 @@ function fmtLeft(ms) {
   return h > 0 ? `${h}h ${m % 60}m` : `${m}m`
 }
 
+// local calendar-day check — done (served) orders only stay in the live queue
+// for the rest of the current day; older ones live in the history screen only.
+function isToday(iso) {
+  if (!iso) return false
+  const d = new Date(iso)
+  const now = new Date()
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+}
+
 export default function OrdersView() {
-  const { orders, filter, setFilter, settings } = useApp()
+  const { orders, filter, setFilter, settings, push } = useApp()
 
   const status = settingsStatus(settings)
 
   const activeOrders = useMemo(() => {
     if (!Array.isArray(orders)) return null
     return orders
-      .filter((o) => ACTIVE_STATUSES.includes(o.status))
+      // Active queue + finished orders waiting for the explicit "Done" tap
+      // (done state is kept only for the current day; cancelled orders leave
+      // immediately; dismissed_at marks the final removal).
+      .filter(
+        (o) =>
+          ACTIVE_STATUSES.includes(o.status) ||
+          (o.status === 'served' && !o.dismissed_at && isToday(o.served_at || o.updated_at)),
+      )
       .filter((o) => filter === 'all' || o.service_type === filter)
   }, [orders, filter])
 
   return (
     <div>
-      <Header variant="tabs" active="orders" />
+      {/* list-note icon (top-right corner) → order history, today + yesterday */}
+      <Header variant="tabs" active="orders" onHistory={() => push('history')} />
 
       <div className="filters" role="tablist" aria-label="Order type filter">
         {FILTERS.map((f) => (

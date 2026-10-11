@@ -74,7 +74,9 @@ export async function PATCH(req: Request) {
   if (body.order_limit !== undefined) {
     const n = Math.round(Number(body.order_limit))
     if (!Number.isFinite(n) || n < 0) return json({ error: 'order_limit must be a non-negative integer' }, 400)
-    s.order_limit = Math.min(99, n)
+    // No business cap (user directive): the ADMIN decides the maximum. 9999 is
+    // only a technical sanity bound against typos — 0 means "no cap".
+    s.order_limit = Math.min(9999, n)
   }
   if (body.pickup_throttle_min !== undefined) {
     const n = Math.round(Number(body.pickup_throttle_min))

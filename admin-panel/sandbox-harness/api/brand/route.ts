@@ -12,7 +12,7 @@ export async function GET() {
   // Defensive default for a stale dev-server singleton (pre-Page-9 demo object).
   if (!demo.profile) {
     demo.profile = {
-      cafe_name: 'UniCafe',
+      cafe_name: 'Medi Cafe',
       phone: '',
       location: '',
       logo_url: '',

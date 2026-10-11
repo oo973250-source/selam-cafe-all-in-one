@@ -14,7 +14,7 @@
 import { demo, json, readBody } from '@/lib/demo/data'
 
 const DEFAULT_PROFILE = {
-  cafe_name: 'UniCafe',
+  cafe_name: 'Medi Cafe',
   phone: '',
   location: '',
   logo_url: '',

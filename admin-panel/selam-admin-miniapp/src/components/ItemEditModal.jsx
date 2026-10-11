@@ -1,6 +1,7 @@
-// Page 4 edit modal — updates an item's name, price (INTEGER Birr), description,
-// photo and availability state via PATCH /api/menu/:id, then the parent refetches
-// the list (RULES: refetch after successful PATCH). Save is guarded (no double submit).
+// Page 4 edit modal — updates an item's name, Amharic name (name_am), price
+// (INTEGER Birr), description, photo and availability state via PATCH
+// /api/menu/:id, then the parent refetches the list (RULES: refetch after
+// successful PATCH). Save is guarded (no double submit).
 import React, { useState } from 'react'
 import { api } from '../api.js'
 import { useApp } from '../store.jsx'
@@ -9,6 +10,7 @@ import { haptic } from '../telegram.js'
 export default function ItemEditModal({ item, onClose, onSaved, onErr }) {
   const { toast } = useApp()
   const [name, setName] = useState(item.name_en || '')
+  const [nameAm, setNameAm] = useState(item.name_am || '')
   const [price, setPrice] = useState(item.price === undefined || item.price === null ? '' : String(item.price))
   const [desc, setDesc] = useState(item.description || '')
   const [img, setImg] = useState(item.image_url || '')
@@ -35,6 +37,7 @@ export default function ItemEditModal({ item, onClose, onSaved, onErr }) {
     try {
       await api.patchMenu(item.id, {
         name_en: name.trim(),
+        name_am: nameAm.trim(),
         price: p,
         description: desc.trim(),
         image_url: img.trim(),
@@ -58,6 +61,15 @@ export default function ItemEditModal({ item, onClose, onSaved, onErr }) {
 
         <div className="f-label">Name</div>
         <input className="f-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
+
+        <div className="f-label">Name (Amharic)</div>
+        <input
+          className="f-input"
+          value={nameAm}
+          onChange={(e) => setNameAm(e.target.value)}
+          maxLength={60}
+          placeholder="ለምሳሌ ዶሮ ወጥ"
+        />
 
         <div className="f-label">Price (Birr)</div>
         <input

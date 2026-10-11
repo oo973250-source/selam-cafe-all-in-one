@@ -1,7 +1,7 @@
 // App state: auth boot flow, nav stack (hash-free mini router), orders, categories, paused flag.
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { api, authenticate, AccessDenied, SessionExpired, bindToast } from './api.js'
-import { closeApp, haptic, initData, showConfirm, showAlert } from './telegram.js'
+import { closeApp, haptic, initData, showConfirm } from './telegram.js'
 
 const Ctx = createContext(null)
 
@@ -36,6 +36,13 @@ export function settingsStatus(s, now = Date.now()) {
 export function AppProvider({ children }) {
   const [boot, setBoot] = useState('splash') // splash | gate | ok | denied | expired
   const [stack, setStack] = useState([{ name: 'orders' }]) // root tabs replace; deeper pages push
+  // Browser-history mirror of the nav stack (Page 8 BackButton directive): the
+  // baseline entry carries state { selam: 0 }, every pushed page adds one entry
+  // { selam: depth }. popstate (hardware back / swipe / history.back) truncates
+  // the stack to the entry's depth — history state is the single depth source.
+  const histDepth = useRef(0) // pushed entries currently in browser history
+  const stackRef = useRef(stack) // synchronous read for event handlers
+  stackRef.current = stack
   const [adminUser, setAdminUser] = useState(null)
   const [orders, setOrders] = useState(null) // null = loading
   const [filter, setFilter] = useState('all') // all | dine_in | takeaway | delivery
@@ -44,8 +51,9 @@ export function AppProvider({ children }) {
   const [paused, setPaused] = useState(false) // emergency pause (mirrors settings.paused)
   const [settings, setSettings] = useState(null) // Page 7 store settings (null = loading)
   const [noDelivery, setNoDelivery] = useState({}) // catId → bool (INTEGRATION POINT: no field yet)
-  const [brandName, setBrandName] = useState('Selam Cafe') // dynamic — wired to Profile page later (remember-list)
-  const [doneIds, setDoneIds] = useState([]) // orders showing "Done" for ~0.7s before disappearing
+  // Brand block text — LIVE from Page 9 on: profile.cafe_name (Page 1 decision #2).
+  // Fallback keeps the pre-profile default until the profile loads / on failure.
+  const [brandName, setBrandName] = useState('Medi Cafe')
   const [toastMsg, setToastMsg] = useState(null) // { msg, key }
 
   const toast = useCallback((msg) => {
@@ -63,12 +71,16 @@ export function AppProvider({ children }) {
   const doAuth = useCallback(async () => {
     const idt = initData()
     if (!idt) {
-      // No initData = the page was opened outside a Mini App context (e.g.
-      // in the in-app browser or refresh-from-browser). Auth can never succeed
-      // here (server requires Telegram initData), so show the dedicated
-      // "Open in Telegram" gate instead of a misleading session-expired screen.
-      setBoot('gate')
-      throw new Error('no telegram initData')
+      // SDK present but no initData (opened outside Telegram) → still try; server decides
+      try {
+        const user = await authenticate('')
+        setAdminUser(user)
+        return user
+      } catch (e) {
+        if (e instanceof AccessDenied) setBoot('denied')
+        else setBoot('expired')
+        throw e
+      }
     }
     try {
       const user = await authenticate(idt)
@@ -81,18 +93,72 @@ export function AppProvider({ children }) {
     }
   }, [])
 
-  // ---------- navigation ----------
-  const switchTab = useCallback((name) => setStack([{ name }]), [])
-  // `extra` carries page payload (e.g. { category } for the items page)
-  const push = useCallback((name, label, extra = {}) => setStack((s) => [...s, { name, label, ...extra }]), [])
-  const back = useCallback(() => {
-    setStack((s) => {
-      if (s.length <= 1) {
-        closeApp() // root page → close the Mini App (user decision #7)
-        return s
+  // ---------- navigation (history-synced, Page 8 directive) ----------
+  // Root resets unwind EVERY pushed history entry (switchTab from a deep page,
+  // e.g. Page 7 bottom-nav → Menu). go(-n) fires one popstate, which lands on
+  // the baseline state and keeps the stack truncation idempotent.
+  const switchTab = useCallback((name) => {
+    setStack([{ name }])
+    const n = histDepth.current
+    if (n > 0) {
+      histDepth.current = 0
+      try {
+        window.history.go(-n)
+      } catch {
+        /* no history API */
       }
-      return s.slice(0, -1)
-    })
+    }
+  }, [])
+
+  // `extra` carries page payload (e.g. { category } for the items page)
+  const push = useCallback((name, label, extra = {}) => {
+    setStack((s) => [...s, { name, label, ...extra }])
+    histDepth.current += 1
+    try {
+      window.history.pushState({ selam: histDepth.current }, '')
+    } catch {
+      /* no history API */
+    }
+  }, [])
+
+  const back = useCallback(() => {
+    if (stackRef.current.length <= 1) {
+      closeApp() // root page → close the Mini App (user decision #7)
+      return
+    }
+    if (histDepth.current > 0) {
+      window.history.back() // popstate pops the stack — history stays in lockstep
+    } else {
+      setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)) // fallback: no entries pushed
+    }
+  }, [])
+
+  // Hardware/BackButton behavior (Page 8): Telegram fires onClick INSTEAD of
+  // navigating webview history, so this handler owns the pop. A visible modal
+  // eats the back action first (closes exactly like an outside tap).
+  const telegramBack = useCallback(() => {
+    const overlay = document.querySelector('.modal-overlay')
+    if (overlay) {
+      overlay.click()
+      return
+    }
+    back()
+  }, [back])
+
+  // History ⇄ stack sync — registered once; baseline entry stamped immediately.
+  useEffect(() => {
+    try {
+      window.history.replaceState({ selam: histDepth.current }, '')
+    } catch {
+      /* no history API */
+    }
+    const onPop = (e) => {
+      const d = e.state && typeof e.state.selam === 'number' ? e.state.selam : 0
+      histDepth.current = d
+      setStack((s) => (s.length > d + 1 ? s.slice(0, d + 1) : s)) // shrink only (no stale forward jumps)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
   }, [])
 
   // ---------- orders ----------
@@ -123,34 +189,62 @@ export function AppProvider({ children }) {
     async (order) => {
       if (order.status !== 'new') return
       haptic('light')
-      patchOrderLocal(order.id, { status: 'preparing' })
+      // Page 1 v3: stamp WHO started cooking. The display name comes from the
+      // authenticated admin (Telegram first name), is stored on the order via the
+      // PATCH body, and is rendered as a top-left badge on every admin device —
+      // so the team sees who is taking which order without asking around.
+      // ⚠️ INTEGRATION NOTE: the real backend should derive the identity from its
+      // own auth (Bearer token), treating the client-sent name as advisory only.
+      const startedBy = String((adminUser && (adminUser.firstName || adminUser.name)) || 'Staff').trim()
+      patchOrderLocal(order.id, { status: 'preparing', started_by: startedBy })
       try {
-        await api.patchOrder(order.id, { status: 'preparing' })
+        await api.patchOrder(order.id, { status: 'preparing', started_by: startedBy })
         await reloadOrders() // RULES: refetch affected list after successful PATCH
       } catch (e) {
         if (e instanceof SessionExpired) setBoot('expired')
         else await reloadOrders()
       }
     },
-    [patchOrderLocal, reloadOrders],
+    [adminUser, patchOrderLocal, reloadOrders],
   )
 
+  // Page 1 v5 — TWO-STEP completion (user directive): tapping "Finished ✅" flips
+  // the order to the done state (the bot notifies the customer) but the card STAYS
+  // in the queue so the team can see it was just completed. The card only leaves
+  // the queue when an admin explicitly taps the green "Done" button (dismissOrder).
   const finishOrder = useCallback(
     async (order) => {
+      if (order.status === 'served' || order.status === 'cancelled') return
       haptic('light')
-      setDoneIds((d) => [...d, order.id]) // button flips to "Done" first…
+      patchOrderLocal(order.id, { status: 'served' }) // flip to done, keep visible
       try {
         await api.patchOrder(order.id, { status: 'served' })
+        await reloadOrders() // server keeps served-until-dismissed orders in the list
       } catch (e) {
         if (e instanceof SessionExpired) setBoot('expired')
+        else await reloadOrders()
       }
-      setTimeout(async () => {
-        setDoneIds((d) => d.filter((x) => x !== order.id))
-        removeOrderLocal(order.id) // …then the order disappears
-        await reloadOrders()
-      }, 700)
     },
-    [removeOrderLocal, reloadOrders],
+    [patchOrderLocal, reloadOrders, setBoot],
+  )
+
+  // Step 2: "Done" removes the finished order from the live queue for every admin
+  // device (dismissed orders remain visible in the order-history screen).
+  // ⚠️ INTEGRATION POINT: persist a `dismissed_at` timestamp on the order row and
+  // keep serving orders with status 'served' until they are dismissed.
+  const dismissOrder = useCallback(
+    async (order) => {
+      haptic('light')
+      patchOrderLocal(order.id, { dismissed_at: new Date().toISOString() }) // queue filter hides it instantly
+      try {
+        await api.patchOrder(order.id, { dismissed: true })
+        await reloadOrders()
+      } catch (e) {
+        if (e instanceof SessionExpired) setBoot('expired')
+        else await reloadOrders() // failure → server truth puts the card back
+      }
+    },
+    [patchOrderLocal, reloadOrders, setBoot],
   )
 
   const cancelOrder = useCallback(
@@ -169,12 +263,17 @@ export function AppProvider({ children }) {
     [removeOrderLocal, reloadOrders],
   )
 
-  const showOrderDetails = useCallback(async (order) => {
+  // Order details — an in-app bottom sheet (replaces the old native alert).
+  // Both entry points open the SAME sheet: the live queue's "Details" button
+  // (OrderCard) and the History screen (tap any row — customer details request).
+  // The sheet itself is rendered once in App.jsx; hardware back closes it
+  // (telegramBack clicks any open .modal-overlay first).
+  const [detailsOrder, setDetailsOrder] = useState(null)
+  const showOrderDetails = useCallback((order) => {
     haptic('select')
-    const name = order.customer_name || order.tg_first_name || order.tg_username || '-'
-    const phone = order.customer_phone || order.phone || (order.customer_loc && order.customer_loc.phone) || '-'
-    await showAlert(`Customer details\n\nName: ${name}\nPhone: ${phone}\nTicket: #${order.id}`)
+    setDetailsOrder(order)
   }, [])
+  const closeOrderDetails = useCallback(() => setDetailsOrder(null), [])
 
   // ---------- categories ----------
   const reloadCategories = useCallback(async () => {
@@ -211,21 +310,24 @@ export function AppProvider({ children }) {
 
   // ---------- Categorize page (category CRUD, Page 5) ----------
   const addCategory = useCallback(
-    async (name, sec) => {
-      await api.postCategory({ name_en: name.trim(), section: sec })
+    async (name, sec, nameAm) => {
+      await api.postCategory({ name_en: name.trim(), name_am: (nameAm || '').trim(), section: sec })
       await reloadCategories() // RULES: refetch after successful POST
     },
     [reloadCategories],
   )
 
   const renameCategory = useCallback(
-    async (cat, name) => {
+    async (cat, name, nameAm) => {
       const next = name.trim()
+      const nextAm = (nameAm || '').trim()
       setCategories((prev) =>
-        Array.isArray(prev) ? prev.map((c) => (c.id === cat.id ? { ...c, name_en: next } : c)) : prev,
+        Array.isArray(prev)
+          ? prev.map((c) => (c.id === cat.id ? { ...c, name_en: next, name_am: nextAm } : c))
+          : prev,
       )
       try {
-        await api.patchCategory(cat.id, { name_en: next })
+        await api.patchCategory(cat.id, { name_en: next, name_am: nextAm })
         return true
       } catch (e) {
         if (e instanceof SessionExpired) setBoot('expired')
@@ -501,7 +603,9 @@ export function AppProvider({ children }) {
   )
 
   const setOrderLimit = useCallback(
-    (n) => updateSettings({ order_limit: Math.max(0, Math.min(99, Math.round(Number(n)) || 0)) }),
+    // No business cap (user directive): the admin decides the maximum — 0 = no
+    // cap, 9999 is only a sanity bound against typos.
+    (n) => updateSettings({ order_limit: Math.max(0, Math.min(9999, Math.round(Number(n)) || 0)) }),
     [updateSettings],
   )
 
@@ -519,28 +623,190 @@ export function AppProvider({ children }) {
     [updateSettings, toast],
   )
 
+  // Realtime push handlers (socket.io) — the server can broadcast changes so every
+  // admin device reacts instantly without waiting for a refetch. The Profile page
+  // is the cafe-identity CONTROLLER: a profile:update push (e.g. someone changed
+  // the cafe name on another device) refreshes the header brand everywhere.
+  const applyServerSettings = useCallback((s) => {
+    const next = { ...DEFAULT_SETTINGS, ...(s && typeof s === 'object' ? s : {}) }
+    setSettings(next)
+    setPaused(!!next.paused)
+  }, [])
+
+  const applyServerAnnouncement = useCallback(
+    (a) => {
+      if (!a || !a.id) return
+      setAnnouncements((prev) => {
+        const base = Array.isArray(prev) ? prev : []
+        if (base.some((x) => x.id === a.id)) return base
+        return [a, ...base]
+      })
+      toast('New announcement')
+    },
+    [toast],
+  )
+
+  // ---------- revenue analytics (Page 8) — ⚠️ INTEGRATION POINT ----------
+  // No contract endpoints (only stats/today exists). Harness serves per-period
+  // stubs; suggested shape: { orders, revenue (ETB int), delivered }.
+  const [revenuePeriod, setRevenuePeriodState] = useState('day') // day | week | month
+  const [revenue, setRevenue] = useState(null) // { period, orders, revenue, delivered } | null = loading
+  const revPeriodRef = useRef('day') // discards out-of-order responses on quick toggles
+
+  const reloadRevenue = useCallback(
+    async (p) => {
+      const period = p || 'day'
+      revPeriodRef.current = period
+      try {
+        const d = await api.getRevenueStats(period)
+        if (revPeriodRef.current !== period) return // a newer period took over
+        setRevenue({ period, orders: d.orders ?? 0, revenue: d.revenue ?? 0, delivered: d.delivered ?? 0 })
+      } catch (e) {
+        if (revPeriodRef.current !== period) return
+        if (e instanceof SessionExpired) setBoot('expired')
+        setRevenue({ period, orders: null, revenue: null, delivered: null }) // api layer already toasted
+      }
+    },
+    [setBoot],
+  )
+
+  const setRevenuePeriod = useCallback(
+    (p) => {
+      setRevenuePeriodState(p)
+      setRevenue(null) // loading while the new period fetches
+      reloadRevenue(p)
+    },
+    [reloadRevenue],
+  )
+
+  // ---------- reports: pause history (Page 7 bottom-nav) — ⚠️ INTEGRATION POINT ----------
+  // GET /api/admin-miniapp/pause-history → { history: [{ id, kind: 'emergency'|
+  // 'countdown'|'closed', reason, started_at, ended_at }] }. The server should
+  // append an entry whenever intake is paused/closed and stamp ended_at on resume.
+  const [pauseHistory, setPauseHistory] = useState(null) // null = loading
+
+  const reloadPauseHistory = useCallback(async () => {
+    try {
+      const d = await api.getPauseHistory()
+      setPauseHistory(Array.isArray(d.history) ? d.history : [])
+    } catch (e) {
+      if (e instanceof SessionExpired) setBoot('expired')
+      setPauseHistory((prev) => (Array.isArray(prev) ? prev : []))
+    }
+  }, [setBoot])
+
+  // ---------- announcements (Page 7 bottom-nav) — ⚠️ INTEGRATION POINT ----------
+  // GET|POST /api/admin-miniapp/announcements — list (newest first) + send.
+  // The server must fan each announcement out to the customer app / bot channel.
+  const [announcements, setAnnouncements] = useState(null) // null = loading
+
+  const reloadAnnouncements = useCallback(async () => {
+    try {
+      const d = await api.getAnnouncements()
+      setAnnouncements(Array.isArray(d.announcements) ? d.announcements : [])
+    } catch (e) {
+      if (e instanceof SessionExpired) setBoot('expired')
+      setAnnouncements((prev) => (Array.isArray(prev) ? prev : []))
+    }
+  }, [setBoot])
+
+  const sendAnnouncement = useCallback(
+    async (message) => {
+      const text = String(message || '').trim()
+      if (!text) return false
+      try {
+        const d = await api.postAnnouncement({ message: text })
+        if (d && d.announcement) {
+          setAnnouncements((prev) => {
+            const base = Array.isArray(prev) ? prev : []
+            return [d.announcement, ...base.filter((a) => a.id !== d.announcement.id)]
+          })
+        } else {
+          await reloadAnnouncements()
+        }
+        toast('Announcement sent ✓')
+        return true
+      } catch (e) {
+        if (e instanceof SessionExpired) setBoot('expired')
+        return false // api layer already toasted the failure
+      }
+    },
+    [reloadAnnouncements, setBoot, toast],
+  )
+
+  // ---------- cafe profile (Page 9) — ⚠️ INTEGRATION POINT ----------
+  // No contract endpoints. Harness serves contract-shaped stubs. cafe_name
+  // feeds the header brand block (Page 1 decision #2 wiring).
+  const [profile, setProfile] = useState(null) // null = loading
+
+  const applyProfile = useCallback((p) => {
+    const next = p && typeof p === 'object' ? p : {}
+    setProfile(next)
+    if (next.cafe_name && String(next.cafe_name).trim()) setBrandName(String(next.cafe_name).trim())
+  }, [])
+
+  // Refetch on boot and on every Profile-page entry; the page seeds its form
+  // from the store state change (falls back to previous data on failure).
+  const reloadProfile = useCallback(async () => {
+    try {
+      const d = await api.getProfile()
+      applyProfile(d.profile || d)
+    } catch (e) {
+      if (e instanceof SessionExpired) setBoot('expired')
+      setProfile((prev) => prev || {}) // api layer already toasted
+    }
+  }, [applyProfile, setBoot])
+
+  // PATCH + server-truth merge; brand refreshes via applyProfile. Returns success.
+  const saveProfile = useCallback(
+    async (patch) => {
+      try {
+        const d = await api.patchProfile(patch)
+        applyProfile(d.profile || d)
+        return true
+      } catch (e) {
+        if (e instanceof SessionExpired) setBoot('expired')
+        return false
+      }
+    },
+    [applyProfile, setBoot],
+  )
+
   const value = useMemo(
     () => ({
-      boot, setBoot, stack, switchTab, push, back,
+      boot, setBoot, stack, switchTab, push, back, telegramBack,
+      revenuePeriod, revenue, reloadRevenue, setRevenuePeriod,
+      profile, reloadProfile, saveProfile,
       adminUser, orders, filter, setFilter, paused, setPaused, togglePaused,
       noDelivery, toggleNoDelivery, brandName, setBrandName,
-      doAuth, reloadOrders, pushNewOrder, startOrder, finishOrder, cancelOrder, showOrderDetails, doneIds,
+      doAuth, reloadOrders, pushNewOrder, startOrder, finishOrder, dismissOrder, cancelOrder, showOrderDetails,
+      detailsOrder, closeOrderDetails,
+      patchOrderLocal, applyProfile, applyServerSettings, applyServerAnnouncement,
       categories, section, setSection, reloadCategories, toggleCategoryHidden,
       addCategory, renameCategory, moveCategory, removeCategory,
       admins, metricsPeriod, setMetricsPeriod, reloadAdmins, verifyAdmin, addAdmin, updateAdmin, revokeAdmin,
       settings, reloadSettings, updateSettings, startPauseCountdown, stopPauseCountdown,
       closeForDays, reopenStore, setDeliveryAvailable, setOrderLimit, setPickupThrottle, saveClosureReason,
+      pauseHistory, reloadPauseHistory,
+      announcements, reloadAnnouncements, sendAnnouncement,
       toastMsg, toast,
     }),
     [
-      boot, stack, switchTab, push, back, adminUser, orders, filter, paused, togglePaused,
+      boot, stack, switchTab, push, back, telegramBack,
+      revenuePeriod, revenue, reloadRevenue, setRevenuePeriod,
+      profile, reloadProfile, saveProfile,
+      adminUser, orders, filter, paused, togglePaused,
       noDelivery, toggleNoDelivery, brandName, doAuth, reloadOrders, pushNewOrder,
-      startOrder, finishOrder, cancelOrder, showOrderDetails, doneIds,
+      startOrder, finishOrder, dismissOrder, cancelOrder, showOrderDetails,
+      detailsOrder, closeOrderDetails,
+      patchOrderLocal, applyProfile, applyServerSettings, applyServerAnnouncement,
       categories, section, reloadCategories, toggleCategoryHidden,
       addCategory, renameCategory, moveCategory, removeCategory,
       admins, metricsPeriod, reloadAdmins, verifyAdmin, addAdmin, updateAdmin, revokeAdmin,
       settings, reloadSettings, updateSettings, startPauseCountdown, stopPauseCountdown,
       closeForDays, reopenStore, setDeliveryAvailable, setOrderLimit, setPickupThrottle, saveClosureReason,
+      pauseHistory, reloadPauseHistory,
+      announcements, reloadAnnouncements, sendAnnouncement,
       toastMsg, toast,
     ],
   )

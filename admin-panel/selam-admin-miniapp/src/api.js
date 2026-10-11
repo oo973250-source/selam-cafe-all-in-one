@@ -131,6 +131,23 @@ function qs(params) {
 
 export const api = {
   // ---- ORDERS ----
+  // Page 1 v3: PATCH /api/orders/:id also accepts { started_by: "Name" } — the
+  // staff/cooker display name stamped when someone taps "start". The order list
+  // returns it back so EVERY admin device renders the same top-left name badge
+  // (the team knows who is taking which order without talking).
+  // ⚠️ INTEGRATION POINT: the real backend should stamp the authenticated admin's
+  // identity server-side (Bearer token) and persist it on the order row; the
+  // client-sent name is advisory. Add e.g. `started_by` (+ timestamp) to the
+  // orders table and include it in the GET /api/orders response.
+  // Page 1 v5 TWO-STEP completion:
+  //   "Finished ✅" → PATCH { status: 'served' }  (customer notified by the bot;
+  //                  the card STAYS in the queue in a green done state)
+  //   "Done"        → PATCH { dismissed: true }   (card leaves the queue)
+  // ⚠️ INTEGRATION POINT: persist `dismissed_at` (+ recommended `served_at`) on
+  // the order row and KEEP returning served-until-dismissed orders in
+  // GET /api/orders (the queue filters them client-side; done cards only stay
+  // in the queue for the current day). Dismissed orders must still be returned
+  // to the order-history screen (or add a dedicated history endpoint).
   getOrders: ({ status, limit = 50 } = {}) => call(`/api/orders${qs({ status, limit })}`),
   getOrderStats: () => call('/api/orders/stats/today'),
   getOrder: (id) => call(`/api/orders/${id}`),
@@ -176,6 +193,46 @@ export const api = {
   // customer app, and auto-resume when pause_until/close_until expire.
   getSettings: () => call('/api/admin-miniapp/settings'),
   patchSettings: (body) => call('/api/admin-miniapp/settings', { method: 'PATCH', body }),
+
+  // ---- REVENUE ANALYTICS (Page 8) — ⚠️ INTEGRATION POINT ----
+  // The RULES contract only documents GET /api/orders/stats/today — no week/month
+  // periods, no revenue total, no completed-delivery count. Suggested endpoint:
+  //   GET /api/admin-miniapp/revenue?period=day|week|month
+  //     → { orders: int, revenue: int (ETB), delivered: int }
+  // Server computes from orders: count, SUM(total) over completed/paid (integer
+  // Birr), completed-delivery count. Harness serves contract-shaped stubs.
+  getRevenueStats: (period) => call(`/api/admin-miniapp/revenue${qs({ period })}`),
+
+  // ---- CAFE PROFILE (Page 9) — ⚠️ INTEGRATION POINT ----
+  // The RULES contract has NO profile endpoints yet. Suggested shape:
+  //   { cafe_name, phone, location, logo_url, hours_open, hours_close, description }
+  // cafe_name drives the header brand block everywhere. hours = "HH:MM" (24h).
+  // Logo: interim = client-downscaled data URL inside logo_url; a real upload
+  // endpoint (POST /api/admin-miniapp/profile/logo → { url }) is pending.
+  // CAFE-IDENTITY CONTROLLER: the profile record is the single source of truth
+  // for the cafe identity across the WHOLE project. When cafe_name changes the
+  // server must broadcast `profile:update` (admin devices) + `brand:update`
+  // (customer miniapp) and the bot must read the name at runtime — so greeting
+  // / order / receipt messages everywhere reflect the new name instantly.
+  // Other surfaces fetch GET /api/brand (public) → { name, logo_url, updated_at }.
+  getProfile: () => call('/api/admin-miniapp/profile'),
+  patchProfile: (body) => call('/api/admin-miniapp/profile', { method: 'PATCH', body }),
+
+  // ---- REPORTS: PAUSE HISTORY (Page 7 bottom-nav REPORTS) — ⚠️ INTEGRATION POINT ----
+  // GET /api/admin-miniapp/pause-history → { history: [{ id, kind: 'emergency' |
+  //   'countdown' | 'closed', reason, started_at, ended_at }] } newest first.
+  // The server should append an entry whenever intake is paused/closed (emergency
+  // kill-switch, duration pause, days closure) and stamp ended_at on resume/reopen.
+  getPauseHistory: () => call('/api/admin-miniapp/pause-history'),
+
+  // ---- ANNOUNCEMENTS (Page 7 bottom-nav "+") — ⚠️ INTEGRATION POINT ----
+  // GET  /api/admin-miniapp/announcements → { announcements: [{ id, message,
+  //   created_at, author? }] } newest first.
+  // POST /api/admin-miniapp/announcements { message (required, ≤300 chars) }
+  //   → { announcement: { id, message, created_at, author? } }
+  // The server must fan each announcement out to the customer app / bot channel.
+  getAnnouncements: () => call('/api/admin-miniapp/announcements'),
+  postAnnouncement: (body) => call('/api/admin-miniapp/announcements', { method: 'POST', body }),
 }
 
 // Generate a unique slug id for POST /api/menu (e.g. "doro_wat_1")

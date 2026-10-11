@@ -1,4 +1,4 @@
-# Selam Cafe — Admin Mini App SPEC (living doc, built from main-AI rules + page drops)
+# Medi Cafe — Admin Mini App SPEC (living doc, built from main-AI rules + page drops)
 
 ## Global contract (from RULES — authoritative)
 - Vite + React SPA, `vite.config base: './'`, hash routing or no router, static `dist/`
@@ -6,7 +6,7 @@
 - Auth: raw `Telegram.WebApp.initData` → POST /api/admin-miniapp/auth → { token, user{id,tgUserId,firstName,role} }
   - Token in memory (+ CloudStorage or sessionStorage). `Authorization: Bearer <token>` on every call.
   - 401 → re-auth once, retry, else "session expired". 403 → "access denied", stop.
-- API (relative paths only): orders (GET list ?status=&limit=50, GET stats/today, GET :id, PATCH :id {status}/{payment_status}), menu CRUD (POST requires client slug id), categories CRUD (sections food|drink, hidden, reorder = full id list per section, DELETE 409 → ?force=true), blocked-users CRUD (+ directory search ?q=, max 50)
+- API (relative paths only): orders (GET list ?status=&limit=50, GET stats/today, GET :id, PATCH :id {status}/{payment_status}), menu CRUD (POST requires client slug id — v7: the client sends `slugify(name, existingIds)` again; servers that assign ids may ignore/replace it. Items + categories carry `name_am` (optional Amharic translation of the name)), categories CRUD (sections food|drink, hidden, reorder = full id list per section, DELETE 409 → ?force=true), blocked-users CRUD (+ directory search ?q=, max 50)
 - Money = INTEGER Birr. 503 → toast, never crash. Loading states, no double-submit.
 - socket.io-client same origin default path, event `order:new` → prepend. Refetch after PATCH.
 - SDK: telegram-web-app.js; ready()+expand() on mount; showAlert/showConfirm; haptics; themeParams-aware.
@@ -27,7 +27,7 @@
 ### Order cards (list)
 - Data: GET /api/orders?limit=50 → show ACTIVE only (new, preparing; ready treated as started). served/cancelled hidden.
 - Badge (top-right, small gray pill): Delivery / Dain in / Takeaway
-- Title: item lines formatted "qty, name of the food" (from items jsonb)
+- Title: item lines formatted "qty x name of the food" (from items jsonb; v6 — was "qty, name")
 - 📝 Note : - → customer note; "-" when empty
 - 📍 Location : --- → ONLY on Delivery cards:
   - GPS shared (customer_loc has lat/lng) → white pill button "Location 📍" (right side) opens map (Google Maps link)
@@ -37,11 +37,11 @@
   - `start` (gold/brown) → PATCH {status:'preparing'} → button becomes `started` (golden-green). Server notifies customer via bot.
   - `Finished ✅` (gray pill) → PATCH {status:'served'} → button becomes `Done` → order disappears from list
   - `Cancel ❌` (dark pill, red X) → confirm (showConfirm) → PATCH {status:'cancelled'} → order disappears
-  - `Details` (SMALL pill, muted slate-blue — my pick, distinct from gold/green/red) → shows customer details: name, phone number, ticket # (via showAlert, Telegram-native). Phone read defensively (not in documented order schema — show "-" if absent). Ticket = order id ("Ticket #N" matches bot receipt format).
+  - `Details` (SMALL pill, muted slate-blue — my pick, distinct from gold/green/red) → opens the in-app ORDER-DETAILS SHEET (v6 — was a Telegram showAlert). Bottom sheet: order # + status chip + placed time, CUSTOMER block (name, phone, telegram handle), service + delivery address + payment, items "qty x name" with line totals, note, big Total row. Shared with the History screen (tapping a history row opens the same sheet).
 - Live: socket.io `order:new` → prepend card (respect active filter). After any PATCH → refetch list.
 
 ### DECIDED (user confirmed 2026-10)
-1. Card title = qty-first ("2, shiro" for qty 2). ✅
+1. Card title = qty-first ("2 x shiro" for qty 2 — v6 format per user: "use x instead of ',' in the orders"). ✅
 2. Brand "Name" is DYNAMIC — editable via admin profile page (Page 9 or 10, spec coming). Until then placeholder; wire later. ⚠️ REMEMBER
 3. Note source = order.note fallback "-" — user may revise later. ⚠️ REMEMBER (flexible)
 4. Card itself shows no total/ticket/customer name — BUT new small `Details` button (see action bar) reveals customer name + phone + ticket #. ✅
@@ -86,6 +86,12 @@
   - `unavailable` — toggles whole category off for customers. MAPPING (proposed): PATCH /api/menu/categories/:id { hidden } — server-supported "hide from customer view"; user's own wording allows "hidden from customer view". Toggle color: muted dark-red when ACTIVE (category unavailable), neutral when available.
   - `No delivery` — disables delivery for all items in category. ⚠️ API GAP: NO field anywhere in contract (items/categories have no delivery flag). UI toggle built; persistence = INTEGRATION POINT pending main-AI field (e.g. category.no_delivery). Toggle color: bright red when active.
 - Toggle UX: constant label, COLOR = state (neutral = normal, red = restriction active) — mock shows both reddish; per-card state colors inferred.
+- v7 AMHARIC: when `category.name_am` is set, the card title renders it as a small muted second line under "n,Name".
+
+### ADDENDUM v2 (user): "U still didn't add a circle add button for the list of categories … at that page I need an add button to add category then click that category to add items"
+- Page 3 now has its OWN circular "+" button (same light disc as Page 4's item + / Page 5 / Admins), rendered INSIDE the scroll region ABOVE the category cards — always visible, also on the empty state (text now "No categories in this section yet — tap + to add one").
+- Tap + → "New category" modal (same sheet as Page 5): Section = the ACTIVE Foods/Drinks toggle (static pill), Name (required), Name (Amharic) (optional → name_am) → POST /api/menu/categories → toast → refetch.
+- Intended admin flow (user's words): menu page → + → add category → tap the new category card → items page → + → add items. (Page 5 Categorize keeps its + too — category MANAGEMENT stays there; Page 3 just no longer requires the detour.)
 
 ### Open questions (defaults if unanswered)
 1. Nav: this opens from Manager → `menu` button. Then `Categorize` button = deeper category CRUD (add/rename/reorder/hide/delete)? And tapping a category card → items-in-category page (future page)? DEFAULT: yes to both
@@ -107,17 +113,18 @@
 ### Item cards (numbered "1,Item name" per mock)
 - Data: GET /api/menu?category=<id> → items sorted by sort_order; display index = position.
 - Title: "1,Doro Wat" (qty-free, index-first). Price row: "Price : x" (x = INTEGER Birr).
+- v7 AMHARIC: when `item.name_am` is set, the card renders it as a small muted second line under the English name.
 - Top-right of each card, two circular outline icon buttons:
   - 🗑️ waste-basket = DELETE (user asked for "basket icon to delete"; using 🗑️ for delete semantics — swap to 🧺 on request). showConfirm first → DELETE /api/menu/:id → toast "Item deleted" → refetch list. Disabled while a delete/save is in flight (no double submit).
   - ✏️ pencil = EDIT → opens the edit modal below.
 - Items with available=false render dimmed + small red "unavailable" flag.
 
 ### Edit modal (bottom sheet)
-- Fields: Name (required), Price (Birr INTEGER — non-digits stripped, validated whole ≥ 0), Description (optional), Photo URL (+ 56px preview thumb), Availability toggle pill (`available` white active ↔ `unavailable` dark-red active).
-- Save → PATCH /api/menu/:id { name_en, price, description, image_url, available } → toast → refetch list (RULES: refetch after PATCH). Cancel / tap-outside closes. Saving state disables both buttons.
+- Fields: Name (required), Name (Amharic) (optional → `name_am`, v7), Price (Birr INTEGER — non-digits stripped, validated whole ≥ 0), Description (optional), Photo URL (+ 56px preview thumb), Availability toggle pill (`available` white active ↔ `unavailable` dark-red active).
+- Save → PATCH /api/menu/:id { name_en, name_am, price, description, image_url, available } → toast → refetch list (RULES: refetch after PATCH). Cancel / tap-outside closes. Saving state disables both buttons.
 
 ### FIELD MAPPING (assumption — confirm at integration)
-- Item fields used: `name_en`, `price`, `description`, `image_url`, `available` — matches the contract-shaped preview harness; the RULES doc doesn't enumerate item columns. If the real backend differs (e.g. `name`, `photo_url`, `hidden`), it's a data-layer-only touch-up in api.js/mapping.
+- Item fields used: `name_en`, `name_am` (v7 Amharic translation), `price`, `description`, `image_url`, `available` — matches the contract-shaped preview harness; the RULES doc doesn't enumerate item columns. If the real backend differs (e.g. `name`, `photo_url`, `hidden`), it's a data-layer-only touch-up in api.js/mapping.
 
 ### DECIDED (user confirmed 2026-10)
 1. Basket icon added next to pencil for delete, with confirm dialog. ✅
@@ -126,6 +133,17 @@
 
 ### ADDENDUM (user, with Page 5 drop): "also add the scroll controls in the menu section"
 - Page 3's category list now uses the SAME custom capsule scroll controls as Page 4 (far-left outlined rail + white pill thumb; thumb hidden when content fits). The list scrolls internally, the shell stays put. ✅
+
+### ADDENDUM v2 (user): "I need an add button for the menu items just as category can add button"
+- Circular light "+" button (same disc as the category + on Page 5 / Admins) rendered INSIDE the scroll region above the item cards — always visible, also on the empty state (empty-state text now "No items in this category yet — tap + to add one").
+- Opens the "New item" bottom sheet mirroring the edit modal's fields: Category shown as a static pill (the page's selected category), Name (required), Price (Birr INTEGER, digits-only), Description (optional), Photo URL (+ preview thumb), Availability toggle (defaults to `available`).
+- Create → POST /api/menu { id (slug), category, name_en, name_am, price, description, image_url, available } → toast "Item created ✓" → refetch list (RULES: refetch after POST). Cancel / tap-outside closes; saving disables both buttons.
+- Contract note (v3 SUPERSEDES): the client sends a client-generated slug id again — see ADDENDUM v3 below.
+
+### ADDENDUM v3 (user): "U didn't fix the add button and translation"
+- TRANSLATION: every item and category carries an optional Amharic name (`name_am`). New-item / edit-item / new-category / edit-category sheets all gained a "Name (Amharic)" field (placeholder "ለምሳሌ ዶሮ ወጥ"). Displayed as a small muted second line under the English name on Page 3 cards, Page 4 item cards and Page 5 pills; Categorize search matches Amharic too. Demo seeds ship real Amharic names (Breakfast ቁርስ, Doro Wat ዶሮ ወጥ, Buna ቡና …).
+- ADD BUTTON / CONTRACT FIX: POST /api/menu sends a client-generated slug id again (`slugify(name, existingIds)` — helper was already in api.js) per the ORIGINAL contract "POST requires client slug id". The v2 note that dropped it is SUPERSEDED — servers that generate their own ids may still ignore/replace the client id (harness tolerates both).
+- STALE-BUNDLE FIX (why the button "didn't fix"): Telegram webviews cached the old index.html and kept serving the previous bundle after redeploy. Harness now serves `/admin-miniapp(…)/index.html` with `Cache-Control: no-store` while hashed assets stay `immutable`. Same header setup is REQUIRED on the real deployment.
 
 ## Page 5 — "Categorize" → category management — source: Screenshot_20260925_235238_Miro.jpg + text spec
 
@@ -137,13 +155,13 @@
 
 ### Controls bar (directly under separator)
 - 🔍 `search..` pill bar (magnifier icon + input): dynamic client-side filter of the active section's categories by name.
-- Circular "+" button far right (light disc, dark plus per mock): opens "New category" modal → name (required) + section = active Foods/Drinks toggle → POST /api/menu/categories { name_en, section } → toast → refetch.
+- Circular "+" button far right (light disc, dark plus per mock): opens "New category" modal → name (required) + Amharic name (optional → `name_am`, v7) + section = active Foods/Drinks toggle → POST /api/menu/categories { name_en, name_am, section } → toast → refetch.
 
 ### Category pills list
 - Vertical stack of full-width pill buttons, centered category name, NO numbering (unlike Page 3's "1,Name" cards).
 - Scroll indicator: slim/thin far-left rail with a small subtle thumb (mock text: "standard thin scrollbar, formatted like a standard system browser scrollbar") — THIN variant of the shared VScroll component. Hidden when content fits.
 - Tap a pill → "Edit category" overlay (bottom sheet):
-  - Rename: name input + Save → PATCH /api/menu/categories/:id { name_en } → toast → refetch.
+  - Rename: name + Amharic name inputs + Save → PATCH /api/menu/categories/:id { name_en, name_am } → toast → refetch.
   - Reorder: Position stepper (▲ n/total ▼) → optimistic local move → POST /api/menu/categories/reorder with the FULL ordered id list for that section → revert via refetch on failure.
   - Delete: showConfirm → DELETE /api/menu/categories/:id → 409 { error, itemCount } → second confirm "delete the category AND its N items?" → DELETE ?force=true → toast + refetch. (First DELETE call is toast-quiet so the 409 flow can speak for itself.)
 
@@ -176,8 +194,8 @@
 - Light circular "+" button at the top of the list area (right-aligned, mock shows it inside the scroll region).
 - Opens "Add admin" overlay/modal asking for:
   1. **Telegram User ID** (or @username) input
-  2. **Role selection** chips: Cashier | Kitchen | Delivery (user's examples — "e.g." implies the set can grow)
-  3. **Assigned Shift / Branch**: shift chips (Morning/Afternoon/Night) + branch text
+  2. **Assigned Shift / Branch**: shift chips (Morning/Afternoon/Night) + branch text
+  - ~~Role selection chips (Cashier/Kitchen/Delivery)~~ — REMOVED (user: "In the admins no need for the role classifiers like cashier, kitchen, delivery"); new admins get the default `['orders']` permission set, fine-tuned per admin in the edit sheet.
 - **Instant verification**: system checks the ID via Telegram Bot API → displays the user's Telegram profile photo + name (+ verified chip) before granting; "Grant access" activates their admin access.
   - ⚠️ INTEGRATION POINT: the frontend cannot call the Bot API directly — needs a server verify endpoint (or a server-side check inside the create call). Harness stub resolves a demo profile.
 
@@ -186,7 +204,7 @@
 
 ### Admin cards (numbered "1,name" per mock)
 - Left: square rounded Telegram avatar (initial-letter fallback when no photo).
-- Title: "1,Name" (index = list position). Small muted line: ID + role (user text: card displays "Telegram avatar, display name, ID, and live order count").
+- Title: "1,Name" (index = list position). Small muted line: ID only (role classifier removed per user revision — the card meta line is now just "ID 123456").
 - Metric block: label "#total order done" + value line "--- N" (mock literal format); N flips with Day/Week/Month.
 - Right column (Page 4 circular icon-button pattern):
   - ✏️ pencil → Edit sheet
@@ -194,7 +212,7 @@
 - Suspended admin → dimmed card + red "suspended" flag (mirrors Page 4's unavailable pattern).
 
 ### Edit sheet (pencil — user: "Quick Action Controls")
-- Role + RBAC permission chips (Orders, Menu, Revenue, Refunds, Pause)
+- RBAC permission chips (Orders, Menu, Revenue, Refunds, Pause) — role chips REMOVED per user revision
 - **Active status toggle — ON/OFF without deleting** (suspend → dimmed card)
 - Shift assignment + **refund limit** (INTEGER Birr, digits-only)
 - Save → PATCH → toast → refetch (RULES refetch-after-PATCH).
@@ -211,8 +229,8 @@
 1. Badge text "Admins"; toggle normalized to "Day | Week | Month". ✅
 2. Cards keep the mock numbering ("1,name") and the "--- N" value line format. ✅
 3. This page uses the CAPSULE scrollbar (not thin). ✅
-4. Role set = Cashier / Kitchen / Delivery. ✅
-5. Card shows ID + role meta line per user text. ✅
+4. ~~Role set = Cashier / Kitchen / Delivery.~~ SUPERSEDED — role classifiers removed entirely (user revision; the role field is no longer sent on create/patch and is not displayed).
+5. ~~Card shows ID + role meta line.~~ SUPERSEDED — card meta line shows the ID only.
 
 ## Page 7 — "Emergency pause" → Admin panel (store status & order controls) — source: upload/1791055752967.jpg + text spec
 
@@ -261,8 +279,8 @@
 ### DECIDED (2026-10)
 1. Hub "Emergency pause" button now NAVIGATES to this page (kill-switch lives here); hub keeps its red styling + active tint while paused. ✅
 2. Emergency = indefinite pause (no countdown); Pause-for = countdown with auto-resume; Close-for = multi-day closure. All three surface on the Orders banner (with the closure reason when set). ✅
-3. Brand block stays dynamic ("Selam Cafe"), not the mock's literal "Admin". ✅
-4. Steppers: − / + flanking the value box, direct typing on blur; pause duration steps 30 min (cap 23:59), days step 1 (cap 30), limit/throttle step 1 (limit cap 99, throttle cap 120). ✅
+3. Brand block stays dynamic ("Medi Cafe" — the actual cafe name per user 2026-10-05), not the mock's literal "Admin". ✅
+4. Steppers: − / + flanking the value box, direct typing on blur; pause duration steps 30 min (cap 23:59), days step 1 (cap 30), limit/throttle step 1 (throttle cap 120; ORDER LIMIT has NO arbitrary cap — the admin decides the maximum, 9999 is only a sanity bound — v4 revision below). ✅
 5. ✓ apply buttons on Pause/Close rows + Stop/Reopen chips in the countdown box = proposed affordances (mock has no submit; flagged). ✅
 
 ## Page 8 — "Revenue" → Revenue & financial analytics — source: Screenshot_20260925_235311_Miro.jpg + text spec
@@ -314,7 +332,7 @@
 ### Profile form panel (single rounded container, legend pill on its top edge)
 - Legend: "🏪 Cafe Profile Settings" — dark pill with white border, centered, overlapping the panel's top border (fieldset-legend look).
 - Field rows (colorful rounded-square icon left + label + control right):
-  1. **Cafe Name** — red storefront icon 🏪; text input, value "UniCafe". DRIVES the header brand block (Page 1 decision #2 remember-list item: brandName = profile.cafe_name, fallback "Selam Cafe" until loaded / on failure).
+  1. **Cafe Name** — red storefront icon 🏪; text input, value seeded from the server profile (demo seed = "Medi Cafe"). DRIVES the header brand block (Page 1 decision #2 remember-list item: brandName = profile.cafe_name, fallback "Medi Cafe" until loaded / on failure).
   2. **Phone Number** — green phone icon 📞; tel input, value "+251 91 234 5678".
   3. **Location** — red pin icon 📍; text input ("Addis Ababa, Bole") + PURPLE map-pin button on the right. INTERIM behavior: opens Google Maps search for the typed address; real map picker = pending (candidate: `WebApp.requestLocation`).
   4. **Profile Picture** — blue image icon 🖼️; small square preview of the current logo + purple "🖼️ Change" button + dark-outline "🗑️ Remove" button. Change = hidden file input → client-side canvas downscale (max 256px, JPEG) → data-URL preview → persisted with the PATCH; real upload endpoint = pending (Remove clears logo_url).
@@ -324,7 +342,7 @@
 
 ### ⚠️ INTEGRATION POINT (profile endpoints — 9th)
 - The RULES contract has NO profile endpoints. Suggested: `GET|PATCH /api/admin-miniapp/profile` → `{ profile: { cafe_name, phone, location, logo_url, hours_open, hours_close, description } }`. PATCH whitelists + validates (cafe_name required non-empty ≤60; description ≤200; hours "HH:MM"; logo ≤ ~400KB). Logo upload: interim data URL inside logo_url; real `POST /api/admin-miniapp/profile/logo → { url }` pending main AI.
-- brandName wiring (Page 1 decision #2) goes LIVE with this page: boot fetches the profile, Header renders `profile.cafe_name` everywhere (fallback "Selam Cafe").
+- brandName wiring (Page 1 decision #2) goes LIVE with this page: boot fetches the profile, Header renders `profile.cafe_name` everywhere (fallback "Medi Cafe").
 
 ## Page 1 — v3 addendum: staff badge + bright-yellow "started" — source: Screenshot_20261004_150339_Miro.jpg + text spec
 
@@ -361,7 +379,7 @@
 
 - Orders root header (tabs variant) renders a LIST-NOTE icon button in the TOP-RIGHT corner of the top bar (list-with-ruled-lines SVG, circular 34px, right-aligned, title stays centered).
 - Tap → pushes the History screen (badge 🕘 "History"). Root-page BackButton behavior unchanged (BackButton stays hidden at root; in-app ↩ from History pops back to Orders).
-- History screen: two sections — TODAY and YESTERDAY (local calendar day grouping, client-side) — read-only rows: `#id` + HH:MM + status chip (New gold / Preparing violet / Ready & Served green / Cancelled red; cancelled rows dimmed), item summary "qty, name · …" (2-line clamp), service label + total "N ETB". Includes served AND cancelled orders (history ≠ active queue). Data: GET /api/orders?limit=100 (existing contract endpoint; no new integration point). Refresh on every entry.
+- History screen (v2): two sections — TODAY and YESTERDAY (local calendar day grouping, client-side) — TAPPABLE rows (role=button + chevron): tapping opens the shared order-details sheet with the customer's info. Rows: `#id` + HH:MM + status chip (New gold / Preparing violet / Ready & Served green / Cancelled red; cancelled rows dimmed), item summary "qty x name · …" (2-line clamp), service label + total "N ETB". Includes served AND cancelled orders (history ≠ active queue). Data: GET /api/orders?limit=100 (existing contract endpoint; no new integration point). Refresh on every entry. Page scrolls inside the app-standard VScroll (v2 fix — the old version clipped below the fold, YESTERDAY was unreachable on-device).
 
 ## Page 1 — v5 addendum: two-step Finished → Done — user report ("it changes to done then the order disappear!! It should disappear when click done")
 
@@ -411,3 +429,21 @@ The admin miniapp's socket layer (`src/socket.js`) now listens to the full push 
 | `announcement:new` | announcement object | announcements list prepends + toast |
 
 The same socket server should serve the CUSTOMER miniapp room: `brand:update`, `menu:update`, `settings:update` (closed/pause banner + intake blocking), `announcement:new`, and order-status messages (`order:status` → bot DM). Full wiring guide for connecting the admin miniapp to the Telegram bot lives in `INTEGRATION-README.md` of the handoff zip.
+
+## Page 1 — v6: item lines "qty x name" + shared order-details sheet — user drop 2026-10-05
+
+1. **Item format** — order-card lines now render `2 x Doro Wat` instead of `2, Doro Wat` (user: "use x instead of ',' in the orders"). Applies everywhere items are summarized: live-queue cards, history rows, and the details sheet. Quantity comes first, `x` as the separator, then the item name.
+2. **Order-details sheet (replaces the native alert)** — the `Details` button AND every History row now open ONE shared in-app bottom sheet (`OrderDetailsModal`, rendered once in App.jsx; Telegram hardware back closes it like any overlay):
+   - Header: `Order #id` + status chip (same chips as history) + ✕ close button; "Placed <date · time>" line under it.
+   - **Customer** block (the v2 history request — "display the details of the user"): name, phone, telegram handle (@username when present).
+   - **Service** block: dine-in / takeaway / delivery, delivery address (when delivery), payment status (Paid online / Cash on delivery / Pending).
+   - **Items** block: `qty x name` lines with per-line totals (`price × qty` ETB, right-aligned) + customer note when present.
+   - Big white-outlined **Total** row at the bottom (`N ETB`).
+   - Data source = the order object already in state; NO extra fetch, opens instantly (super-speed directive).
+3. **History scroll fix** — the History page (and Reports + Announcements, which shared the same latent bug) now scrolls inside the app-standard thin VScroll. Previously the page rendered straight into a clipped `.page-scroll` container (`overflow:hidden`), so everything below the fold — the whole YESTERDAY section — could never be reached on-device (user report). Section headers scroll with the lists.
+
+## Page 7 — v4: the ADMIN decides the order maximum — user drop 2026-10-05 ("the admin should be the one to decide the maximum number not u (99)")
+
+- The "Limit incoming orders to:" stepper had an arbitrary `max = 99` clamp (UI) and the harness PATCH silently clamped to 99 server-side. REMOVED both: the admin can now type/step ANY maximum they want (sanity bound 9999 against typos only). `0` still means "no cap".
+- Real-backend note: do NOT reintroduce a business cap — enforce only non-negative integers; treat 0 as unlimited.
+- Brand naming: the cafe's actual name is **Medi Cafe** (user: "the cafe name is medi cafe not selam") — demo seeds, defensive defaults, fallback brand and all handoff docs now use "Medi Cafe". The name stays runtime-editable via the Profile identity controller (Page 9 v2).
