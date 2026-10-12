@@ -21,6 +21,7 @@ import 'dotenv/config'
 
 import { createOrder, countTodaysOrdersForUser, getUserLang, isUserBlocked, getIntakeStatus, getCafeProfile, publicBrand } from '../db.js'
 import { sendOrderConfirmation, notifyStaff } from '../bot.js'
+import { mergeOrderForMessages } from '../order-items.js'
 
 const router = Router()
 
@@ -179,8 +180,11 @@ router.post('/orders', async (req, res) => {
   // (falls back to their Telegram client language, then English).
   let lang = 'en'
   try { lang = await getUserLang(tgUser.id) } catch (_) { /* default en */ }
+  // Customer confirmation + staff alert BOTH use the merged order so item
+  // names/quantities/total always render (Issue #5).
+  const customerOrder = mergeOrderForMessages(order, payload)
   try {
-    await sendOrderConfirmation(tgUser.id, order, todaysCount, lang)
+    await sendOrderConfirmation(tgUser.id, customerOrder, todaysCount, lang)
   } catch (e) {
     console.error('[miniapp] confirmation send failed:', e.message)
     return res.status(200).json({
@@ -194,7 +198,7 @@ router.post('/orders', async (req, res) => {
 
   // 3) Staff notification with action buttons
   try {
-    notifyStaff(order, payload, {
+    notifyStaff(customerOrder, payload, {
       username: tgUser.username,
       firstName: tgUser.first_name,
     })

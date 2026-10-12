@@ -92,6 +92,51 @@ router.post('/auth', async (req, res) => {
 // Everything below requires an authenticated admin (Bearer token).
 router.use(requireAuth)
 
+// ── Shift gating (Issue #1) ──────────────────────────────────────────────
+// Admins are assigned a shift (morning | afternoon | night | all). "Certain
+// admin accounts are assigned to ALL shifts at once" was the symptom: the API
+// never consulted the assigned shift, so every admin could act at any hour.
+// Shift windows (local server time):
+//   morning   06:00 – 14:00
+//   afternoon 14:00 – 22:00
+//   night     22:00 – 06:00 (wraps past midnight)
+// Shift 'all' (explicit admin request) is active at any hour.
+export const SHIFT_WINDOWS = {
+  morning:   { start: 6,  end: 14 },
+  afternoon: { start: 14, end: 22 },
+  night:     { start: 22, end: 30 }, // 22:00 → 06:00 next day
+}
+export function shiftIsActive(shift) {
+  if (shift === 'all') return true
+  const w = SHIFT_WINDOWS[shift]
+  if (!w) return true // 'day'-style or legacy shift: treat as always active
+  const h = new Date().getHours() + new Date().getMinutes() / 60
+  if (w.end <= 24) return h >= w.start && h < w.end
+  const h2 = h < 6 ? h + 24 : h // wrap the night shift past midnight
+  return h2 >= w.start && h2 < w.end
+}
+// Is this acting admin's CURRENT shift the one they are assigned to?
+// Returns true when allowed. A DB error throws (caller decides fail-open).
+export async function isActingAdminOnShift(tgUserId) {
+  if ( OwnerIdIsOwner(tgUserId)) return true
+  const { rows } = await pool.query(
+    `SELECT shift, active FROM staff_admins WHERE tg_user_id = $1`, [Number(tgUserId)]
+  )
+  const row = rows[0]
+  if (!row) return true // owner-only accounts (env allowlist) have no row
+  if (row.active === false) return false // suspended admins never act
+  return shiftIsActive(row.shift)
+}
+function OwnerIdIsOwner(tgUserId) {
+  return OWNER_ID != null && Number(tgUserId) === OWNER_ID
+}
+
+// Convenience for orders.js: '' → not found (skip), false → blocked.
+export async function activeAdminDuringCurrentShift(tgUserId) {
+  if (tgUserId == null) return true // no identity → legacy path, allow
+  return isActingAdminOnShift(tgUserId)
+}
+
 // ── Store settings (Page 7) — pause / closure / delivery / order limits ─
 router.get('/settings', async (_req, res) => {
   try {

@@ -8,6 +8,8 @@
 import TelegramBot from 'node-telegram-bot-api'
 import 'dotenv/config'
 
+import { normalizeOrderItems, mergeOrderForMessages } from './order-items.js'
+
 import {
   ensureSchema,
   createOrder,
@@ -70,9 +72,7 @@ function emitOrderUpdate(order) {
     if (io && order) {
       io.to('admins').emit('order:update', {
         ...order,
-        items: (Array.isArray(order.items) ? order.items : []).map((i) => ({
-          id: i.id, name: i.nameEn || i.name || i.nameAm || i.id, price: i.price, qty: i.quantity || i.qty || 1,
-        })),
+        items: normalizeOrderItems(order.items),
       })
     }
   } catch (e) {
@@ -98,12 +98,136 @@ function emitMenuUpdate() {
   }
 }
 
+// Card index: chatId -> (orderId -> Set<messageId>) — every staff-alert copy
+// Telegram delivered for that order. On any status change we re-render ALL
+// copies (each admin chat gets the same fresh state, Issue 6B).
+const staffCardIndex = new Map()
+function rememberStaffCard(chatId, orderId, messageId) {
+  try {
+    if (!staffCardIndex.has(chatId)) staffCardIndex.set(chatId, new Map())
+    const byOrder = staffCardIndex.get(chatId)
+    if (!byOrder.has(orderId)) byOrder.set(orderId, new Set())
+    byOrder.get(orderId).add(messageId)
+  } catch (_) { /* index stays best-effort */ }
+}
+function forgetStaffCard(chatId, orderId) {
+  try {
+    staffCardIndex.get(chatId)?.delete(orderId)
+  } catch (_) { /* noop */ }
+}
+// Drop card copies of orders that left the live queue (cancelled / dismissed)
+// so old message ids don't accumulate.
+function pruneStaffCard(chatId, orderId) { forgetStaffCard(chatId, orderId) }
+
 // Safety net: an unhandled rejection (e.g. a bug in one Telegram handler) must
 // never take down the whole Railway service — previously it crash-looped the
 // deploy and even /start stopped responding.
 process.on('unhandledRejection', (reason) => {
   console.error('[bot] unhandledRejection (process kept alive):', reason)
 })
+
+// ── HTTP → Bot status bridge (admin miniapp actions) ─────────────────
+// When an admin starts / finishes / cancels an order INSIDE the Admin Mini
+// App, orders.js (PATCH /api/orders/:id) hands the fresh order row to:
+//   1. notify the CUSTOMER in their stored language, and
+//   2. flip the status/buttons on the staff alert card in EVERY admin chat.
+// This mirrors exactly what a bot-button tap does, so both surfaces stay in
+// lockstep in both directions. Best-effort: it is called after the PATCH
+// response; a bot hiccup never affects the HTTP result.
+async function notifyCustomerStatus(updated, extraStartedBy = null) {
+  const bot = activeBot
+  if (!bot || !updated?.tg_user_id) return
+  try {
+    const newStatus = updated.status
+    if (newStatus !== 'preparing' && newStatus !== 'served' && newStatus !== 'cancelled') return
+    const custLang = await getUserLang(updated.tg_user_id)
+    const readyText = updated.service_type === 'delivery'
+      ? t('statusReadyDelivery', custLang)
+      : t('statusReadyPickup', custLang)
+    let custMsg
+    if (newStatus === 'preparing') {
+      const preparer = updated.started_by || extraStartedBy
+      custMsg = `Order ${orderCode(updated.id)} ${t('statusPreparing', custLang)}` +
+        (preparer ? ` (${t('startedByWord', custLang)}: ${preparer})` : '')
+    } else if (newStatus === 'served') {
+      custMsg = `Order ${orderCode(updated.id)} ${t('statusReady', custLang)} ${readyText}`
+    } else {
+      custMsg = `Order ${orderCode(updated.id)} ${t('statusCancelled', custLang)}`
+    }
+    await bot.sendMessage(updated.tg_user_id, custMsg)
+  } catch (e) {
+    console.warn(`[bot] customer status message failed for ${updated?.tg_user_id}:`, e.message)
+  }
+}
+
+// Re-render a staff alert card: the message text + inline buttons follow the
+// new status (Started → Mark ready / Finished → Done), in THAT staff chat's
+// language. Edit without parseMode (the receipt is plain text).
+async function editStaffCard(statusPayload) {
+  const bot = activeBot
+  if (!bot || !statusPayload?.id) return
+  const { id, status, started_by } = statusPayload
+  const newStatus = status
+  if (!STATUS_BADGES[newStatus]) return
+  try {
+    const statusWordLine = STATUS_BADGES[newStatus] || ''
+    const whoSuffix = newStatus === 'preparing'
+      ? ` — ${t('startedByWord', 'en')}: ${started_by || ''}`.trimEnd()
+      : (newStatus === 'served' ? ` — ${t('finishedWord', 'en')}` : (newStatus === 'ready' ? ` — ${t('finishedWord', 'en')}` : ''))
+    const staffMsg = buildOrderMessage('alert', {
+      ...fullOrderForStaff({ items: statusPayload.items || [], serviceType: statusPayload.service_type, total: statusPayload.total }, id),
+      status: newStatus,
+    }, await getUserLang(statusPayload.tg_user_id), {
+      username: statusPayload.tg_username,
+      firstName: statusPayload.tg_first_name,
+    }) + `\n${statusWordLine} ${statusWord(newStatus, 'en')}${whoSuffix}`
+    const newKb = newStatus === 'preparing'
+      ? { reply_markup: { inline_keyboard: [
+          [{ text: `✅ ${t('markReady', 'en')}`, callback_data: `ready_${id}` }],
+          [{ text: `❌ ${t('cancelOrder', 'en')}`, callback_data: `dismiss_${id}` }],
+        ] } }
+      : (newStatus === 'served' || newStatus === 'ready')
+      ? { reply_markup: { inline_keyboard: [
+          [{ text: `🍽️ ${t('finishedWord', 'en')}`, callback_data: `noop_${id}` }],
+          [{ text: `❌ ${t('cancelOrder', 'en')}`, callback_data: `dismiss_${id}` }],
+        ] } }
+      : { reply_markup: { inline_keyboard: [[{ text: `❌ ${t('cancelOrder', 'en')}`, callback_data: `dismiss_${id}` }]] } }
+    for (const chatId of STAFF_CHAT_IDS) {
+      const msgIds = staffCardIndex.get(chatId)?.get(id)
+      if (!msgIds) continue
+      for (const messageId of msgIds) {
+        try {
+          await bot.editMessageText(staffMsg, {
+            chat_id: chatId,
+            message_id: messageId,
+            ...newKb,
+          })
+        } catch (e) {
+          console.warn(`[bot] staff card ${chatId}/${messageId} edit failed:`, e.message)
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[bot] staff card edit failed:', e.message)
+  }
+}
+
+// Edit the status+buttons on the staff alert cards for the given order and
+// ALSO notify the customer (used both by the HTTP bridge and internally).
+export async function syncOrderStatusToBot(order, extraStartedBy = null) {
+  try {
+    await Promise.all([
+      editStaffCard({ ...order, tg_user_id: order.tg_user_id }),
+      notifyCustomerStatus(order, extraStartedBy),
+    ])
+  } catch (e) {
+    console.warn('[bot] syncOrderStatusToBot failed:', e.message)
+  }
+}
+// Exact alias requested by the orders-route integration.
+export function applyOrderStatusFromHttp(order, startedBy = null) {
+  return syncOrderStatusToBot(order, startedBy)
+}
 
 
 // (Legacy login-code store removed with the /login flow — the Admin Mini App
@@ -1570,7 +1694,7 @@ export async function startBot(io) {
     await rememberUserLang(user.id, user.language_code || 'en', user.username, user.first_name)
     const lang = await getUserLang(user.id)
 
-    await sendOrderConfirmation(chatId, order, await safeTodaysCount(user.id), lang)
+    await sendOrderConfirmation(chatId, mergeOrderForMessages(order, payload), await safeTodaysCount(user.id), lang)
 
     // ── Push to admin dashboard (real-time) ──
     if (io) {
@@ -1889,63 +2013,26 @@ export async function startBot(io) {
 
       // Realtime: push the new state to every Admin Mini App device so the bot
       // and the miniapp are always in lockstep (same status everywhere).
-      emitOrderUpdate({ id, ...updated, started_by: action === 'prep' ? (updated.started_by || actorName) : updated.started_by })
+      const merged = { id, ...updated, started_by: action === 'prep' ? (updated.started_by || actorName) : updated.started_by }
+      emitOrderUpdate(merged)
+      if (newStatus === 'cancelled') pruneStaffCard(chatId, id)
 
       // Update the staff alert card in place: replace the status line and
       // swap the buttons to reflect the new state (Started / Finished),
       // with Cancel always styled and available for dismissal. When the
       // START came from a bot button, the card shows WHO started it so other
       // staff on their own copies see the same name the miniapp will show.
+      // Re-render EVERY staff-alert copy of this order (this chat and every
+      // other admin chat) with the new status + buttons, and tell the
+      // customer in THEIR language — one shared path for bot-shop and
+      // miniapp-made changes (Issue 6A + 6B).
       try {
-        const statusWordLine = STATUS_BADGES[newStatus] || ''
-        const whoSuffix = newStatus === 'preparing'
-          ? ` — ${t('startedByWord', 'en')}: ${updated.started_by || actorName}`
-          : (newStatus === 'ready' ? ` — ${t('finishedWord', 'en')}` : '')
-        const staffMsg = buildOrderMessage('alert', {
-          ...fullOrderForStaff({ items: updated.items || [], serviceType: updated.service_type, total: updated.total }, id),
-          status: newStatus,
-        }, await getUserLang(userId), {
-          username: updated.tg_username,
-          firstName: updated.tg_first_name,
-        }) + `\n${statusWordLine} ${statusWord(newStatus, 'en')}${whoSuffix}`
-        const newKb = newStatus === 'preparing'
-          ? { reply_markup: { inline_keyboard: [
-              [{ text: `✅ ${t('markReady', 'en')}`, callback_data: `ready_${id}` }],
-              [{ text: `❌ ${t('cancelOrder', 'en')}`, callback_data: `dismiss_${id}` }],
-            ] } }
-          : newStatus === 'ready'
-          ? { reply_markup: { inline_keyboard: [
-              [{ text: `🍽️ ${t('finishedWord', 'en')}`, callback_data: `noop_${id}` }],
-              [{ text: `❌ ${t('cancelOrder', 'en')}`, callback_data: `dismiss_${id}` }],
-            ] } }
-          : { reply_markup: { inline_keyboard: [[{ text: `❌ ${t('cancelOrder', 'en')}`, callback_data: `dismiss_${id}` }]] } }
-        await bot.editMessageText(staffMsg, {
-          chat_id: chatId,
-          message_id: cq.message?.message_id,
-          ...newKb,
-        })
+        if (!staffCardIndex.get(chatId)?.get(id)) { try { const mm = cq.message?.message_id; if (mm) rememberStaffCard(chatId, id, mm) } catch (_) {} }
+        await editStaffCard(merged)
       } catch (e) {
         console.warn('[bot] alert card edit failed:', e.message)
       }
-
-      // Tell the customer their order status changed — in THEIR language.
-      // For 'preparing' we also include the named preparer (the same started_by
-      // the admin miniapp shows) when the change was made from a bot button.
-      const custLang = await getUserLang(updated.tg_user_id)
-      const readyText = updated.service_type === 'delivery' ? t('statusReadyDelivery', custLang) : t('statusReadyPickup', custLang)
-      let custMsg
-      if (newStatus === 'preparing') {
-        const preparer = updated.started_by || actorName
-        custMsg = `Order ${orderCode(id)} ${t('statusPreparing', custLang)}` +
-          (newStatus === 'preparing' && preparer
-            ? ` (${t('startedByWord', custLang)}: ${preparer})`
-            : '')
-      }
-      else if (newStatus === 'ready') custMsg = `Order ${orderCode(id)} ${t('statusReady', custLang)} ${readyText}`
-      else custMsg = `Order ${orderCode(id)} ${t('statusCancelled', custLang)}`
-      try { bot.sendMessage(updated.tg_user_id, custMsg) } catch (e) {
-        console.warn(`[bot] customer status message failed for ${updated.tg_user_id}:`, e.message)
-      }
+      await notifyCustomerStatus(merged, actorName)
       return
     }
 
@@ -2034,7 +2121,10 @@ function fullOrderForStaff(payload, orderId) {
     service_type: payload.serviceType,
     customer_name: payload.customer?.name || 'Unknown',
     customer_loc: payload.customer?.location || null,
-    items: payload.items,
+    // Normalized so a staff alert card never renders "undefined" item lines
+    // (payload items are {id,nameEn,...,quantity}; the card edits read
+    // name/qty — see server/order-items.js).
+    items: normalizeOrderItems(payload.items),
     total: payload.total,
     status: 'new',
   }
@@ -2101,7 +2191,11 @@ export function notifyStaff(order, payload, from = {}) {
         },
       }
 
-      await bot.sendMessage(id, staffMsg, staffKeyboard)
+      const sent = await bot.sendMessage(id, staffMsg, staffKeyboard)
+      // Remember THIS chat's copy so a status change made in the Admin Mini
+      // App (or from another admin's bot) can re-render it with the new
+      // state + buttons (Issue 6B — real-time bot card sync).
+      if (sent?.message_id) rememberStaffCard(id, order.id, sent.message_id)
     })().catch((e) => {
       console.warn(`[bot] notify chat ${id} failed:`, e.message)
     })
