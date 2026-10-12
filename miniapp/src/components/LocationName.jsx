@@ -57,7 +57,9 @@ export default function LocationName({ bgProps }) {
   const hasLocation =
     !isDelivery ||
     (customerLocation && (customerLocation.lat || customerLocation.address))
-  const canSubmit = hasName && hasLocation && !submitting
+  // Name is now required for EVERY order type (our user requested it).
+  // Dine-in / takeaway no longer skip the location, so name gates all three.
+  const canSubmit = hasName && !submitting
 
   const handleShareLocation = () => {
     if (!navigator?.geolocation) {
@@ -253,33 +255,40 @@ export default function LocationName({ bgProps }) {
         brightness={0.35}
       />
 
-      <div className="frame-scroll no-bottom-bar" style={{ position: 'relative', zIndex: 2 }}>
-        <div className="frame-header" style={{ paddingTop: 12 }}>
-          <div className="title-block">
-            <h1>{t('almostThere')}</h1>
-            <p>
-              {isDelivery ? t('deliveryWhere') : t('nameOnly')}
-            </p>
+      <div className="frame-scroll no-bottom-bar" style={{ position: 'relative', zIndex: 2 }}>          <div className="frame-header" style={{ paddingTop: 12 }}>
+            <div className="title-block">
+              <h1>{t('almostThere')}</h1>
+              <p>
+                {isDelivery ? t('deliveryWhere') : t('nameOnly')}
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* Name */}
-        <div style={{ marginBottom: 20 }}>
-          <label className="input-label" htmlFor="cust-name">
-            {t('yourName')}
-          </label>
-          <input
-            id="cust-name"
-            ref={nameRef}
-            type="text"
-            className="input-field"
-            placeholder={t('namePlaceholder')}
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            maxLength={60}
-            autoComplete="name"
-          />
-        </div>
+          {/* Name (required) */}
+          <div style={{ marginBottom: 20, border: '1px solid '+ (customerName.trim() ? 'transparent' : 'rgba(212,168,83,0.55)'), borderRadius: '14px', padding: '14px 16px' }}>
+            <label htmlFor="cust-name" style={{ display: 'flex', alignItems: 'center', fontSize: 15, fontWeight: 700, marginBottom: '8px', color: '#FFF8E7', letterSpacing: '.01em' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                {t('yourName')}
+                <span style={{ color: '#fff8e7aa', fontSize: 13, fontWeight: 500 }}>(this is required)</span>
+              </span>
+            </label>
+            <input
+              id="cust-name"
+              ref={nameRef}
+              type="text"
+              className="input-field"
+              placeholder={t('namePlaceholder')}
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              maxLength={60}
+              autoComplete="name"
+            />
+            {customerName.trim() && (
+              <div style={{ fontSize: 11, color: 'var(--accent-gold)', marginTop: 4 }}>
+                ✓ Name saved
+              </div>
+            )}
+          </div>
 
         {/* Location (delivery only) */}
         {isDelivery && (
