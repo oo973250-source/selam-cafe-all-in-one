@@ -66,7 +66,7 @@ const MEAL_TABS = [
   { key: 'snacks',    labelKey: 'snacks' },
 ]
 
-export default function MainMenu({ onAdvance, bgProps }) {
+export default function MainMenu({ onAdvance, onBack, bgProps }) {
   const { setCategory } = useCart()
   const { hapticFeedback } = useTelegram()
   const { t, lang } = useLang()
@@ -167,6 +167,45 @@ export default function MainMenu({ onAdvance, bgProps }) {
           zIndex: 1,
         }}
       />
+
+      {/* Bottom-right: prominent Back pill (user request v12 — reference
+          screenshot shows a large rounded "← Back" button in the right
+          corner). Returns to the service-choice frame. */}
+      <motion.button
+        type="button"
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.3, duration: 0.35, ease: 'easeOut' }}
+        whileTap={{ scale: 0.94 }}
+        aria-label={t('back')}
+        onClick={() => {
+          hapticFeedback.impactOccurred('light')
+          onBack?.()
+        }}
+        style={{
+          position: 'absolute',
+          right: 14,
+          bottom: 'calc(var(--safe-bottom, 0px) + 18px)',
+          zIndex: 40,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 2,
+          padding: '12px 22px',
+          borderRadius: 16,
+          border: '1px solid rgba(212, 168, 83, 0.55)',
+          background: 'linear-gradient(180deg, #3A2410 0%, #1A0E05 100%)',
+          color: '#FFF8E7',
+          fontSize: 18,
+          lineHeight: 1.1,
+          fontWeight: 600,
+          boxShadow: '0 6px 16px rgba(30, 20, 8, 0.45)',
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{ fontSize: 22 }} aria-hidden>←</span>
+        <span>{t('back')}</span>
+      </motion.button>
 
       {/* Top-right: cafe logo (consistent with Frame 1) */}
       <motion.div

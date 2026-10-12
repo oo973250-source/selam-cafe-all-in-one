@@ -120,10 +120,38 @@ router.patch('/categories/:id', requireAuth, requireRole('manager', 'owner'), as
   params.push(id)
 
   try {
-    const { rows } = await pool.query(
+    let { rows } = await pool.query(
       `UPDATE menu_categories SET ${sets.join(', ')} WHERE id = $1 RETURNING *`,
       params
     )
+    // Self-heal (Issue #3): after a RENAME the in-memory card can still carry
+    // the OLD slug as its id (the miniapp/admin list wasn't refetched), so the
+    // exact-id UPDATE matches nothing → the admin saw "Could not update
+    // category". If the id is unknown, retry against the English name (and
+    // the Amharic name) — names are unique in practice and renaming is the
+    // only operation that changes the slug.
+    if (!rows.length) {
+      const nameGuess = String(id).replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
+      const { rows: byName } = await pool.query(
+        `UPDATE menu_categories SET ${sets.join(', ')}
+          WHERE id = $${params.length} OR LOWER(name_en) = LOWER($${params.length})
+             OR (name_am IS NOT NULL AND name_am = $${params.length})
+          RETURNING *`,
+        params
+      ).catch(() => ({ rows: [] }))
+      if (!byName.length) {
+        // Last resort: unique-name match on the de-slugged id itself.
+        const { rows: byName2 } = await pool.query(
+          `UPDATE menu_categories SET ${sets.join(', ')}
+            WHERE LOWER(name_en) = LOWER($1) OR name_am = $1
+            RETURNING *`,
+          [nameGuess, ...params.slice(1)]
+        ).catch(() => ({ rows: [] }))
+        rows = byName2
+      } else {
+        rows = byName
+      }
+    }
     if (!rows.length) return res.status(404).json({ error: 'not found' })
     emitMenuUpdate(req)
     res.json({ category: rows[0] })

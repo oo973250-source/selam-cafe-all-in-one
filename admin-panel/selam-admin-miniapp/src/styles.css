@@ -453,9 +453,10 @@ button {
 }
 
 .tg-unavail.on {
-  background: var(--red-dim-bg);
-  border-color: var(--red-dim-border);
-  color: var(--red-dim-text);
+  background: #8a4a4a;
+  border-color: #c96a6a;
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .tg-nodel.on {
@@ -632,8 +633,15 @@ button {
   margin-bottom: 8px;
 }
 
+/* Unavailable state (Issue #3): the old 0.55 whole-card fade left the item
+   name grey-on-grey and hard to read. Keep the card fully readable: slight
+   dim + a red left bar + a HIGH-CONTRAST white-on-red "unavailable" flag. */
 .item-off {
-  opacity: 0.55;
+  opacity: 0.92;
+  border-left: 4px solid var(--red-dim-border);
+}
+.item-off .item-name {
+  opacity: 1;
 }
 
 .item-row {
@@ -686,7 +694,18 @@ button {
 .item-unflag {
   margin-top: 8px;
   font-size: 12.5px;
-  color: var(--red-dim-text);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #ffffff;
+  background: var(--red-dim-border);
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.admin-unflag {
+  background: #6a6a6a;
 }
 
 /* long category names in the header badge */

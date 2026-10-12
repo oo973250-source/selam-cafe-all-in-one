@@ -85,6 +85,7 @@ function AppInner() {
           <MainMenu
             bgProps={bgProps}
             onAdvance={() => goToFrame(3)}
+            onBack={() => goToFrame(1)}
           />
         )
       case 3:
