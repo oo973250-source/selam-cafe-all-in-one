@@ -164,6 +164,7 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
                         nameEn: item.nameEn,
                         nameAm: item.nameAm,
                         price: item.price,
+                        icon: item.icon,
                       })
                       hapticFeedback.impactOccurred('light')
                     }}
