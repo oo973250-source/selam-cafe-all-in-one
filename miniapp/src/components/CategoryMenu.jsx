@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import SmartCafeBg from './SmartCafeBg.jsx'
 import CafeLogo from './CafeLogo.jsx'
 import { useCart } from '../context/CartContext.jsx'
@@ -26,6 +26,7 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
   const { t, lang } = useLang()
 
   // Resolve items for the active category.
+  const [expandedId, setExpandedId] = useState(null)
   const categoryItems = useMemo(() => {
     if (!currentCategory) return []
     const section = menuData[currentCategory.sectionKey]
@@ -122,13 +123,58 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
                   opacity: inStock ? undefined : 0.45,
                 }}
               >
-                <div className="item-info">
+                <div
+                  className="item-info"
+                  onClick={() => {
+                    hapticFeedback.impactOccurred('light')
+                    setExpandedId(expandedId === item.id ? null : item.id)
+                  }}
+                  style={{ cursor: 'pointer', flex: 1, minWidth: 0 }}
+                  role="button"
+                  aria-expanded={expandedId === item.id}
+                >
                   <div className="item-name-en">
                     {lang === 'am' && item.nameAm ? item.nameAm : item.nameEn}
                   </div>
                   <div className="item-name-am">
                     {lang === 'am' ? item.nameEn : item.nameAm}
                   </div>
+                  {expandedId === item.id && (
+                    <div
+                      style={{
+                        marginTop: 10,
+                        width: '100%',
+                        maxWidth: 200,
+                        height: 130,
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        background: 'rgba(15, 23, 30, 0.8)',
+                        border: '1px solid rgba(212, 168, 83, 0.35)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+                      }}
+                    >
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.nameEn}
+                          draggable={false}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            userSelect: 'none',
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: 52 }} aria-hidden>
+                          {item.icon || currentCategory.icon || '🍽️'}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="item-price">{item.price} Br</div>

@@ -200,6 +200,8 @@ export async function syncMenuFromServer() {
         nameAm: it.name_am || it.name_en,
         price: Number(it.price) || 0,
         available: it.available !== false,
+        // Admin-uploaded photo (may be null for seed/placeholder items).
+        image_url: it.image_url || null,
       })
     }
 
@@ -211,7 +213,11 @@ export async function syncMenuFromServer() {
         nameAm: meta?.name_am || '',
         icon: meta?.icon || '🍽️',
         mealTimes: ['all', 'breakfast', 'lunch', 'dinner', 'snacks'],
-        items: (byCat.get(catId) || []).map((i) => ({ ...i, available: i.available })),
+        items: (byCat.get(catId) || []).map((i) => ({
+          ...i,
+          available: i.available,
+          image_url: i.image_url || null,
+        })),
       }
     }
 
@@ -244,6 +250,7 @@ export async function syncMenuFromServer() {
               nameAm: i.nameAm,
               price: i.price,
               available: i.available,
+              image_url: i.image_url || null,
             })),
           }
         }
