@@ -63,24 +63,32 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
       >
         {/* ── HERO: chef above the gold title, divider with chef-hat ── */}
         <div style={{ position: 'relative', textAlign: 'center', marginBottom: 8 }}>
+          {/* Big chef, bottom edge tucked slightly behind the title so she
+              "leans" on it (reference screenshot). Negative bottom margin
+              pulls the title up into her clasped-hands zone; the title's
+              zIndex keeps the text readable. */}
           <img
             src="/owner/pose-7-leaning-transparent.png"
             alt="Chef confirming your order"
             draggable={false}
             style={{
-              width: 190,
-              height: 190,
+              width: 260,
+              height: 260,
               objectFit: 'contain',
               objectPosition: 'top center',
               filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.5))',
               userSelect: 'none',
               pointerEvents: 'none',
-              margin: '0 auto 4px',
+              margin: '0 auto -58px',
               display: 'block',
+              position: 'relative',
+              zIndex: 1,
             }}
           />
           <h1
             style={{
+              position: 'relative',
+              zIndex: 2,
               fontFamily: 'var(--font-display)',
               fontSize: 30,
               fontWeight: 800,

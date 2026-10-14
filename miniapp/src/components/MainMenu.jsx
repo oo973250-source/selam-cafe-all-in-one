@@ -177,7 +177,7 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.3, duration: 0.35, ease: 'easeOut' }}
         whileTap={{ scale: 0.94 }}
-        aria-label={t('back')}
+        aria-label="Back"
         onClick={() => {
           hapticFeedback.impactOccurred('light')
           onBack?.()
@@ -204,7 +204,7 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
         }}
       >
         <span style={{ fontSize: 22 }} aria-hidden>←</span>
-        <span>{t('back')}</span>
+        <span>{t('backShort')}</span>
       </motion.button>
 
       {/* Top-right: cafe logo (consistent with Frame 1) */}
