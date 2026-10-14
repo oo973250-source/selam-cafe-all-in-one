@@ -72,14 +72,14 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
             alt="Chef confirming your order"
             draggable={false}
             style={{
-              width: 260,
-              height: 260,
+              width: 340,
+              height: 436,
               objectFit: 'contain',
               objectPosition: 'top center',
               filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.5))',
               userSelect: 'none',
               pointerEvents: 'none',
-              margin: '0 auto -58px',
+              margin: '0 auto -64px',
               display: 'block',
               position: 'relative',
               zIndex: 1,
