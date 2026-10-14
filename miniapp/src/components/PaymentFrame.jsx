@@ -104,9 +104,16 @@ function Checkmark() {
 }
 
 export default function PaymentFrame({ onSuccess, onError, bgProps }) {
-  const { serviceType, items, total, successfulPayments, recordSuccessfulPayment } =
-    useCart()
-  const { hapticFeedback, user } = useTelegram()
+  const {
+    serviceType,
+    items,
+    total,
+    successfulPayments,
+    recordSuccessfulPayment,
+    customerName,
+    customerLocation,
+  } = useCart()
+  const { tg, initData, hapticFeedback, user } = useTelegram()
   const { t } = useLang()
 
   const serviceShort = serviceType === 'dine_in'
@@ -175,12 +182,85 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
   const [selectedMethod, setSelectedMethod] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [pressedKey, setPressedKey] = useState(null)
+  const [orderWarning, setOrderWarning] = useState('')
+  const orderSubmittedRef = React.useRef(false)
 
-  // When entering success state, fire success haptic and record successful payment.
+  // New flow: payment FIRST, then the order. Once payment succeeds we POST
+  // the order to /api/miniapp/orders (HTTP, initData-verified) and the server
+  // messages the customer with the ticket. We deliberately do NOT use
+  // tg.sendData() — the bot only receives web_app_data for keyboard-launched
+  // Mini Apps, so menu-button orders would never arrive.
+  const submitOrder = async () => {
+    if (orderSubmittedRef.current) return
+    orderSubmittedRef.current = true
+
+    const payload = {
+      type: 'cafe_order',
+      at: new Date().toISOString(),
+      serviceType,
+      customer: {
+        name: customerName.trim(),
+        location: customerLocation,
+      },
+      items: items.map((i) => ({
+        id: i.id,
+        nameEn: i.nameEn,
+        nameAm: i.nameAm,
+        price: i.price,
+        quantity: i.quantity,
+      })),
+      // Server re-checks availability; items already localized.
+      total,
+      trustLevel: successfulPayments,
+    }
+
+    try {
+      const res = await fetch('/api/miniapp/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData, order: payload }),
+      })
+      const data = await res.json().catch(() => ({}))
+
+      // Server-side blocklist gate (Task 4).
+      if (res.status === 403 && data.blocked) {
+        setOrderWarning(t('blockedTitle') + ' — ' + t('blockedMessage'))
+        return
+      }
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || `Order failed (${res.status})`)
+      }
+
+      const code = `MC-${String(data.orderId).padStart(4, '0')}`
+      const alertText = `${t('orderReceivedTitle')}\n\n${t('yourTicketIs').replace('{n}', code)}\n${t('checkChat')}`
+      if (tg?.showAlert) {
+        tg.showAlert(alertText)
+      } else {
+        window.alert(alertText)
+      }
+
+      // If the bot could not message the user (never pressed Start), show a hint.
+      if (data.confirmationSent === false) {
+        setOrderWarning(data.warning || t('orderSavedWarning'))
+      }
+
+      // Done — close the Mini App and return to the chat.
+      setTimeout(() => {
+        try { tg?.close?.() } catch { /* no-op */ }
+      }, 900)
+    } catch (e) {
+      console.error('[order] submit failed:', e)
+      setOrderWarning(e.message || t('submitFailed'))
+    }
+  }
+
+  // When entering success state: haptic, record trust, then submit the order.
   useEffect(() => {
     if (state === 'success') {
       hapticFeedback.notificationOccurred('success')
       recordSuccessfulPayment()
+      submitOrder()
     }
     if (state === 'error') {
       hapticFeedback.notificationOccurred('error')
@@ -445,11 +525,26 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
             {selectedMethod?.amount || 0} Br
           </p>
 
+          {orderWarning && (
+            <p
+              style={{
+                color: 'var(--text-secondary)',
+                fontSize: 12,
+                maxWidth: 300,
+                margin: '0 0 16px',
+                textAlign: 'center',
+              }}
+            >
+              {orderWarning}
+            </p>
+          )}
+
           <button
             className="btn btn-primary btn-block"
             style={{ maxWidth: 280 }}
             onClick={() => {
               hapticFeedback.impactOccurred('light')
+              try { tg?.close?.() } catch { /* no-op */ }
               onSuccess?.()
             }}
           >

@@ -1,36 +1,20 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 import SmartCafeBg from './SmartCafeBg.jsx'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
 import { useLang } from '../context/LangContext.jsx'
 
-// Order code format: #5 → MC-0005 (matches the bot and admin dashboard).
-function orderCode(orderId) {
-  return `MC-${String(orderId).padStart(4, '0')}`
-}
-
 /**
- * LocationName (Frame 7)
+ * LocationName (Frame 5)
  * -----------------------
- * Final frame before the order is submitted to the bot.
- *
- * - "Almost There!" header
- * - Name input (autoFocus)
- * - If delivery: location section
- *     - "Share my location" button (dashed border) -> navigator.geolocation
- *     - Manual address input below *   - Submit button: "🚗 Place Delivery Order" or "✓ Place Order"
- *   - Disabled until name (and location if delivery) are filled
- *   - When enabled: gold gradient
- *   - On submit: POST the order to /api/miniapp/orders (HTTP) with Telegram
- *     initData for server-side verification. The server saves the order,
- *     sends the confirmation message through the bot, and notifies staff.
- *
- *     IMPORTANT: We deliberately do NOT use tg.sendData() here. Telegram only
- *     delivers web_app_data for Mini Apps opened from a keyboard button —
- *     menu-button/link launches silently drop it, so the bot would never
- *     receive the order and no confirmation would ever be sent.
+ * "Almost There!" — collect the customer's details BEFORE payment:
+ *   - Name input (required for every order type)
+ *   - If delivery: "Share my location" button (geolocation) + manual address
+ *   - "✓ Place Order" button — enabled once the required fields are filled.
+ *     It does NOT submit the order; it hands off to the Payment frame,
+ *     where payment is taken first and the order is submitted afterwards.
  */
-export default function LocationName({ bgProps }) {
+export default function LocationName({ bgProps, onPlaceOrder }) {
   const {
     serviceType,
     items,
@@ -39,16 +23,12 @@ export default function LocationName({ bgProps }) {
     customerLocation,
     setCustomerName,
     setCustomerLocation,
-    successfulPayments,
   } = useCart()
-  const { tg, initData, hapticFeedback } = useTelegram()
+  const { hapticFeedback } = useTelegram()
   const { t, lang } = useLang()
 
-  const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState('')
-  const [blocked, setBlocked] = useState(false)
-  const [locating, setLocating] = useState(false)
-  const [manualAddress, setManualAddress] = useState(
+  const [locating, setLocating] = React.useState(false)
+  const [manualAddress, setManualAddress] = React.useState(
     customerLocation?.address || ''
   )
 
@@ -57,9 +37,7 @@ export default function LocationName({ bgProps }) {
   const hasLocation =
     !isDelivery ||
     (customerLocation && (customerLocation.lat || customerLocation.address))
-  // Name is now required for EVERY order type (our user requested it).
-  // Dine-in / takeaway no longer skip the location, so name gates all three.
-  const canSubmit = hasName && !submitting
+  const canProceed = hasName && hasLocation
 
   const handleShareLocation = () => {
     if (!navigator?.geolocation) {
@@ -79,7 +57,7 @@ export default function LocationName({ bgProps }) {
         setLocating(false)
         hapticFeedback.notificationOccurred('success')
       },
-      (err) => {
+      () => {
         setLocating(false)
         hapticFeedback.notificationOccurred('error')
         // eslint-disable-next-line no-alert
@@ -100,83 +78,10 @@ export default function LocationName({ bgProps }) {
     })
   }
 
-  const handleSubmit = async () => {
-    if (!canSubmit) return
-    setSubmitting(true)
-    setSubmitError('')
+  const handlePlaceOrder = () => {
+    if (!canProceed) return
     hapticFeedback.impactOccurred('medium')
-
-    const payload = {
-      type: 'cafe_order',
-      at: new Date().toISOString(),
-      serviceType,
-      customer: {
-        name: customerName.trim(),
-        location: customerLocation,
-      },
-      items: items.map((i) => ({
-        id: i.id,
-        nameEn: i.nameEn,
-        nameAm: i.nameAm,
-        price: i.price,
-        quantity: i.quantity,
-      })),
-      // Server re-checks availability; items already localized.
-      total,
-      trustLevel: successfulPayments,
-    }
-
-    try {
-      const res = await fetch('/api/miniapp/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData, order: payload }),
-      })
-      const data = await res.json().catch(() => ({}))
-
-      // Task 4: server-side blocklist gate — show the "restricted" screen
-      // instead of a generic error. The order was NOT saved.
-      if (res.status === 403 && data.blocked) {
-        setBlocked(true)
-        setSubmitting(false)
-        hapticFeedback.notificationOccurred('error')
-        return
-      }
-
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || `Order failed (${res.status})`)
-      }
-
-      hapticFeedback.notificationOccurred('success')
-
-      // Show the in-app confirmation with the real ticket number, in the
-      // language the user selected in the bot (via ?lang= from bot buttons).
-      const alertText = `${t('orderReceivedTitle')}\n\n${t('yourTicketIs').replace('{n}', orderCode(data.orderId))}\n${t('checkChat')}`
-      if (tg?.showAlert) {
-        tg.showAlert(alertText)
-      } else {
-        window.alert(alertText)
-      }
-
-      // If the bot could not message the user (never pressed Start), show a hint.
-      if (data.confirmationSent === false) {
-        if (tg?.showAlert) {
-          tg.showAlert(data.warning || t('orderSavedWarning'))
-        } else {
-          window.alert(data.warning || t('orderSavedWarning'))
-        }
-      }
-
-      // Done — close the Mini App and return to the chat.
-      setTimeout(() => {
-        try { tg?.close?.() } catch { /* no-op */ }
-      }, 800)
-    } catch (e) {
-      console.error('[order] submit failed:', e)
-      setSubmitError(e.message || t('submitFailed'))
-      setSubmitting(false)
-      hapticFeedback.notificationOccurred('error')
-    }
+    onPlaceOrder?.()
   }
 
   // Auto-focus name input on mount
@@ -185,110 +90,50 @@ export default function LocationName({ bgProps }) {
     nameRef.current?.focus()
   }, [])
 
-  // Blocked screen (Task 4): replaces the ordering flow with a clear
-  // "restricted, contact support" message in the user's language.
-  if (blocked) {
-    return (
-      <div style={{ position: 'absolute', inset: 0 }}>
-        <SmartCafeBg {...bgProps} blur={4} brightness={0.3} />
-        <div
-          className="frame-scroll no-bottom-bar"
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100%',
-            textAlign: 'center',
-            padding: 24,
-          }}
-        >
-          <div
-            style={{
-              width: 90,
-              height: 90,
-              borderRadius: '50%',
-              background: 'rgba(196,69,54,0.12)',
-              border: '2px solid var(--accent-red, #c44536)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 40,
-            }}
-          >
-            ⛔
-          </div>
-          <h1
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 24,
-              fontWeight: 800,
-              margin: '16px 0 8px',
-              color: 'var(--accent-red, #c44536)',
-            }}
-          >
-            {t('blockedTitle')}
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14, maxWidth: 300, margin: 0 }}>
-            {t('blockedMessage')}
-          </p>
-          <button
-            className="btn btn-secondary btn-block"
-            style={{ maxWidth: 280, marginTop: 24 }}
-            onClick={() => { try { tg?.close?.() } catch { /* no-op */ } }}
-          >
-            {t('contactSupport')}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       <SmartCafeBg
         {...bgProps}
-        forceBg={isDelivery ? 'night-taxi' : undefined}
+        forceBg={isDelivery ? 'night-taxi' : 'day-stall'}
         blur={3}
         brightness={0.35}
       />
 
-      <div className="frame-scroll no-bottom-bar" style={{ position: 'relative', zIndex: 2 }}>          <div className="frame-header" style={{ paddingTop: 12 }}>
-            <div className="title-block">
-              <h1>{t('almostThere')}</h1>
-              <p>
-                {isDelivery ? t('deliveryWhere') : t('nameOnly')}
-              </p>
-            </div>
+      <div className="frame-scroll no-bottom-bar" style={{ position: 'relative', zIndex: 2 }}>
+        <div className="frame-header" style={{ paddingTop: 12 }}>
+          <div className="title-block">
+            <h1>{t('almostThere')}</h1>
+            <p>
+              {isDelivery ? t('deliveryWhere') : t('nameOnly')}
+            </p>
           </div>
+        </div>
 
-          {/* Name (required) */}
-          <div style={{ marginBottom: 20, border: '1px solid '+ (customerName.trim() ? 'transparent' : 'rgba(212,168,83,0.55)'), borderRadius: '14px', padding: '14px 16px' }}>
-            <label htmlFor="cust-name" style={{ display: 'flex', alignItems: 'center', fontSize: 15, fontWeight: 700, marginBottom: '8px', color: '#FFF8E7', letterSpacing: '.01em' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                {t('yourName')}
-                <span style={{ color: '#fff8e7aa', fontSize: 13, fontWeight: 500 }}>(this is required)</span>
-              </span>
-            </label>
-            <input
-              id="cust-name"
-              ref={nameRef}
-              type="text"
-              className="input-field"
-              placeholder={t('namePlaceholder')}
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              maxLength={60}
-              autoComplete="name"
-            />
-            {customerName.trim() && (
-              <div style={{ fontSize: 11, color: 'var(--accent-gold)', marginTop: 4 }}>
-                ✓ Name saved
-              </div>
-            )}
-          </div>
+        {/* Name (required) */}
+        <div style={{ marginBottom: 20, border: '1px solid ' + (hasName ? 'transparent' : 'rgba(212,168,83,0.55)'), borderRadius: '14px', padding: '14px 16px' }}>
+          <label htmlFor="cust-name" style={{ display: 'flex', alignItems: 'center', fontSize: 15, fontWeight: 700, marginBottom: '8px', color: '#FFF8E7', letterSpacing: '.01em' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+              {t('yourName')}
+              <span style={{ color: '#fff8e7aa', fontSize: 13, fontWeight: 500 }}>({t('nameRequiredHint')})</span>
+            </span>
+          </label>
+          <input
+            id="cust-name"
+            ref={nameRef}
+            type="text"
+            className="input-field"
+            placeholder={t('namePlaceholder')}
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            maxLength={60}
+            autoComplete="name"
+          />
+          {hasName && (
+            <div style={{ fontSize: 11, color: 'var(--accent-gold)', marginTop: 4 }}>
+              ✓ {t('nameSaved')}
+            </div>
+          )}
+        </div>
 
         {/* Location (delivery only) */}
         {isDelivery && (
@@ -383,38 +228,16 @@ export default function LocationName({ bgProps }) {
           </div>
         </div>
 
-        {/* Submit */}
+        {/* Proceed to payment */}
         <button
           type="button"
-          className={`btn btn-block ${canSubmit ? 'btn-primary anim-pulseGlow' : 'btn-secondary'}`}
-          disabled={!canSubmit || submitting}
-          onClick={handleSubmit}
+          className={`btn btn-block ${canProceed ? 'btn-primary anim-pulseGlow' : 'btn-secondary'}`}
+          disabled={!canProceed}
+          onClick={handlePlaceOrder}
           style={{ minHeight: 54 }}
         >
-          {submitting
-            ? t('placingOrder')
-            : isDelivery
-            ? t('placeDeliveryOrder')
-            : t('placeOrder')}
+          {t('placeOrder')}
         </button>
-
-        {submitError && (
-          <div
-            role="alert"
-            style={{
-              marginTop: 12,
-              padding: '10px 14px',
-              borderRadius: 12,
-              background: 'rgba(196,69,54,0.12)',
-              border: '1px solid var(--accent-red)',
-              color: 'var(--accent-red)',
-              fontSize: 13,
-              textAlign: 'center',
-            }}
-          >
-            {submitError}
-          </div>
-        )}
 
         <p
           style={{

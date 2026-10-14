@@ -5,182 +5,106 @@ import { useTelegram } from '../hooks/useTelegram.js'
 import { useLang } from '../context/LangContext.jsx'
 
 /**
- * ConfirmOrder (Frame 5) — v11f
+ * ConfirmOrder (Frame 4) — v12
  * --------------------------------------
- * Per user v11f (chef leaning MORE on the title):
- *   - Lower the owner image itself: top:0 → top:20.
- *   - Title stays at top:175 (already lower per v11e).
- *   - Net effect: chef hands now drape across nearly the entire title
- *     (41/42px = 98% overlap) → strong "leaning on the text" feel.
- *   - Title remains fully readable because it is painted on top
- *     (zIndex 3 > image's zIndex 1).
- *
- * Composition (top of the frame, centered):
- *   - Chef image (transparent bg, leaning forward, hands clasped) at
- *     top:20, 360x360, centered. Source content ends at y=308 of 566
- *     (54.4%). Scale = 360/566 = 0.636. Chef content rendered bottom
- *     = 20 + (308 * 0.636) = 20 + 196 ≈ 216. So chef's hands end at
- *     screen y≈216.
- *   - "Confirm Your Order" h1 (gold serif, 28px) at top:175. h1 spans
- *     y=175-217. Chef hands span y=20-216, so the overlap zone is
- *     y=175-216 → 41 of 42px of title height (98%). The chef appears
- *     to be leaning her whole upper body weight onto the gold letters.
- *     Gold text remains fully readable because it's painted on top.
- *   - NO subtitle (kept removed since v11d).
- *   - Cart item rows / qty steppers / total / bottom bar — preserved
- *     from v10.
+ * Redesigned per the user's new spec:
+ *   - Background: day-stall cafe scene (blurred outdoor counter).
+ *   - Chef image at top, gold serif "Confirm Your Order" title below her,
+ *     gold divider with chef-hat icon.
+ *   - Single dark rounded card holds every cart line + total:
+ *       [thumb] Title            (-) qty (+)          line total
+ *               90 Br each · ...
+ *   - Total row separated by a divider, gold total.
+ *   - Bottom actions:
+ *       Row 1: [＋ Add More (teal)]   [💳 Pay {total} Br → (gold)]
+ *       Row 2:             [← Back]
+ *   - + / − buttons bump the cart, total, and the Pay button amount live.
  */
-export default function ConfirmOrder({ onCancel, onPay, bgProps }) {
+export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
   const { items, total, addItem, removeItem, deleteItem } = useCart()
   const { hapticFeedback } = useTelegram()
   const { t, lang } = useLang()
 
-  // Localized item name: Amharic speakers see nameAm first, others nameEn.
   const primaryName = (item) => (lang === 'am' && item.nameAm ? item.nameAm : item.nameEn)
   const secondaryName = (item) => (lang === 'am' ? item.nameEn : item.nameAm)
 
   const handleMinus = (item) => {
+    hapticFeedback.impactOccurred('light')
     if (item.quantity <= 1) {
       deleteItem(item.id)
       hapticFeedback.notificationOccurred('warning')
     } else {
       removeItem(item.id)
-      hapticFeedback.impactOccurred('light')
     }
+  }
+
+  const handlePlus = (item) => {
+    hapticFeedback.impactOccurred('light')
+    addItem({
+      id: item.id,
+      nameEn: item.nameEn,
+      nameAm: item.nameAm,
+      price: item.price,
+    })
   }
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
-      <SmartCafeBg {...bgProps} forceBg="customer-served" blur={3} brightness={0.4} />
+      {/* Outdoor cafe stall photo — the one used across the app, per spec */}
+      <SmartCafeBg {...bgProps} forceBg="day-stall" blur={3} brightness={0.42} />
 
       <div
-        className="frame-scroll"
+        className="frame-scroll no-bottom-bar"
         style={{
           position: 'relative',
           zIndex: 2,
-          paddingBottom: 'calc(var(--bottom-bar-h) + var(--safe-bottom) + 24px)',
+          padding: '12px 16px calc(var(--safe-bottom) + 24px)',
         }}
       >
-        {/* ──────────────────────────────────────────────────────────
-            HEADER COMPOSITION (v11c — per user's reference image)
-            The user provided 2 reference images:
-              (1) image-removebg-preview.png — chef leaning forward,
-                  hands clasped in front, on transparent background.
-              (2) pasted_image_1786051065717.png — target layout:
-                  chef image sits in upper-center, DIRECTLY ABOVE the
-                  "Confirm Your Order" title text. Her lower torso /
-                  hands slightly overlap the top of the title text,
-                  creating a layered "leaning over the title" effect.
-
-            Composition:
-              - Owner image is at the TOP of the screen, centered.
-              - "Confirm Your Order" title sits IMMEDIATELY below her,
-                overlapping slightly so she appears to lean over it.
-              - Title text is in FRONT (higher z-index) so it remains
-                fully readable even where her hands overlap.
-
-            NOTE: This is NOT the same as v11b (which used pose-4 with
-            a white board behind her). The user's reference image has
-            NO board — just the chef on transparent background. The
-            "leaning" illusion comes from her forward pose + the title
-            text appearing right under her clasped hands.
-        ────────────────────────────────────────────────────────── */}
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            // Total header height: with 360x360 image, chef content
-            // ends at y≈196; title spans y=175-217. Header needs ~240px
-            // to give breathing room below the title before cart items.
-            height: 240,
-            marginBottom: 16,
-          }}
-        >
-          {/* (1) OWNER IMAGE — leaning forward, transparent background.
-              Positioned in upper-center, per the user's reference
-              image. Her hands/clasped fingers drape down toward the
-              title text below. zIndex 1 = BEHIND the title.
-
-              v11e: image enlarged AGAIN per user "make the owner
-              image size bigger" (still felt small after v11d's 280).
-              Grew 280 → 360. Re-computed overlap math:
-                - Source PNG 441x566, chef content ends at y=308 (54.4%).
-                - Scale = 360/566 = 0.636.
-                - Chef content rendered bottom (from image top) = 196px.
-
-              v11f: image LOWERED per user "lower the owner image also
-              to make it feel it is leaning on the text". Moved
-              top:0 → top:20. Now chef content ends at screen y≈216
-              (20 + 196), which is 1px above the bottom of the title
-              (y=217). The chef's hands drape across nearly the entire
-              title text → strong "leaning on the title" feel.
-              Title remains fully readable (zIndex 3 paints on top). */}
+        {/* ── HERO: chef above the gold title, divider with chef-hat ── */}
+        <div style={{ position: 'relative', textAlign: 'center', marginBottom: 8 }}>
           <img
             src="/owner/pose-7-leaning-transparent.png"
-            alt="Cafe owner leaning over your order"
+            alt="Chef confirming your order"
             draggable={false}
             style={{
-              position: 'absolute',
-              top: 20,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              // v11e: enlarged from 280 → 360 per user "bigger".
-              width: 360,
-              height: 360,
+              width: 190,
+              height: 190,
               objectFit: 'contain',
               objectPosition: 'top center',
-              filter: 'drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45))',
+              filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.5))',
               userSelect: 'none',
               pointerEvents: 'none',
-              zIndex: 1,
+              margin: '0 auto 4px',
+              display: 'block',
             }}
           />
-
-          {/* (2) TITLE BLOCK — "Confirm Your Order" sits immediately
-              below the owner, with the top edge of the title slightly
-              OVERLAPPED by the bottom of the owner image (her hands).
-              The title paints on top (zIndex 3) so the text is always
-              fully readable, even where her hands cross it.
-
-              v11e: title LOWERED AGAIN per user "lower the confirm
-              your order text" (still wanted it lower after v11d's 120).
-              Moved from top:120 → top:175. Kept at 175 in v11f.
-              Math with the bigger 360x360 image (v11f image top:20):
-                - Chef hands end at screen y≈216 (20 + 196).
-                - h1 (42px tall) at top:175 spans screen y=175-217.
-                - Overlap zone y=175-216 → 41 of 42px (98%) of title
-                  height is BEHIND the chef's hands. The chef appears
-                  to be leaning her whole upper body weight onto the
-                  gold "Confirm Your Order" letters, which remain
-                  fully readable because the title paints on top
-                  (zIndex 3 > image's zIndex 1).
-              Subtitle REMOVED per user feedback ("remove 'Adjust
-              quantities or remove items below' text") — kept removed. */}
-          <div
+          <h1
             style={{
-              position: 'absolute',
-              top: 175,
-              left: 0,
-              right: 0,
-              textAlign: 'center',
-              zIndex: 3,
-              padding: '0 16px',
+              fontFamily: 'var(--font-display)',
+              fontSize: 30,
+              fontWeight: 800,
+              margin: '0 0 10px',
+              color: '#FFC107',
+              letterSpacing: 0.3,
+              textShadow: '0 2px 8px rgba(0,0,0,0.65)',
             }}
           >
-            <h1
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 28,
-                fontWeight: 800,
-                margin: 0,
-                // Gold serif per user's reference image.
-                color: 'var(--accent-gold)',
-                letterSpacing: 0.3,
-                textShadow: '0 2px 6px rgba(0, 0, 0, 0.6)',
-              }}
-            >
-              {t('confirmTitle')}
-            </h1>
+            {t('confirmTitle')}
+          </h1>
+          {/* Gold rules flanking a small chef-hat icon */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              maxWidth: 280,
+              margin: '0 auto 18px',
+            }}
+          >
+            <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #FFC107)' }} />
+            <span style={{ fontSize: 16 }} aria-hidden>👨‍🍳</span>
+            <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #FFC107, transparent)' }} />
           </div>
         </div>
 
@@ -191,90 +115,230 @@ export default function ConfirmOrder({ onCancel, onPay, bgProps }) {
             </p>
           </div>
         ) : (
-          <>
+          /* ── ORDER SUMMARY CARD ── */
+          <div
+            style={{
+              background: 'rgba(15, 23, 30, 0.85)',
+              borderRadius: 16,
+              border: '1px solid rgba(255, 193, 7, 0.35)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+              overflow: 'hidden',
+            }}
+          >
             {items.map((item, i) => (
               <div
                 key={item.id}
-                className="item-row anim-slideInUp"
-                style={{ animationDelay: `${i * 60}ms` }}
+                className="anim-slideInUp"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '14px 14px',
+                  borderBottom: '1px solid rgba(255,255,255,0.07)',
+                  animationDelay: `${i * 60}ms`,
+                }}
               >
-                <div className="item-info">
-                  <div className="item-name-en">{primaryName(item)}</div>
-                  <div className="item-name-am">
+                {/* Thumbnail */}
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 12,
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 24,
+                    flexShrink: 0,
+                  }}
+                  aria-hidden
+                >
+                  {item.icon || '🍽️'}
+                </div>
+
+                {/* Name + unit price */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, color: '#FFFFFF', fontSize: 15, lineHeight: 1.2 }}>
+                    {primaryName(item)}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>
                     {item.price} Br {t('each')} · {secondaryName(item)}
                   </div>
                 </div>
 
-                <div className="qty-stepper">
+                {/* Circular qty stepper — dark minus, gold plus */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <button
                     type="button"
-                    className="qty-btn qty-minus"
                     aria-label={`${t('decreaseQty')} ${primaryName(item)}`}
                     onClick={() => handleMinus(item)}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      border: '1px solid rgba(255,255,255,0.16)',
+                      background: 'rgba(255,255,255,0.08)',
+                      color: '#fff',
+                      fontSize: 18,
+                      lineHeight: 1,
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
                   >
                     −
                   </button>
-                  <span className="qty-value">{item.quantity}</span>
+                  <span style={{ minWidth: 22, textAlign: 'center', fontWeight: 700, color: '#fff', fontSize: 16 }}>
+                    {item.quantity}
+                  </span>
                   <button
                     type="button"
-                    className="qty-btn qty-plus"
                     aria-label={`${t('increaseQty')} ${primaryName(item)}`}
-                    onClick={() => {
-                      addItem({
-                        id: item.id,
-                        nameEn: item.nameEn,
-                        nameAm: item.nameAm,
-                        price: item.price,
-                      })
-                      hapticFeedback.impactOccurred('light')
+                    onClick={() => handlePlus(item)}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      border: 'none',
+                      background: '#FFC107',
+                      color: '#1a1a1a',
+                      fontSize: 20,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      cursor: 'pointer',
+                      flexShrink: 0,
                     }}
                   >
                     +
                   </button>
                 </div>
 
-                <div className="item-price" style={{ minWidth: 70, textAlign: 'right' }}>
+                {/* Line total */}
+                <div
+                  style={{
+                    minWidth: 64,
+                    textAlign: 'right',
+                    color: '#FFC107',
+                    fontWeight: 800,
+                    fontSize: 15,
+                    flexShrink: 0,
+                  }}
+                >
                   {item.price * item.quantity} Br
                 </div>
               </div>
             ))}
 
-            <div className="total-line">
-              <div className="total-label">{t('total')}</div>
-              <div className="total-value">{total} Br</div>
+            {/* ── TOTAL ROW ── */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 14px',
+                borderTop: '1px solid rgba(255,193,7,0.22)',
+                background: 'rgba(255,193,7,0.04)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 18 }} aria-hidden>📜</span>
+                <span style={{ fontWeight: 700, color: '#FFFFFF', fontSize: 15 }}>{t('total')}</span>
+              </div>
+              <span style={{ color: '#FFC107', fontWeight: 800, fontSize: 22 }}>
+                {total} Br
+              </span>
             </div>
-          </>
+          </div>
         )}
       </div>
 
-      <div className="bottom-bar">
-        <button
-          className="btn btn-danger"
-          onClick={() => {
-            hapticFeedback.impactOccurred('light')
-            onCancel?.()
-          }}
-        >
-          {t('cancel')}
-        </button>
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
-          }}
-        >
+      {/* ── BOTTOM ACTION BUTTONS (floating) ── */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 16,
+          right: 16,
+          bottom: 'calc(var(--safe-bottom) + 16px)',
+          zIndex: 3,
+        }}
+      >
+        {/* Row 1: Add More + Pay */}
+        <div style={{ display: 'flex', gap: 10 }}>
           <button
-            className="btn btn-primary"
+            type="button"
+            className={items.length === 0 ? 'btn btn-secondary' : 'btn-teal'}
+            style={{ flex: 1, minHeight: 52, borderRadius: 999 }}
+            onClick={() => {
+              hapticFeedback.impactOccurred('light')
+              onAddMore?.()
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 15 }}>
+              <span
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: '50%',
+                  background: 'rgba(52,211,153,0.22)',
+                  border: '1px solid rgba(110,231,183,0.4)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 14,
+                  color: '#6EE7B7',
+                }}
+                aria-hidden
+              >
+                +
+              </span>
+              {t('addMoreShort')}
+            </span>
+          </button>
+
+          <button
+            type="button"
             disabled={items.length === 0}
             onClick={() => {
               hapticFeedback.impactOccurred('medium')
               onPay?.()
             }}
+            style={{
+              flex: 1.15,
+              minHeight: 52,
+              borderRadius: 999,
+              border: 'none',
+              cursor: items.length === 0 ? 'not-allowed' : 'pointer',
+              background: items.length === 0
+                ? 'rgba(255,193,7,0.18)'
+                : 'linear-gradient(135deg, #FFD54F 0%, #FFB300 100%)',
+              color: '#1a1a1a',
+              boxShadow: items.length === 0 ? 'none' : '0 6px 18px rgba(255,193,7,0.35)',
+              opacity: items.length === 0 ? 0.7 : 1,
+            }}
           >
-            Pay {total} Br
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 15 }}>
+              <span aria-hidden>💳</span>
+              {t('payTotal').replace('{n}', total)}
+              <span aria-hidden style={{ fontSize: 14 }}>→</span>
+            </span>
           </button>
         </div>
+
+        {/* Row 2: Back */}
+        <button
+          type="button"
+          className="btn-back-pill"
+          style={{ display: 'block', margin: '10px auto 0', minWidth: 160 }}
+          onClick={() => {
+            hapticFeedback.impactOccurred('light')
+            onBack?.()
+          }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 14 }}>
+            <span aria-hidden>←</span>
+            {t('backShort')}
+          </span>
+        </button>
       </div>
     </div>
   )
