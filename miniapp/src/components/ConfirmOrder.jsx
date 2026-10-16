@@ -249,7 +249,11 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
                 justifyContent: 'space-between',
                 padding: '14px 14px',
                 borderTop: '1px solid rgba(255,193,7,0.22)',
-                background: 'rgba(255,193,7,0.04)',
+                /* Opaque background — the sticky Total used to be nearly
+                   transparent (4% gold wash), so cart rows were visibly
+                   scrolling behind the amount right as the customer reads
+                   it. Solid dark, same tone as the card. */
+                background: 'rgb(13, 20, 27)',
                 position: 'sticky',
                 bottom: 0,
               }}
