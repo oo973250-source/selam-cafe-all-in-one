@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import SmartCafeBg from './SmartCafeBg.jsx'
 import BrandLogo from './BrandLogo.jsx'
@@ -94,8 +94,29 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
   const { hapticFeedback } = useTelegram()
   const { t } = useLang()
   const [hoveredBg, setHoveredBg] = useState(null)
+  // Server-driven service availability (Section 6.2): the delivery option is
+  // MUTED + NON-CLICKABLE when the admin pauses delivery — the state comes
+  // from GET /api/miniapp/intake, matching the backend order gate exactly.
+  const [deliveryOff, setDeliveryOff] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    fetch('/api/miniapp/intake')
+      .then((r) => r.json())
+      .then((d) => {
+        if (alive && d && d.delivery_available === false) setDeliveryOff(true)
+      })
+      .catch(() => {}) // fail-open: backend still rejects a bypassing submit
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const handleSelect = (svc) => {
+    if (svc.key === 'delivery' && deliveryOff) {
+      hapticFeedback.notificationOccurred('warning')
+      return // muted option: not selectable
+    }
     hapticFeedback.impactOccurred('light')
     setServiceType(svc.key)
     onAdvance?.()
@@ -265,20 +286,26 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
                 transform: 'translateY(-50%)',
               }}
             >
-              {SERVICES.map((svc, i) => (
+              {SERVICES.map((svc, i) => {
+                const muted = svc.key === 'delivery' && deliveryOff
+                return (
                 <motion.button
                   key={svc.key}
                   type="button"
+                  aria-disabled={muted}
+                  title={muted ? t('deliveryUnavailableMsg') : undefined}
                   initial={{ opacity: 0, y: 12, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: 0.5 + i * 0.1, duration: 0.4 }}
-                  whileHover={{ scale: 1.06, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  onMouseEnter={() => setHoveredBg(svc.bg)}
+                  whileHover={muted ? undefined : { scale: 1.06, y: -2 }}
+                  whileTap={muted ? undefined : { scale: 0.95 }}
+                  onMouseEnter={() => !muted && setHoveredBg(svc.bg)}
                   onMouseLeave={() => setHoveredBg(null)}
                   onTouchStart={() => {
-                    setHoveredBg(svc.bg)
-                    hapticFeedback.selectionChanged()
+                    if (!muted) {
+                      setHoveredBg(svc.bg)
+                      hapticFeedback.selectionChanged()
+                    }
                   }}
                   onTouchEnd={() => setHoveredBg(null)}
                   onClick={() => handleSelect(svc)}
@@ -291,7 +318,10 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
                     background:
                       'linear-gradient(180deg, rgba(26, 14, 5, 0.96) 0%, rgba(10, 6, 2, 0.98) 100%)',
                     color: '#FFF8E7',
-                    cursor: 'pointer',
+                    cursor: muted ? 'not-allowed' : 'pointer',
+                    opacity: muted ? 0.45 : 1,
+                    filter: muted ? 'grayscale(0.8)' : undefined,
+                    pointerEvents: 'auto',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -303,7 +333,7 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
                     WebkitBackdropFilter: 'blur(8px)',
                   }}
                 >
-                  <span style={{ fontSize: 26, lineHeight: 1 }}>{svc.icon}</span>
+                  <span style={{ fontSize: 26, lineHeight: 1 }}>{muted ? '🚫' : svc.icon}</span>
                   <span
                     style={{
                       fontSize: 12,
@@ -312,10 +342,11 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {t(svc.labelKey)}
+                    {muted ? t('deliveryOffShort') : t(svc.labelKey)}
                   </span>
                 </motion.button>
-              ))}
+                )
+              })}
             </div>
           </motion.div>
         </motion.div>

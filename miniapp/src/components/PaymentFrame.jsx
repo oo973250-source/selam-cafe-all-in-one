@@ -228,6 +228,33 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
         return
       }
 
+      // Section 5/6 server gates — each carries a friendly backend-written
+      // message; fall back to a sensible default per code.
+      // 429 = order limit reached (kitchen at capacity)
+      if (res.status === 429 && (data.order_limit || data.error === 'order limit reached')) {
+        setOrderWarning(data.message || t('orderLimitReachedMsg'))
+        return
+      }
+
+      // 409 = delivery globally unavailable OR a no-delivery category
+      if (res.status === 409 && (data.delivery_unavailable || data.no_delivery || data.error === 'delivery unavailable')) {
+        setOrderWarning(
+          data.message ||
+            t('categoryNoDeliveryMsg') ||
+            'Delivery is currently unavailable. Please choose another ordering method.',
+        )
+        return
+      }
+      // 409 = item or category no longer available/unhidden
+      if (res.status === 409 && (data.item_unavailable || data.error === 'item unavailable' || data.error === 'category unavailable')) {
+        setOrderWarning(data.message || t('itemUnavailableMsg'))
+        return
+      }
+      if (res.status === 503 && data.closed) {
+        setOrderWarning(data.reason || t('storeClosedMsg'))
+        return
+      }
+
       if (!res.ok || !data.ok) {
         throw new Error(data.error || `Order failed (${res.status})`)
       }

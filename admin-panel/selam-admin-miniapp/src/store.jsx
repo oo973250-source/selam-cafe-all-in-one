@@ -46,6 +46,9 @@ export function AppProvider({ children }) {
   const [adminUser, setAdminUser] = useState(null)
   const [orders, setOrders] = useState(null) // null = loading
   const [filter, setFilter] = useState('all') // all | dine_in | takeaway | delivery
+  // Section 3.2 — 'new' = New Orders queue (default); 'started' | 'finished' |
+  // 'canceled' switch the list to that stored status view.
+  const [statusTab, setStatusTab] = useState('new')
   const [categories, setCategories] = useState(null)
   const [section, setSection] = useState('food') // 'food' | 'drink'
   const [paused, setPaused] = useState(false) // emergency pause (mirrors settings.paused)
@@ -279,7 +282,14 @@ export function AppProvider({ children }) {
   const reloadCategories = useCallback(async () => {
     try {
       const d = await api.getCategories()
-      setCategories(Array.isArray(d.categories) ? d.categories : [])
+      const list = Array.isArray(d.categories) ? d.categories : []
+      setCategories(list)
+      // Keep the legacy id→bool mirror in sync with server truth.
+      setNoDelivery((prev) => {
+        const next = { ...prev }
+        for (const c of list) next[c.id] = !!c.no_delivery
+        return next
+      })
     } catch (e) {
       if (e instanceof SessionExpired) setBoot('expired')
       setCategories((prev) => (Array.isArray(prev) ? prev : []))
@@ -301,12 +311,25 @@ export function AppProvider({ children }) {
     [reloadCategories],
   )
 
-  // INTEGRATION POINT: no backend field for "No delivery" yet (RULES API has no such column).
-  // Toggle is UI-local until the main AI adds e.g. category.no_delivery.
-  const toggleNoDelivery = useCallback(async (cat) => {
-    haptic('light')
-    setNoDelivery((prev) => ({ ...prev, [cat.id]: !prev[cat.id] }))
-  }, [])
+  // INTEGRATION DONE: `no_delivery` is now a REAL category column (Section 5.2).
+  // Optimistic flip → PATCH /api/menu/categories/:id { no_delivery } → server
+  // truth on failure. The customer miniapp + bot enforce it server-side.
+  const toggleNoDelivery = useCallback(
+    async (cat) => {
+      haptic('light')
+      const next = !cat.no_delivery
+      setCategories((prev) =>
+        Array.isArray(prev) ? prev.map((c) => (c.id === cat.id ? { ...c, no_delivery: next } : c)) : prev,
+      )
+      try {
+        await api.patchCategory(cat.id, { no_delivery: next })
+      } catch (e) {
+        if (e instanceof SessionExpired) setBoot('expired')
+        await reloadCategories() // revert to server truth on failure
+      }
+    },
+    [reloadCategories],
+  )
 
   // ---------- Categorize page (category CRUD, Page 5) ----------
   const addCategory = useCallback(
@@ -775,6 +798,7 @@ export function AppProvider({ children }) {
   const value = useMemo(
     () => ({
       boot, setBoot, stack, switchTab, push, back, telegramBack,
+      statusTab, setStatusTab,
       revenuePeriod, revenue, reloadRevenue, setRevenuePeriod,
       profile, reloadProfile, saveProfile,
       adminUser, orders, filter, setFilter, paused, setPaused, togglePaused,
@@ -793,7 +817,7 @@ export function AppProvider({ children }) {
     }),
     [
       boot, stack, switchTab, push, back, telegramBack,
-      revenuePeriod, revenue, reloadRevenue, setRevenuePeriod,
+      statusTab, revenuePeriod, revenue, reloadRevenue, setRevenuePeriod,
       profile, reloadProfile, saveProfile,
       adminUser, orders, filter, paused, togglePaused,
       noDelivery, toggleNoDelivery, brandName, doAuth, reloadOrders, pushNewOrder,

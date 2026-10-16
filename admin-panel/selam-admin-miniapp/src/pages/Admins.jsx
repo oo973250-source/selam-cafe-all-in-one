@@ -1,9 +1,8 @@
-// Page 6 — "Admins": staff admin management, opened from the Manager hub.
-// Day|Week|Month metrics toggle (instant per-card recalc), circular "+" (add-admin
-// modal), CAPSULE scrollbar per mock, numbered admin cards "1,Name" with
-// ✏️ pencil (edit sheet) + ❌ red X (revoke, confirm-guarded).
-// Revision (user): role classifiers (Cashier/Kitchen/Delivery) removed —
-// cards show only the Telegram ID; add/edit modals no longer offer role chips.
+// Page 6 — "Admins": staff admin management rebuilt per reference image 4.
+// Gold left-rail cards, avatar tile with the initial, name + Telegram ID,
+// "#total order done — N" for the selected period (Day | Week | Month),
+// compact round edit ✏️ and delete ✖️ buttons, and a compact gold circular
+// add button. All values come from the real staff_admins table.
 import React, { useCallback, useEffect, useState } from 'react'
 import Header from '../components/Header.jsx'
 import VScroll from '../components/VScroll.jsx'
@@ -20,10 +19,27 @@ const PERIODS = [
   { key: 'month', label: 'Month' },
 ]
 
+function CalIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="3" stroke="currentColor" strokeWidth="1.9" />
+      <path d="M3.5 9.5h17" stroke="currentColor" strokeWidth="1.9" />
+      <path d="M8 2.8v3.4M16 2.8v3.4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <path d="M8 13h2.5M13.5 13H16M8 16.5h2.5M13.5 16.5H16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function Avatar({ name, url }) {
-  if (url) return <img className="admin-avatar" src={url} alt="" />
+  if (url) {
+    return (
+      <span className="avatar-initial" aria-hidden="true">
+        <img src={url} alt="" draggable={false} onError={(e) => { e.currentTarget.parentNode.textContent = String(name || '?').trim().charAt(0).toUpperCase() || '?' }} />
+      </span>
+    )
+  }
   const initial = String(name || '?').trim().charAt(0).toUpperCase()
-  return <div className="admin-avatar admin-avatar-fb">{initial}</div>
+  return <span className="avatar-initial" aria-hidden="true">{initial}</span>
 }
 
 export default function Admins() {
@@ -48,25 +64,24 @@ export default function Admins() {
 
       <div className="hr" />
 
-      {/* Day | Week | Month — metrics period (recalcs every card) */}
-      <div className="period-bar">
-        <div className="seg seg-days" role="tablist" aria-label="Metrics period">
-          {PERIODS.map((p) => (
-            <button
-              key={p.key}
-              role="tab"
-              aria-selected={metricsPeriod === p.key}
-              className={metricsPeriod === p.key ? 'active' : ''}
-              onClick={() => {
-                if (metricsPeriod === p.key) return
-                haptic('select')
-                setMetricsPeriod(p.key)
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+      {/* Day | Week | Month — metrics period (recalcs every card), gold-style */}
+      <div className="seg-days-gold" role="tablist" aria-label="Metrics period">
+        {PERIODS.map((p) => (
+          <button
+            key={p.key}
+            role="tab"
+            aria-selected={metricsPeriod === p.key}
+            className={metricsPeriod === p.key ? 'active' : ''}
+            onClick={() => {
+              if (metricsPeriod === p.key) return
+              haptic('select')
+              setMetricsPeriod(p.key)
+            }}
+          >
+            <CalIcon />
+            {p.label}
+          </button>
+        ))}
       </div>
 
       {admins === null ? (
@@ -74,7 +89,7 @@ export default function Admins() {
       ) : (
         <VScroll variant="thin">
           <div className="add-row">
-            <button className="add-btn" aria-label="Add admin" onClick={() => { haptic('light'); setAdding(true) }}>
+            <button className="add-btn-gold" aria-label="Add admin" onClick={() => { haptic('light'); setAdding(true) }}>
               +
             </button>
           </div>
@@ -82,38 +97,36 @@ export default function Admins() {
           {admins.length === 0 ? (
             <EmptyState>No staff admins yet — tap + to add one</EmptyState>
           ) : (
-            admins.map((a, i) => {
+            admins.map((a) => {
               const suspended = a.active === false
               const stats = a.stats || {}
               const count = stats[metricsPeriod] ?? 0
               return (
-                <div className={`card admin-card ${suspended ? 'admin-suspended' : ''}`} key={a.tg_user_id}>
-                  <div className="admin-flex">
-                    <Avatar name={a.name} url={a.photo_url} />
+                <div className={`admin-card-gold ${suspended ? 'admin-suspended' : ''}`} key={a.tg_user_id}>
+                  <Avatar name={a.name} url={a.photo_url} />
 
-                    <div className="admin-body">
-                      <div className="admin-name">{i + 1},{a.name}</div>
-                      <div className="admin-id">ID {a.tg_user_id}</div>
-                      <div className="admin-metric-label">#total order done</div>
-                      <div className="admin-metric-val">--- {count}</div>
-                    </div>
+                  <div className="admin-body">
+                    <div className="admin-name">{a.name || a.username || 'Admin'}</div>
+                    <div className="admin-id">ID {a.tg_user_id}</div>
+                    <div className="admin-metric-label">#total order done</div>
+                    <div className="admin-metric-val">— {count}</div>
+                  </div>
 
-                    <div className="item-ico admin-actions">
-                      <button
-                        className="ico-btn"
-                        aria-label={`Edit ${a.name}`}
-                        onClick={() => { haptic('light'); setEditing(a) }}
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        className="ico-btn"
-                        aria-label={`Revoke ${a.name}`}
-                        onClick={() => { haptic('warning'); revokeAdmin(a) }}
-                      >
-                        ❌
-                      </button>
-                    </div>
+                  <div className="admin-actions-ico">
+                    <button
+                      className="round-ico-btn"
+                      aria-label={`Edit ${a.name}`}
+                      onClick={() => { haptic('light'); setEditing(a) }}
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      className="round-ico-btn round-ico-btn-danger"
+                      aria-label={`Remove ${a.name}`}
+                      onClick={() => { haptic('warning'); revokeAdmin(a) }}
+                    >
+                      ✖️
+                    </button>
                   </div>
 
                   {suspended && <div className="item-unflag admin-unflag">suspended</div>}

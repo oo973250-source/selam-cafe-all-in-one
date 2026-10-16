@@ -1,7 +1,10 @@
-// Page 5 — "Categorize": category management, opened from the Manager hub.
-// 🔍 search bar (client-side filter) + circular "+" (new category modal),
-// full-width category pills — tap opens the edit overlay (rename / reorder /
-// delete). Slim THIN scrollbar far left per mock. Badge: "Category".
+// Page 5 — "Categorize": category-management screen, rebuilt per reference
+// image 1 (Categories Management):
+//   • dark cards with a food thumbnail, name + "N items" count, right chevron
+//   • Foods/Drinks segmented tabs, search bar + compact gold circular add
+//   • narrow gold scrollbar, gold rail on the first visible card
+// Behaviour preserved: tap opens the edit overlay (rename / reorder /
+// availability / delete), + opens the new-category modal, search filters.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import Header from '../components/Header.jsx'
 import VScroll from '../components/VScroll.jsx'
@@ -12,8 +15,29 @@ import { SessionExpired } from '../api.js'
 import { useApp } from '../store.jsx'
 import { haptic } from '../telegram.js'
 
+function Chevron() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+// Emoji fallback never blanks out: only render a thumb when the category has
+// a real image (icon emojis otherwise go through the .cat-thumb tile).
+function CatThumb({ cat }) {
+  if (cat.image_url) {
+    return (
+      <span className="cat-thumb" aria-hidden="true">
+        <img src={cat.image_url} alt="" draggable={false} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+      </span>
+    )
+  }
+  return <span className="cat-thumb" aria-hidden="true">{cat.icon || '🍽️'}</span>
+}
+
 export default function Categorize() {
-  const { categories, section, setSection, reloadCategories, setBoot } = useApp()
+  const { categories, section, setSection, reloadCategories, setBoot, push } = useApp()
   const [q, setQ] = useState('')
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(null) // category object
@@ -45,7 +69,7 @@ export default function Categorize() {
 
   return (
     <div className="page-scroll">
-      <Header variant="badge" badge="Category">
+      <Header variant="badge" badge="Category" badgeIcon={'▦'}>
         <div className="seg seg-sub" role="tablist" aria-label="Menu section">
           <button role="tab" aria-selected={section === 'food'} className={section === 'food' ? 'active' : ''} onClick={() => { haptic('select'); setSection('food') }}>
             Foods
@@ -61,19 +85,19 @@ export default function Categorize() {
       <div className="controls-bar">
         <div className="search-pill">
           <svg className="search-ico" width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="10.5" cy="10.5" r="6.75" stroke="#9fc3d8" strokeWidth="2.2" />
-            <path d="M15.6 15.6L21 21" stroke="#9fc3d8" strokeWidth="2.2" strokeLinecap="round" />
+            <circle cx="10.5" cy="10.5" r="6.75" stroke="#ffc83d" strokeWidth="2.2" />
+            <path d="M15.6 15.6L21 21" stroke="#ffc83d" strokeWidth="2.2" strokeLinecap="round" />
           </svg>
           <input
             className="search-input"
-            placeholder="search.."
+            placeholder="Search categories…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             aria-label="Search categories"
             maxLength={40}
           />
         </div>
-        <button className="add-btn" aria-label="Add category" onClick={() => { haptic('light'); setAdding(true) }}>
+        <button className="add-btn-gold" aria-label="Add category" onClick={() => { haptic('light'); setAdding(true) }}>
           +
         </button>
       </div>
@@ -88,17 +112,27 @@ export default function Categorize() {
         )
       ) : (
         <VScroll variant="thin">
-          {list.map((cat) => (
+          {list.map((cat, i) => (
             <button
-              className="cat-pill"
+              className={`cat-overview-card ${i === 0 && !q.trim() ? 'cat-rail' : ''} ${cat.hidden ? 'cat-off' : ''}`}
               key={cat.id}
               onClick={() => {
                 haptic('light')
-                setEditing(cat)
+                push('items', cat.name_en, { category: cat })
               }}
+              aria-label={`${cat.name_en} — ${cat.item_count ?? 0} items${cat.hidden ? ' (unavailable)' : ''}`}
             >
-              {cat.name_en}
-              {cat.name_am ? <span className="am-line am-pill">{cat.name_am}</span> : null}
+              <CatThumb cat={cat} />
+              <span className="cat-overview-body">
+                <span className="cat-overview-name">{cat.name_en}</span>
+                <span className="cat-overview-sub">
+                  {cat.item_count ?? 0} {cat.item_count === 1 ? 'item' : 'items'}
+                  {cat.hidden ? ' · Unavailable' : ''}
+                </span>
+              </span>
+              <span className="cat-overview-chevron" aria-hidden="true">
+                <Chevron />
+              </span>
             </button>
           ))}
         </VScroll>

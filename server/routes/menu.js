@@ -34,13 +34,23 @@ export function emitMenuUpdate(req) {
 }
 
 // Public — categories for the Mini App (includes section/hidden so the app
-// can group Food vs Drink and hide disabled categories).
+// can group Food vs Drink and hide disabled categories) + no_delivery so the
+// customer app can show "Delivery unavailable" and the machine can enforce it.
+// Public — categories for the Mini App (includes section/hidden so the app
+// can group Food vs Drink and hide disabled categories) + no_delivery for the
+// customer-facing delivery messaging and server-side enforcement.
 router.get('/categories', async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, name_en, name_am, icon, section, hidden, sort_order
-         FROM menu_categories
-        ORDER BY section, sort_order, name_en`
+      `SELECT c.id, c.name_en, c.name_am, c.icon, c.section, c.hidden,
+              c.no_delivery, c.sort_order,
+              COALESCE(n.item_count, 0)::int AS item_count
+         FROM menu_categories c
+         LEFT JOIN (
+           SELECT category, COUNT(*)::int AS item_count
+             FROM menu_items GROUP BY category
+         ) n ON n.category = c.id
+        ORDER BY c.section, c.sort_order, c.name_en`
     )
     res.json({ categories: rows })
   } catch (e) {
@@ -100,16 +110,22 @@ router.post('/categories', requireAuth, requireRole('manager', 'owner'), async (
   }
 })
 
-// Update a category: rename / re-icon / move section / hide / explicit order.
-// Body: any of { name_en, name_am, icon, section, hidden, sort_order }
+// Update a category: rename / re-icon / move section / toggle availability
+// (hidden) / toggle No-delivery / explicit order.
+// Body: any of { name_en, name_am, icon, section, hidden, no_delivery, sort_order }
+// 4.2 fix — the OLD self-heal matched categories by AMBIGUOUS name/id strings
+// (its positional $1/$N references were actually out of sync with the params
+// array, which made legitimate updates fail with "Could not update category").
+// Now: exact id first; if it truly doesn't exist return a clean 404 so the
+// UI refetches instead of inventing a match.
 router.patch('/categories/:id', requireAuth, requireRole('manager', 'owner'), async (req, res) => {
   const id = req.params.id
-  const fields = ['name_en', 'name_am', 'icon', 'section', 'hidden', 'sort_order']
+  const fields = ['name_en', 'name_am', 'icon', 'section', 'hidden', 'no_delivery', 'sort_order']
   const sets = []
   const params = []
   for (const f of fields) {
     if (req.body[f] !== undefined) {
-      params.push(f === 'hidden' ? Boolean(req.body[f]) : req.body[f])
+      params.push(f === 'hidden' ? Boolean(req.body[f]) : f === 'no_delivery' ? Boolean(req.body[f]) : req.body[f])
       sets.push(`${f} = $${params.length}`)
     }
   }
@@ -120,39 +136,11 @@ router.patch('/categories/:id', requireAuth, requireRole('manager', 'owner'), as
   params.push(id)
 
   try {
-    let { rows } = await pool.query(
+    const { rows } = await pool.query(
       `UPDATE menu_categories SET ${sets.join(', ')} WHERE id = $1 RETURNING *`,
       params
     )
-    // Self-heal (Issue #3): after a RENAME the in-memory card can still carry
-    // the OLD slug as its id (the miniapp/admin list wasn't refetched), so the
-    // exact-id UPDATE matches nothing → the admin saw "Could not update
-    // category". If the id is unknown, retry against the English name (and
-    // the Amharic name) — names are unique in practice and renaming is the
-    // only operation that changes the slug.
-    if (!rows.length) {
-      const nameGuess = String(id).replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
-      const { rows: byName } = await pool.query(
-        `UPDATE menu_categories SET ${sets.join(', ')}
-          WHERE id = $${params.length} OR LOWER(name_en) = LOWER($${params.length})
-             OR (name_am IS NOT NULL AND name_am = $${params.length})
-          RETURNING *`,
-        params
-      ).catch(() => ({ rows: [] }))
-      if (!byName.length) {
-        // Last resort: unique-name match on the de-slugged id itself.
-        const { rows: byName2 } = await pool.query(
-          `UPDATE menu_categories SET ${sets.join(', ')}
-            WHERE LOWER(name_en) = LOWER($1) OR name_am = $1
-            RETURNING *`,
-          [nameGuess, ...params.slice(1)]
-        ).catch(() => ({ rows: [] }))
-        rows = byName2
-      } else {
-        rows = byName
-      }
-    }
-    if (!rows.length) return res.status(404).json({ error: 'not found' })
+    if (!rows.length) return res.status(404).json({ error: 'category not found' })
     emitMenuUpdate(req)
     res.json({ category: rows[0] })
   } catch (e) {

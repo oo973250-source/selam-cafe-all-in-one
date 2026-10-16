@@ -35,6 +35,8 @@ const translations = {
     takeawayDesc: 'Grab it hot and ready to go',
     delivery: 'Delivery',
     deliveryDesc: 'We bring it to your doorstep',
+    deliveryOffShort: 'Delivery off',
+    deliveryUnavailableMsg: 'Delivery is currently unavailable. Please choose another ordering method.',
     // Main menu (Frame 2)
     menuRoot: 'menu',
     foods: 'Foods',
@@ -129,6 +131,12 @@ const translations = {
     checkChat: 'Check the chat for your receipt.',
     orderSavedWarning: 'Order saved, but the bot could not message you. Open the bot and press Start once, then check your ticket there.',
     submitFailed: 'Something went wrong. Please try again.',
+    // Section 5/6 — server intake gates (backend-written messages are shown
+    // verbatim; these localized defaults only show when the server message is missing).
+    storeClosedMsg: 'The cafe is currently closed. Please try again later to place an order.',
+    orderLimitReachedMsg: 'Kitchen is at capacity right now. Please try again in a few minutes.',
+    categoryNoDeliveryMsg: 'Delivery is currently unavailable for this category. Please choose another category or select an available ordering method.',
+    itemUnavailableMsg: 'An item in your cart is no longer available. Please review your order.',
     // Blocked user (Task 4)
     blockedTitle: '⛔ Order Restricted',
     blockedMessage: "You can't place orders right now. Your account has been restricted by the cafe. If you think this is a mistake, please contact support.",
@@ -151,6 +159,8 @@ const translations = {
     takeawayDesc: 'ሞቅ ብሎ ዝግጁ ሆኖ ይውሰዱት',
     delivery: 'መላኪያ',
     deliveryDesc: 'እስከ በርዎ እናመጣለን',
+    deliveryOffShort: 'መላኪያ ዝግቷል',
+    deliveryUnavailableMsg: 'መላኪያ በአሁኑ ጊዜ አይሰራም። እባክዎ ሌላ የማዘዝ ዘዴ ይምረጡ።',
     // Main menu
     menuRoot: 'ምናሌ',
     foods: 'ምግብ',
@@ -246,6 +256,12 @@ const translations = {
     checkChat: 'ደረሰኙን ከቻት ውስጥ ይመልከቱ።',
     orderSavedWarning: 'ትዕዛዝዎ ተቀምጧል፣ ግን ቦቱ መልእክት መላክ አልቻለም። ቦቱን ክፈት እና አንዴ Start ይንኩ።',
     submitFailed: 'የሆነ ስህተት ተከስቷል። እባክዎ እንደገና ይሞክሩ።',
+    // Section 5/6 — server intake gates (backend-written messages are English;
+    // these localized defaults only show when the server message is missing).
+    storeClosedMsg: 'ካፌው አሁን ተዘግቷል። ትዕዛዝ ለማዘዝ እባክዎ በኋላ ይሞክሩ።',
+    orderLimitReachedMsg: 'ኪችኑ አሁን በተያያዝ ተሞልቷል። በጥቂት ደቂቃዎች ውስጥ እንደገና ይሞክሩ።',
+    categoryNoDeliveryMsg: 'ለዚህ ምድብ መላኪያ ማቅረብ አሁን አይቻልም። እባክዎ ሌላ ምድብ ወይም ሌላ የትዕዛዝ ዘዴ ይምረጡ።',
+    itemUnavailableMsg: 'ጋሪዎ ውስጥ ያለ አንድ እቃ አሁን አይገኝም። እባክዎ ትዕዛዝዎን ይመልከቱ።',
     // Blocked user
     blockedTitle: '⛔ ትዕዛዝ ተዘግቷል',
     blockedMessage: 'አሁን ትዕዛዝ መላክ አይችሉም። መለያዎ በካፌው ተገድቷል። ስህተት ከሆነ እባክዎ ያግኙን።',
@@ -268,6 +284,8 @@ const translations = {
     takeawayDesc: "Hoo'aa qabatee deemi",
     delivery: 'Dabarsuu',
     deliveryDesc: 'Bira keessaniin nu geessina',
+    deliveryOffShort: 'Dabarsuu cufame',
+    deliveryUnavailableMsg: 'Dabarsuun yeroo ammaa hin hojjetu. Maaloo karaa biraan filadhu.',
     // Main menu
     menuRoot: 'Minjeecha',
     foods: 'Nyaata',
@@ -363,6 +381,11 @@ const translations = {
     checkChat: 'Rasiisaa caatii keessatti ilaali.',
     orderSavedWarning: 'Ajajni kee qabameera, garuu botin akkaana hin erginee. Boti banittii yimmoo Start tuqi.',
     submitFailed: "Waan tokko dogoggorerra. Maaloo irra deebi'i yaali.",
+    // Section 5/6 — server intake gates
+    storeClosedMsg: 'Kafeen amma cufameera. Maaloo booda deebi\'i yaali.',
+    orderLimitReachedMsg: 'Kicheen amma guutaa jira. Qaree muraan irra deebi\'i yaali.',
+    categoryNoDeliveryMsg: "Dabarsuun gosa kanaaf yeroo ammaa hin danda'amu. Maaloo gosa bira ykn karaa ajajaa bira filadhu.",
+    itemUnavailableMsg: "Wanti kaartaa kee keessaa tokko yeroo ammaa hin argamu. Maaloo ajaja kee ilaali.",
     // Blocked user
     blockedTitle: '⛔ Ajaja dhorkameera',
     blockedMessage: "Amma ajaja erguu hin dandeessu. Herregaan kee kafeen dhorkameera. Dogoggoro yoo ta'e maaloo nu qunnamsiisi.",

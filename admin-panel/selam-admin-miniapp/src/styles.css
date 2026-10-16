@@ -9,6 +9,22 @@
   --text: #ffffff;
   --muted: #cfcfcf;
   --hint: #9a9a9a;
+  /* Medi Cafe gold design system (reference images 1–4): warm amber accent
+     used for the primary action, active tabs, scroll rail + highlight rings. */
+  --mc-gold: #ffc83d;
+  --mc-gold-deep: #f0a500;
+  --mc-gold-glow: rgba(255, 200, 61, 0.35);
+  --mc-green: #34c177;
+  --mc-green-dim: rgba(52, 193, 119, 0.16);
+  --mc-green-border: rgba(52, 193, 119, 0.45);
+  --mc-red: #f0574f;
+  --mc-red-dim: rgba(240, 87, 79, 0.14);
+  --mc-red-border: rgba(240, 87, 79, 0.45);
+  --mc-gray-dim: rgba(255, 255, 255, 0.07);
+  --mc-gray-border: rgba(255, 255, 255, 0.22);
+  --mc-cat-bg: #1d1d1f;
+  --mc-cat-bg2: #17171a;
+  --cat-thumb-bg: radial-gradient(circle at 34% 30%, rgba(120, 85, 30, 0.55), rgba(40, 40, 44, 0.9));
   --gold: #a8922e;
   --gold-bright: #ffe14d; /* Page 1 v3: "started" state — bright yellow */
   --gold-green: #8fa318;
@@ -1519,30 +1535,489 @@ button {
   color: #f2c9c9;
 }
 
-/* ---------- Page 8: Revenue (financial analytics) ---------- */
-/* metric cards — clean thin WHITE outline per user directive: pops against the
-   dark background (border 1px solid rgba(255,255,255,0.8)), centered stack */
+/* ---------- Page 8: Revenue (financial analytics) ----------
+   Rebuilt per reference image 2: tall rounded cards with a colored icon
+   disc on the left, big value + label on the right, thin dark borders.
+   The FIRST card carries the gold selected accent (left bar + glow). */
 .metric-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
   margin: 0 0 18px;
-  background: var(--card);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: var(--radius-card);
-  padding: 28px 18px 22px;
-  text-align: center;
+  background: linear-gradient(180deg, #202023 0%, #1a1a1d 100%);
+  border: 1px solid var(--border-soft);
+  border-radius: 24px;
+  padding: 22px 18px;
+  text-align: left;
+  overflow: hidden;
 }
 
+.metric-card.metric-selected {
+  border-color: var(--mc-gold);
+}
+
+.metric-card.metric-selected::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--mc-gold);
+  box-shadow: 0 0 12px var(--mc-gold-glow);
+}
+
+.metric-ico {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.metric-ico-gold { background: radial-gradient(circle at 35% 30%, rgba(255, 200, 61, 0.38), rgba(255, 200, 61, 0.1)); }
+.metric-ico-green { background: radial-gradient(circle at 35% 30%, rgba(52, 193, 119, 0.34), rgba(52, 193, 119, 0.08)); }
+.metric-ico-purple { background: radial-gradient(circle at 35% 30%, rgba(148, 102, 253, 0.34), rgba(148, 102, 253, 0.08)); }
+
+.metric-body { flex: 1; min-width: 0; }
+
 .metric-value {
-  font-size: 36px;
-  font-weight: 700;
+  font-size: 34px;
+  font-weight: 800;
   letter-spacing: 0.5px;
-  line-height: 1.15;
+  line-height: 1.1;
+  color: var(--text);
 }
 
 .metric-label {
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--muted);
   font-size: 15px;
 }
+
+.metric-chevron {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--mc-gray-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+/* gold Day/Week/Month segmented control (references 2 + 4) */
+.seg-days-gold {
+  display: flex;
+  gap: 4px;
+  background: #1d1d20;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  padding: 6px;
+  margin: 0 14px 18px;
+}
+
+.seg-days-gold button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  padding: 11px 6px;
+  border-radius: 999px;
+}
+
+.seg-days-gold button.active {
+  background: linear-gradient(180deg, var(--mc-gold) 0%, var(--mc-gold-deep) 100%);
+  color: #1a1204;
+  font-weight: 700;
+  box-shadow: 0 2px 14px var(--mc-gold-glow);
+}
+
+.seg-days-gold button svg { flex-shrink: 0; }
+
+/* ---------- gold circular add button (references 1–4) ----------
+   Compact modern disc with a clear plus — replaces the old oversized gray +. */
+.add-btn-gold {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(180deg, var(--mc-gold) 0%, var(--mc-gold-deep) 100%);
+  color: #231702;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 0 4px 16px var(--mc-gold-glow);
+}
+
+.add-btn-gold:active { transform: scale(0.94); }
+.add-btn-gold:disabled { opacity: 0.55; }
+
+/* gold scroll rail (reference 1: narrow gold indicator) */
+.vscroll-thin .vscroll-track { background: rgba(255, 200, 61, 0.08); }
+.vscroll-thin .vscroll-thumb { background: var(--mc-gold); opacity: 0.85; }
+
+/* ---------- reference image 1: category overview cards ----------
+   Dark rounded rows: food thumbnail, name + "N items", right chevron. */
+.cat-overview-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  background: linear-gradient(180deg, var(--mc-cat-bg) 0%, var(--mc-cat-bg2) 100%);
+  border: 1px solid var(--border-soft);
+  border-radius: 22px;
+  padding: 12px 14px;
+  margin: 0 0 16px;
+  color: var(--text);
+  text-align: left;
+}
+
+.cat-overview-card:active { transform: scale(0.985); }
+
+.cat-thumb {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  background: var(--cat-thumb-bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  flex-shrink: 0;
+  overflow: hidden;
+  object-fit: cover;
+}
+
+.cat-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.cat-overview-body { flex: 1; min-width: 0; }
+
+.cat-overview-name {
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.cat-overview-sub {
+  margin-top: 3px;
+  font-size: 13.5px;
+  color: var(--hint);
+}
+
+.cat-overview-chevron {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--mc-gray-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+/* gold left rail highlight on the currently relevant / first card (image 1) */
+.cat-overview-card.cat-rail::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 12px;
+  bottom: 12px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--mc-gold);
+  box-shadow: 0 0 12px var(--mc-gold-glow);
+}
+
+/* unavailable (hidden) state: fade the row but keep it legible */
+.cat-overview-card.cat-off .cat-thumb,
+.cat-overview-card.cat-off .cat-overview-name { opacity: 0.55; }
+
+/* ---------- reference image 3: menu rows with Available/Delivery pills --- */
+.menu-row-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: linear-gradient(180deg, var(--mc-cat-bg) 0%, var(--mc-cat-bg2) 100%);
+  border: 1px solid var(--border-soft);
+  border-radius: 22px;
+  padding: 12px;
+  margin: 0 0 16px;
+  color: var(--text);
+  text-align: left;
+}
+
+.menu-row-card:active { transform: scale(0.985); }
+
+.menu-row-thumb {
+  width: 62px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--cat-thumb-bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.menu-row-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.menu-row-body { flex: 1; min-width: 0; }
+
+.menu-row-name {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.menu-row-sub {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.menu-row-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+/* status pill toggles: green = active, red = unavailable, gray = no-delivery */
+.mc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  border: 1px solid var(--mc-gray-border);
+  background: var(--mc-gray-dim);
+  color: var(--muted);
+  font-size: 13px;
+  padding: 8px 13px;
+  white-space: nowrap;
+}
+
+.mc-pill-avail.on {
+  background: var(--mc-green-dim);
+  border-color: var(--mc-green-border);
+  color: #7fe3ac;
+  font-weight: 600;
+}
+
+.mc-pill-unavail.on {
+  background: var(--mc-red-dim);
+  border-color: var(--mc-red-border);
+  color: #ff9a94;
+  font-weight: 600;
+}
+
+.mc-pill-delivery.on {
+  background: var(--mc-green-dim);
+  border-color: var(--mc-green-border);
+  color: #7fe3ac;
+  font-weight: 600;
+}
+
+.mc-pill-nodel.on {
+  background: var(--mc-gray-dim);
+  border-color: var(--mc-gray-border);
+  color: var(--muted);
+}
+
+.mc-pill-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.mc-pill-avail.on .mc-pill-dot { background: var(--mc-green); color: #08130c; }
+.mc-pill-unavail.on .mc-pill-dot { background: var(--mc-red); color: #fff; }
+.mc-pill-delivery.on .mc-pill-dot { background: var(--mc-green); color: #08130c; }
+
+/* ---------- reference image 4: Admins cards ---------- */
+.admin-card-gold {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(180deg, var(--mc-cat-bg) 0%, var(--mc-cat-bg2) 100%);
+  border: 1px solid var(--border-soft);
+  border-radius: 22px;
+  padding: 14px;
+  margin: 0 0 16px;
+}
+
+.admin-card-gold::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 14px;
+  bottom: 14px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--mc-gold);
+  box-shadow: 0 0 12px var(--mc-gold-glow);
+}
+
+.avatar-initial {
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--mc-gray-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  color: var(--muted);
+  flex-shrink: 0;
+  overflow: hidden;
+  object-fit: cover;
+}
+
+.avatar-initial img { width: 100%; height: 100%; object-fit: cover; }
+
+.admin-actions-ico {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.round-ico-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--mc-gray-border);
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  color: var(--text);
+  padding: 0;
+}
+
+.round-ico-btn:active { transform: scale(0.94); }
+.round-ico-btn:disabled { opacity: 0.5; }
+.round-ico-btn-danger { color: #ff8a84; border-color: var(--mc-red-border); }
+
+/* ---------- Section 3.2: Started / Finished / Canceled status selector ---
+   compact three-icon selector placed directly below the divider, filters
+   the actual stored order status. Selected = gold; each shows its count. */
+.status-selector {
+  display: flex;
+  gap: 6px;
+  margin: 0 14px 16px;
+}
+
+.status-selector button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 999px;
+  border: 1px solid var(--mc-gray-border);
+  background: var(--mc-gray-dim);
+  color: var(--muted);
+  font-size: 13.5px;
+  padding: 10px 4px;
+  white-space: nowrap;
+}
+
+.status-selector button.active {
+  background: linear-gradient(180deg, var(--mc-gold) 0%, var(--mc-gold-deep) 100%);
+  border-color: transparent;
+  color: #1a1204;
+  font-weight: 700;
+  box-shadow: 0 2px 14px var(--mc-gold-glow);
+}
+
+.status-selector .st-count {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+/* card tint per stored status on the orders screen */
+.order-card-st-preparing { border-color: var(--mc-gold); }
+.order-card-st-served { border-color: var(--mc-green-border); }
+.order-card-st-cancelled { border-color: var(--mc-red-border); opacity: 0.85; }
+
+/* photo-upload control (Section 4.3) */
+.upload-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #141414;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+.upload-tile img {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.upload-tile-btn {
+  border: none;
+  background: var(--purple);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 10px 16px;
+  white-space: nowrap;
+}
+
+.upload-tile-btn:disabled { opacity: 0.5; }
+
+.upload-state {
+  font-size: 12.5px;
+  color: var(--hint);
+  margin-top: 6px;
+}
+
+.upload-state-err { color: #ff8a84; }
 
 /* ---------- Page 9: Profile (cafe profile & business settings) ---------- */
 /* One white-outlined panel (global directive: border 1px rgba(255,255,255,0.8))
