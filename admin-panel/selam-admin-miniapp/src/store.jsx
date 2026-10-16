@@ -165,10 +165,36 @@ export function AppProvider({ children }) {
   }, [])
 
   // ---------- orders ----------
+  // local calendar-day check (same rule as OrdersView): cancelled orders only
+  // stay in the Canceled tab for the rest of their own day.
+  const isToday = (iso) => {
+    if (!iso) return false
+    const d = new Date(iso)
+    const n = new Date()
+    return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()
+  }
+
   const reloadOrders = useCallback(async () => {
     try {
-      const d = await api.getOrders({ limit: 50 })
-      setOrders(Array.isArray(d.orders) ? d.orders : [])
+      // Queue (active + finished-today) AND cancelled-today, fetched in one
+      // sweep so the Canceled tab works locally without a status query.
+      // FIX: the old code loaded only the live queue (which excludes
+      // cancelled rows server-side), so the "Canceled 56%|" status tab had
+      // no data to render and showed an empty list even right after an
+      // admin cancelled an order.
+      const [d, c] = await Promise.all([
+        api.getOrders({ limit: 50 }),
+        api.getOrders({ status: 'cancelled', limit: 100 }),
+      ])
+      const queue = Array.isArray(d.orders) ? d.orders : []
+      const canceled = Array.isArray(c.orders)
+        ? c.orders.filter((o) => isToday(o.updated_at || o.created_at))
+        : []
+      // Canceled rows are excluded from the server queue query by design,
+      // so merging ids can never duplicate a card — cancelOrder() also
+      // relies on this (it optimistically strips the card from the queue).
+      const seen = new Set(queue.map((o) => o.id))
+      setOrders([...queue, ...canceled.filter((o) => !seen.has(o.id))])
     } catch (e) {
       if (e instanceof SessionExpired) setBoot('expired')
       setOrders((prev) => (Array.isArray(prev) ? prev : []))
@@ -261,6 +287,11 @@ export function AppProvider({ children }) {
         await reloadOrders()
       } catch (e) {
         if (e instanceof SessionExpired) setBoot('expired')
+        else {
+          // PATCH failed (DB hiccup etc.) → reload server truth. The card
+          // stays in the queue, so the admin sees the cancel didn't take.
+          await reloadOrders()
+        }
       }
     },
     [removeOrderLocal, reloadOrders],

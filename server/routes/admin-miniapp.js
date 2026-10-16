@@ -192,6 +192,15 @@ router.patch('/settings', async (req, res) => {
     // Sync every admin device instantly; the customer gate reads the row
     // server-side on every order, so no event is needed for enforcement.
     req.app.get('io')?.to('admins').emit('settings:update', settings)
+    // Delivery toggle push (customer-facing): when the admin switches the
+    // delivery button off/on, every open customer Mini App learns it right
+    // away — the app pops a localized "delivery unavailable" message on the
+    // OFF transition instead of letting her discover it at order time.
+    if (req.body.delivery_available !== undefined) {
+      req.app.get('io')?.to('customers').emit('service:update', {
+        delivery_available: settings.delivery_available !== false,
+      })
+    }
     res.json({ settings })
   } catch (e) {
     console.error('[admin-miniapp] settings update failed:', e.message)
