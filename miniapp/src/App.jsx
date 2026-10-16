@@ -11,6 +11,7 @@ import CategoryMenu from './components/CategoryMenu.jsx'
 import ConfirmOrder from './components/ConfirmOrder.jsx'
 import PaymentFrame from './components/PaymentFrame.jsx'
 import LocationName from './components/LocationName.jsx'
+import { useLiveServiceAlerts } from './hooks/useLiveServiceAlerts.js'
 
 /**
  * App
@@ -30,6 +31,10 @@ import LocationName from './components/LocationName.jsx'
 function AppInner() {
   const { serviceType } = useCart()
   const { ready } = useTelegram()
+
+  // Realtime customer alerts: when an admin switches the delivery toggle or
+  // marks a cart item unavailable, pop a localized message immediately.
+  useLiveServiceAlerts()
 
   const [currentFrame, setCurrentFrame] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false) // true while fade-out is in progress
