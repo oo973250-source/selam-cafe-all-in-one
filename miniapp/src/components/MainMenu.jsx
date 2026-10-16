@@ -75,9 +75,10 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
   // admin/in-bot write) + a 20s polling fallback refetch the DB-backed menu
   // and bump a version counter so the category lists re-render instantly.
   const menuVersion = useLiveMenu()
-  // Two-tap pattern: 1st tap expands the pill to show full category name,
-  // 2nd tap on the same pill confirms selection and advances to Frame 3.
-  // Tapping a different pill collapses the previous one and expands the new.
+  // Single-tap selection (per user request: no double tap needed):
+  // tapping a category pill immediately selects it and advances to the
+  // item list. The expand-on-hover name reveal is retained for hover UX,
+  // but a tap is a direct selection — one tap = one category chosen.
   const [expandedCatId, setExpandedCatId] = useState(null)
 
   // MEAL-TIME FILTERING (per user spec):
@@ -122,22 +123,16 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
   }
 
   const handlePick = (cat, sectionKey) => {
-    if (expandedCatId === cat.id) {
-      // Second tap on the SAME expanded pill → confirm selection + advance.
-      hapticFeedback.impactOccurred('light')
-      setCategory({
-        id: cat.id,
-        nameEn: cat.nameEn,
-        nameAm: cat.nameAm,
-        icon: cat.icon,
-        sectionKey,
-      })
-      onAdvance?.()
-    } else {
-      // First tap (or tap on a different pill) → expand to reveal full name.
-      hapticFeedback.selectionChanged()
-      setExpandedCatId(cat.id)
-    }
+    // Single tap → select the category and advance (no confirm tap).
+    hapticFeedback.impactOccurred('light')
+    setCategory({
+      id: cat.id,
+      nameEn: cat.nameEn,
+      nameAm: cat.nameAm,
+      icon: cat.icon,
+      sectionKey,
+    })
+    onAdvance?.()
   }
 
   return (
