@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import CafeLogo from './CafeLogo.jsx'
 import { menuData } from '../data/menuData.js'
@@ -122,8 +122,16 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
     }
   }
 
+  // Guard against double-fire: on touch we register the pick on
+  // pointerdown AND the WebView may still emit the delayed synthetic
+  // click afterwards — allow one pick per category per ~700ms.
+  const lastPickRef = useRef(null)
+
   const handlePick = (cat, sectionKey) => {
     // Single tap → select the category and advance (no confirm tap).
+    const now = Date.now()
+    if (lastPickRef.current && now - lastPickRef.current.at < 700 && lastPickRef.current.id === cat.id) return
+    lastPickRef.current = { id: cat.id, at: now }
     hapticFeedback.impactOccurred('light')
     setCategory({
       id: cat.id,
@@ -133,6 +141,16 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
       sectionKey,
     })
     onAdvance?.()
+  }
+
+  // Root cause of "needs more than one tap": Telegram's WebView (iOS in
+  // particular) holds the synthetic `click` behind its double-tap-zoom
+  // heuristic — the first tap can be delayed long enough that customers
+  // assumed it never registered and tapped again. Registering the pick on
+  // finger-down (pointerdown) bypasses that heuristic entirely; mouse and
+  // keyboard users keep the normal click path.
+  const pickOnPress = (cat, sectionKey) => (e) => {
+    if (e?.pointerType === 'touch') handlePick(cat, sectionKey)
   }
 
   return (
@@ -196,6 +214,7 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
           fontWeight: 600,
           boxShadow: '0 6px 16px rgba(30, 20, 8, 0.45)',
           cursor: 'pointer',
+          touchAction: 'manipulation',
         }}
       >
         <span style={{ fontSize: 22 }} aria-hidden>←</span>
@@ -273,6 +292,7 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
                 fontWeight: 600,
                 fontSize: 10,
                 cursor: 'pointer',
+                touchAction: 'manipulation',
                 transition: 'background 200ms, color 200ms',
                 boxShadow: active
                   ? '0 2px 6px rgba(58, 36, 16, 0.4)'
@@ -623,7 +643,11 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
                       delay: 0.4 + i * 0.04,
                       duration: 0.25,
                     }}
-                    whileTap={{ scale: 0.96 }}
+                    // Scoped press transition — without it, whileTap
+                    // inherits the entrance delay (0.4s + i*40ms) and the
+                    // press feedback would lag a few hundred ms or later.
+                    whileTap={{ scale: 0.96, transition: { duration: 0.1 } }}
+                    onPointerDown={pickOnPress(cat, 'foods')}
                     onClick={() => handlePick(cat, 'foods')}
                     style={{
                       height: 46,
@@ -642,6 +666,10 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
                       backdropFilter: 'blur(4px)',
                       WebkitBackdropFilter: 'blur(4px)',
                       pointerEvents: isExpanded ? 'none' : 'auto',
+                      // Drop the double-tap-zoom tap delay on this element
+                      // (the global .btn rule doesn't reach these buttons —
+                      // they have no className).
+                      touchAction: 'manipulation',
                     }}
                   >
                     <span style={{ fontSize: 14, lineHeight: 1, flexShrink: 0 }}>{cat.icon}</span>
@@ -812,7 +840,11 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
                       delay: 0.4 + i * 0.04,
                       duration: 0.25,
                     }}
-                    whileTap={{ scale: 0.96 }}
+                    // Scoped press transition — without it, whileTap
+                    // inherits the entrance delay (0.4s + i*40ms) and the
+                    // press feedback would lag a few hundred ms or later.
+                    whileTap={{ scale: 0.96, transition: { duration: 0.1 } }}
+                    onPointerDown={pickOnPress(cat, 'drinks')}
                     onClick={() => handlePick(cat, 'drinks')}
                     style={{
                       height: 46,
@@ -831,6 +863,10 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
                       backdropFilter: 'blur(4px)',
                       WebkitBackdropFilter: 'blur(4px)',
                       pointerEvents: isExpanded ? 'none' : 'auto',
+                      // Drop the double-tap-zoom tap delay on this element
+                      // (the global .btn rule doesn't reach these buttons —
+                      // they have no className).
+                      touchAction: 'manipulation',
                     }}
                   >
                     <span style={{ fontSize: 14, lineHeight: 1, flexShrink: 0 }}>{cat.icon}</span>
