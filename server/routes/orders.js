@@ -27,13 +27,26 @@ import { activeAdminDuringCurrentShift } from './admin-miniapp.js'
 
 const router = Router()
 
-/**
- * Items are stored as the customer miniapp sent them
- * ({ id, nameEn, nameAm, price, quantity }). The admin cards read
- * `name` / `qty`, older web-panel code read `quantity`, and older
- * receipts read `nameEn` — normalize ONCE here so every consumer
- * gets all shapes and item names never render as "undefined".
+/* Section 3.1 + 3.2 — one canonical LIST shape for the whole admin miniapp.
+   blocked_users LEFT JOIN removes a blocked user's orders from every state
+   the admin actively works with (queue AND the Started/Finished/Canceled
+   filters). This is NOT deletion: revenue stats and Reports read the plain
+   orders table and keep every record. Statuses are filtered from the stored
+   status column — no client-side status copies, no duplicates across lists.
  */
+const QUEUE_SELECT = `SELECT o.id, o.tg_user_id, o.tg_username, o.tg_first_name, o.service_type,
+              o.customer_name, o.customer_loc, o.items, o.total, o.trust_level,
+              o.status, o.payment_status, o.tx_ref, o.note, o.customer_phone,
+              o.started_by, o.served_at, o.dismissed_at, o.created_at, o.updated_at`
+const QUEUE_JOIN = `FROM orders o
+              LEFT JOIN blocked_users b ON b.tg_user_id = o.tg_user_id`
+const QUEUE_ACTIVE_WHERE = `WHERE (o.status IN ('new', 'preparing', 'ready')
+           OR (o.status = 'served' AND o.dismissed_at IS NULL
+               AND o.served_at >= date_trunc('day', now())))
+          AND b.tg_user_id IS NULL
+          ORDER BY (o.status = 'new') DESC, o.created_at DESC
+          LIMIT $1 OFFSET $2`
+
 function normalizeItems(items) {
   if (!Array.isArray(items)) return items
   return items.map((i) => {
@@ -57,51 +70,41 @@ function normalizeOrderRow(row) {
 }
 
 router.get('/', async (req, res) => {
-  const { status, since, limit = 50, offset = 0 } = req.query
-  const where = []
-  const params = []
-  if (status) { params.push(status); where.push(`status = $${params.length}`) }
-  if (since) { params.push(since); where.push(`created_at >= $${params.length}::timestamptz`) }
-  if (where.length) {
-    const whereClause = `WHERE ${where.join(' AND ')}`
-    params.push(Number(limit), Number(offset))
-    try {
+  const { status, limit = 50, offset = 0 } = req.query
+  const lim = Math.max(1, Math.min(Number(limit) || 50, 200))
+  const off = Math.max(Number(offset) || 0, 0)
+
+  try {
+    if (status) {
+      if (!['new', 'preparing', 'ready', 'served', 'cancelled'].includes(status)) {
+        return res.status(400).json({ error: 'invalid status' })
+      }
+      // Single-status filter (Started = preparing, Finished = served,
+      // Canceled = cancelled) → exactly the stored rows in that state.
       const { rows } = await pool.query(
-        `SELECT id, tg_user_id, tg_username, tg_first_name, service_type,
-                customer_name, customer_loc, items, total, trust_level,
-                status, payment_status, tx_ref, note, customer_phone,
-                started_by, served_at, dismissed_at, created_at, updated_at
-           FROM orders ${whereClause}
-          ORDER BY created_at DESC
-          LIMIT $${params.length - 1} OFFSET $${params.length}`,
-        params
+        `${QUEUE_SELECT}
+           ${QUEUE_JOIN}
+          WHERE o.status = $1
+            AND b.tg_user_id IS NULL
+          ORDER BY o.created_at DESC
+          LIMIT $2 OFFSET $3`,
+        [status, lim, off]
       )
       return res.json({ orders: rows.map(normalizeOrderRow) })
-    } catch (e) {
-      console.error('[orders] list failed:', e.message)
-      return res.status(503).json({ error: 'orders unavailable', orders: [] })
     }
-  }
 
-  // No filters → admin live queue shape: active + served-not-dismissed-today.
-  try {
+    // No status → admin live queue: active + served-not-dismissed-today,
+    // blocked users excluded (their orders stay in history/stats untouched).
     const { rows } = await pool.query(
-      `SELECT id, tg_user_id, tg_username, tg_first_name, service_type,
-              customer_name, customer_loc, items, total, trust_level,
-              status, payment_status, tx_ref, note, customer_phone,
-              started_by, served_at, dismissed_at, created_at, updated_at
-         FROM orders
-        WHERE status IN ('new', 'preparing', 'ready')
-           OR (status = 'served' AND dismissed_at IS NULL
-               AND served_at >= date_trunc('day', now()))
-          ORDER BY (status = 'new') DESC, created_at DESC
-          LIMIT $1 OFFSET $2`,
-      [Number(limit), Number(offset)]
+      `${QUEUE_SELECT}
+         ${QUEUE_JOIN}
+        ${QUEUE_ACTIVE_WHERE}`,
+      [lim, off]
     )
-    res.json({ orders: rows.map(normalizeOrderRow) })
+    return res.json({ orders: rows.map(normalizeOrderRow) })
   } catch (e) {
-    console.error('[orders] queue list failed:', e.message)
-    res.status(503).json({ error: 'orders unavailable', orders: [] })
+    console.error('[orders] list failed:', e.message)
+    return res.status(503).json({ error: 'orders unavailable', orders: [] })
   }
 })
 

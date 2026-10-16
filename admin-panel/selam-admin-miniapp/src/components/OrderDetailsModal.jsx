@@ -7,6 +7,7 @@
 // (store.telegramBack clicks any open .modal-overlay first).
 import React from 'react'
 import { useApp, SERVICE_LABELS } from '../store.jsx'
+import ReportUserModal from './ReportUserModal.jsx'
 
 const STATUS_LABEL = {
   new: 'New',
@@ -38,6 +39,7 @@ function fmtWhen(iso) {
 
 export default function OrderDetailsModal() {
   const { detailsOrder, closeOrderDetails } = useApp()
+  const [reporting, setReporting] = React.useState(false)
   if (!detailsOrder) return null
   const o = detailsOrder
 
@@ -129,7 +131,24 @@ export default function OrderDetailsModal() {
             <b>{o.total.toLocaleString('en-US')} ETB</b>
           </div>
         )}
+
+        {o.tg_user_id ? (
+          <button
+            type="button"
+            className="btn od-report-btn"
+            onClick={() => setReporting(true)}
+          >
+            🚩 Report this user
+          </button>
+        ) : null}
       </div>
+
+      {reporting && (
+        <ReportUserModal
+          preset={{ tg_user_id: o.tg_user_id, tg_username: o.tg_username, tg_first_name: o.tg_first_name }}
+          onClose={() => setReporting(false)}
+        />
+      )}
     </div>
   )
 }

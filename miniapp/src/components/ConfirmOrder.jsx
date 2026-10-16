@@ -58,11 +58,11 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
         style={{
           position: 'relative',
           zIndex: 2,
-          padding: '12px 16px calc(var(--safe-bottom) + 24px)',
+          padding: '6px 16px calc(var(--safe-bottom) + 24px)',
         }}
       >
         {/* ── HERO: chef above the gold title, divider with chef-hat ── */}
-        <div style={{ position: 'relative', textAlign: 'center', marginBottom: 8 }}>
+        <div style={{ position: 'relative', textAlign: 'center', marginBottom: 0 }}>
           {/* Big chef, bottom edge tucked slightly behind the title so she
               "leans" on it (reference screenshot). Negative bottom margin
               pulls the title up into her clasped-hands zone; the title's
@@ -79,7 +79,7 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
               filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.5))',
               userSelect: 'none',
               pointerEvents: 'none',
-              margin: '0 auto -64px',
+              margin: '0 auto -88px',
               display: 'block',
               position: 'relative',
               zIndex: 1,
@@ -95,7 +95,7 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
               margin: '0 0 10px',
               color: '#FFC107',
               letterSpacing: 0.3,
-              textShadow: '0 2px 8px rgba(0,0,0,0.65)',
+              textShadow: '0 2px 10px rgba(0,0,0,0.75)',
             }}
           >
             {t('confirmTitle')}
@@ -114,16 +114,13 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
             <span style={{ fontSize: 16 }} aria-hidden>👨‍🍳</span>
             <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #FFC107, transparent)' }} />
           </div>
-        </div>
-
-        {items.length === 0 ? (
+        </div>          {items.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: 24 }}>
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
               {t('confirmCartEmpty')}
             </p>
-          </div>
-        ) : (
-          /* ── ORDER SUMMARY CARD ── */
+          </div>        ) : (
+          /* ── ORDER SUMMARY CARD (scrollable) ── */
           <div
             style={{
               background: 'rgba(15, 23, 30, 0.85)',
@@ -131,6 +128,9 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
               border: '1px solid rgba(255, 193, 7, 0.35)',
               boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
               overflow: 'hidden',
+              maxHeight: 368,
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
             }}
           >
             {items.map((item, i) => (
@@ -142,6 +142,7 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
                   alignItems: 'center',
                   gap: 12,
                   padding: '14px 14px',
+                  marginBottom: 10,
                   borderBottom: '1px solid rgba(255,255,255,0.07)',
                   animationDelay: `${i * 60}ms`,
                 }}
@@ -217,10 +218,8 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
                       flexShrink: 0,
                     }}
                   >
-                    +
-                  </button>
+                    +                  </button>
                 </div>
-
                 {/* Line total */}
                 <div
                   style={{
@@ -237,7 +236,7 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
               </div>
             ))}
 
-            {/* ── TOTAL ROW ── */}
+            {/* ── TOTAL ROW (sticky) ── */}
             <div
               style={{
                 display: 'flex',
@@ -246,6 +245,8 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
                 padding: '14px 14px',
                 borderTop: '1px solid rgba(255,193,7,0.22)',
                 background: 'rgba(255,193,7,0.04)',
+                position: 'sticky',
+                bottom: 0,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

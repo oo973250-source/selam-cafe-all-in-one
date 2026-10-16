@@ -1,15 +1,17 @@
 // Page 4 — "New item" modal (the circular + button, same pattern as the
 // category + on Page 5). Fields mirror ItemEditModal: name (required),
 // Amharic name (optional translation → name_am), price (INTEGER Birr),
-// optional description + photo URL, availability toggle.
+// optional description + uploaded photo, availability toggle.
 // Contract (RULES): POST /api/menu REQUIRES a client-generated unique slug id
 // → slugify(name, existingIds). Servers that assign their own ids simply
 // ignore/replace it. POST → parent refetches the list (RULES: refetch after
 // successful POST). Save is guarded (no double submit).
+// Section 4.3: Photo URL input REPLACED by the file-picker uploader.
 import React, { useState } from 'react'
 import { api, slugify } from '../api.js'
 import { useApp } from '../store.jsx'
 import { haptic } from '../telegram.js'
+import PhotoUploader from './PhotoUploader.jsx'
 
 export default function ItemAddModal({ category, existingIds = [], onClose, onSaved, onErr }) {
   const { toast } = useApp()
@@ -105,17 +107,8 @@ export default function ItemAddModal({ category, existingIds = [], onClose, onSa
           placeholder="Optional"
         />
 
-        <div className="f-label">Photo URL</div>
-        <div className="f-row">
-          {img.trim() ? <img className="f-thumb" src={img.trim()} alt="" /> : <div className="f-thumb" />}
-          <input
-            className="f-input"
-            value={img}
-            onChange={(e) => setImg(e.target.value)}
-            placeholder="https://…"
-            inputMode="url"
-          />
-        </div>
+        <div className="f-label">Photo</div>
+        <PhotoUploader value={img} onChange={setImg} />
 
         <div className="f-label">Availability</div>
         <button

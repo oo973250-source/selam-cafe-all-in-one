@@ -22,6 +22,8 @@ import {
   unblockUser,
   findUserRef,
   getCafeProfile,
+  getIntakeStatus,
+  countActiveOrders,
   pool,
 } from './db.js'
 
@@ -1673,6 +1675,70 @@ export async function startBot(io) {
       console.log(`[bot] order BLOCKED for tg ${user.id} (web_app_data path)`)
       bot.sendMessage(chatId, t('blockedUserMsg', await getUserLang(user.id)))
       return
+    }
+
+    // ── Sections 5.1/5.2/6.1/6.2 — the bot path enforces the SAME intake
+    // gates as POST /api/miniapp/orders so neither surface can be bypassed:
+    // pause/closure, delivery availability, order limit, category rules.
+    try {
+      const intake = await getIntakeStatus()
+      if (intake.kind !== 'open') {
+        bot.sendMessage(chatId,
+          `⏸ ${intake.kind === 'closed' ? t('storeClosed', 'en') : t('ordersPaused', 'en')}` +
+          (intake.reason ? ` — ${intake.reason}` : ''))
+        return
+      }
+      const s = intake.settings || {}
+      if (payload.serviceType === 'delivery' && s.delivery_available === false) {
+        bot.sendMessage(chatId, t('deliveryUnavailableMsg', 'en'))
+        return
+      }
+      if (s && s.order_limit > 0) {
+        const active = await countActiveOrders()
+        if (active >= s.order_limit) {
+          bot.sendMessage(chatId, t('orderLimitReachedMsg', 'en'))
+          return
+        }
+      }
+      // Category restrictions (5.1/5.2) — unavailable categories can never be
+      // ordered and no-delivery categories can't land in a delivery order.
+      if (Array.isArray(payload.items) && payload.items.length) {
+        const ids = [...new Set(payload.items.map((it) => String(it?.id || '')).filter(Boolean))]
+        if (ids.length) {
+          const { rows: itemRows } = await pool.query(
+            `SELECT id, category, available FROM menu_items WHERE id = ANY($1)`, [ids]
+          )
+          const itemMap = {}
+          for (const r of itemRows) itemMap[r.id] = r
+          const catIds = [...new Set(itemRows.map((r) => r.category))]
+          const { rows: catRows } = await pool.query(
+            `SELECT id, hidden, no_delivery FROM menu_categories WHERE id = ANY($1)`,
+            [catIds.length ? catIds : ['']]
+          )
+          const catMap = {}
+          for (const c of catRows) catMap[c.id] = c
+          for (const it of payload.items) {
+            const itemId = String(it?.id || '')
+            if (!itemId) continue
+            const itemRow = itemMap[itemId]
+            if (!itemRow || itemRow.available === false) {
+              bot.sendMessage(chatId, `⚠️ ${it?.nameEn || itemId} in your cart is no longer available. Please review your order.`)
+              return
+            }
+            const cat = catMap[itemRow.category]
+            if (!cat || cat.hidden) {
+              bot.sendMessage(chatId, `⚠️ ${it?.nameEn || itemId} is currently unavailable. Please choose another item.`)
+              return
+            }
+            if (cat.no_delivery && payload.serviceType === 'delivery') {
+              bot.sendMessage(chatId, t('categoryNoDeliveryMsg', 'en'))
+              return
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[bot] intake gate failed (fail-open):', e.message)
     }
 
     let order

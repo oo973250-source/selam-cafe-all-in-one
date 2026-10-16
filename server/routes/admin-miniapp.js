@@ -24,6 +24,10 @@ import {
   listPauseEvents,
   listAnnouncements,
   createAnnouncement,
+  lookupUserForReport,
+  createUserReport,
+  listUserReports,
+  reviewUserReport,
 } from '../db.js'
 
 const router = Router()
@@ -402,7 +406,9 @@ router.get('/pause-history', async (_req, res) => {
   }
 })
 
-// ── Revenue (Page 8) — per day|week|month from real orders ─────────────
+// ── Revenue (Page 8) — per day|week|month from real orders, never sampled/hardcoded
+// data. Total = orders in the period; Revenue = SUM(total) over PAID orders;
+// Delivery done = delivery orders paid (kept in sync with the bot/miniapp).
 router.get('/revenue', async (req, res) => {
   try {
     const period = ['day', 'week', 'month'].includes(String(req.query.period))
@@ -421,6 +427,101 @@ router.get('/revenue', async (req, res) => {
   } catch (e) {
     console.error('[admin-miniapp] revenue read failed:', e.message)
     res.status(503).json({ error: 'could not load revenue' })
+  }
+})
+
+// ── User reports (Section 7) — allegations with a review lifecycle ──────
+// Every endpoint requires the admin JWT (router.use(requireAuth) above);
+// reports NEVER trigger automatic blocking or labeling — blocking stays an
+// explicit, separately-recorded admin action via /api/blocked-users.
+const REPORT_CATEGORIES = [
+  'spam', 'duplicate_orders', 'order_flooding', 'payment_fraud',
+  'fake_orders', 'restriction_bypass', 'exploitation', 'harassment', 'other',
+]
+
+// Resolve a user (by Telegram ID or @username) for the report form: shows
+// identity + order-history summary. NO payment details, credentials or
+// private contact data — only what staff need to investigate.
+router.get('/reports/lookup', async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim()
+    if (!q) return res.status(400).json({ error: 'q (Telegram ID or @username) is required' })
+    const profile = await lookupUserForReport(q)
+    if (!profile) return res.status(404).json({ error: 'no user found for that Telegram ID or @username' })
+    res.json({ user: profile })
+  } catch (e) {
+    console.error('[admin-miniapp] report lookup failed:', e.message)
+    res.status(503).json({ error: 'lookup failed' })
+  }
+})
+
+router.get('/reports', async (_req, res) => {
+  try {
+    res.json({ reports: await listUserReports() })
+  } catch (e) {
+    console.error('[admin-miniapp] reports read failed:', e.message)
+    res.status(503).json({ error: 'could not load reports' })
+  }
+})
+
+router.post('/reports', async (req, res) => {
+  try {
+    const tgUserId = Number(req.body?.tg_user_id)
+    if (!Number.isSafeInteger(tgUserId) || tgUserId <= 0) {
+      return res.status(400).json({ error: 'a valid Telegram user ID is required' })
+    }
+    const category = String(req.body?.category || '')
+    if (!REPORT_CATEGORIES.includes(category)) {
+      return res.status(400).json({ error: 'a report category is required' })
+    }
+    const description = String(req.body?.description || '').slice(0, 1000) || null
+    const evidence = String(req.body?.evidence || '').slice(0, 2000) || null
+    // Spam guard: the same reporter cannot file the same category for the
+    // same user twice while the report is still Pending/Under review.
+    const { rows: dupes } = await pool.query(
+      `SELECT 1 FROM user_reports
+        WHERE tg_user_id = $1 AND category = $2
+          AND status IN ('pending', 'under_review')
+          AND reporter_tg_user_id = $3
+        LIMIT 1`,
+      [tgUserId, category, req.user?.tgUserId ?? req.user?.id ?? null]
+    )
+    if (dupes.length) {
+      return res.status(409).json({ error: 'you already have an open report of this type for this user' })
+    }
+    const report = await createUserReport({
+      tgUserId,
+      tgUsername: req.body.tg_username || null,
+      tgFirstName: req.body.tg_first_name || null,
+      category,
+      description,
+      evidence,
+      reporterTgUserId: req.user?.tgUserId ?? req.user?.id ?? null,
+      reporterName: req.user?.firstName || req.user?.username || 'admin',
+    })
+    req.app.get('io')?.to('admins').emit('report:new', report)
+    res.status(201).json({ report })
+  } catch (e) {
+    console.error('[admin-miniapp] report create failed:', e.message)
+    res.status(503).json({ error: 'could not create report' })
+  }
+})
+
+router.patch('/reports/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'bad id' })
+    const { status } = req.body || {}
+    if (status && !['pending', 'under_review', 'resolved', 'dismissed'].includes(status)) {
+      return res.status(400).json({ error: 'invalid status' })
+    }
+    const updated = await reviewUserReport(id, req.body || {}, req.user?.firstName || 'admin')
+    if (!updated) return res.status(404).json({ error: 'report not found' })
+    req.app.get('io')?.to('admins').emit('report:update', updated)
+    res.json({ report: updated })
+  } catch (e) {
+    console.error('[admin-miniapp] report review failed:', e.message)
+    res.status(503).json({ error: 'could not update report' })
   }
 })
 

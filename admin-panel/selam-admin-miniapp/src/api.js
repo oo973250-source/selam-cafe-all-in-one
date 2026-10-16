@@ -218,12 +218,24 @@ export const api = {
   getProfile: () => call('/api/admin-miniapp/profile'),
   patchProfile: (body) => call('/api/admin-miniapp/profile', { method: 'PATCH', body }),
 
-  // ---- REPORTS: PAUSE HISTORY (Page 7 bottom-nav REPORTS) — ⚠️ INTEGRATION POINT ----
-  // GET /api/admin-miniapp/pause-history → { history: [{ id, kind: 'emergency' |
-  //   'countdown' | 'closed', reason, started_at, ended_at }] } newest first.
-  // The server should append an entry whenever intake is paused/closed (emergency
-  // kill-switch, duration pause, days closure) and stamp ended_at on resume/reopen.
+  // ---- REPORTS: PAUSE HISTORY (Page 7 bottom-nav REPORTS) ----------
+  // GET /api/admin-miniapp/pause-history → { history: [...] } newest first.
   getPauseHistory: () => call('/api/admin-miniapp/pause-history'),
+
+  // ---- USER REPORTS (Section 7) — backend-enforced review workflow ----
+  // GET  /api/admin-miniapp/reports/lookup?q=<tg id|@username>
+  //        → { user: { tg_user_id, tg_username, tg_first_name, is_blocked,
+  //                    stats: { total, cancelled, active, served_total },
+  //                    recent_orders: [...] } }  (no payment details)
+  // GET  /api/admin-miniapp/reports  → { reports: [...] }
+  // POST /api/admin-miniapp/reports { tg_user_id, category, description?, evidence? }
+  // PATCH /api/admin-miniapp/reports/:id { status?, decision_note? }
+  //        (409 duplicate → surfaced to the caller via the `quiet` flag)
+  lookupReportUser: (q) => call(`/api/admin-miniapp/reports/lookup${qs({ q })}`),
+  getReports: () => call('/api/admin-miniapp/reports'),
+  getReportsQuiet: () => call('/api/admin-miniapp/reports', { quiet: true }),
+  postReport: (body) => call('/api/admin-miniapp/reports', { method: 'POST', body, quiet: false }),
+  patchReport: (id, body) => call(`/api/admin-miniapp/reports/${id}`, { method: 'PATCH', body }),
 
   // ---- ANNOUNCEMENTS (Page 7 bottom-nav "+") — ⚠️ INTEGRATION POINT ----
   // GET  /api/admin-miniapp/announcements → { announcements: [{ id, message,

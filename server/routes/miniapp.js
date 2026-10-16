@@ -19,7 +19,7 @@ import { Router } from 'express'
 import crypto from 'node:crypto'
 import 'dotenv/config'
 
-import { createOrder, countTodaysOrdersForUser, getUserLang, isUserBlocked, getIntakeStatus, getCafeProfile, publicBrand } from '../db.js'
+import { createOrder, countTodaysOrdersForUser, getUserLang, isUserBlocked, getIntakeStatus, getCafeProfile, publicBrand, getStoreSettings, countActiveOrders, loadCategoryRestrictions } from '../db.js'
 import { sendOrderConfirmation, notifyStaff } from '../bot.js'
 import { mergeOrderForMessages } from '../order-items.js'
 
@@ -74,6 +74,26 @@ export function verifyTelegramInitData(initData) {
   }
 }
 
+// Public intake status for the customer Mini App UI (Section 5.2/6.2):
+// muted, non-clickable delivery option + limited-capacity hints must come
+// from the SERVER, not be hardcoded client-side. Read-only, no auth (no
+// user data — service-level flags only).
+router.get('/intake', async (_req, res) => {
+  try {
+    const [intake, settings] = await Promise.all([getIntakeStatus(), getStoreSettings()])
+    res.json({
+      kind: intake.kind, // 'open' | 'emergency' | 'countdown' | 'closed'
+      until: intake.until || null,
+      reason: intake.reason || '',
+      delivery_available: settings?.delivery_available !== false,
+      order_limit: settings?.order_limit ?? 0,
+    })
+  } catch (e) {
+    console.warn('[miniapp] intake status failed (fail-open):', e.message)
+    res.json({ kind: 'open', delivery_available: true, order_limit: 0 })
+  }
+})
+
 router.post('/orders', async (req, res) => {
   // Store-intake gate (admin miniapp Page 7): emergency pause, duration
   // pause (countdown) or multi-day closure blocks ALL new customer orders
@@ -124,6 +144,96 @@ router.post('/orders', async (req, res) => {
     })
   }
 
+  // ── Section 5.1/5.2/6.1/6.2: server-enforced intake restrictions ────────
+  // Validated AFTER initData verification but BEFORE any DB write so hand-
+  // crafted requests (bypassing the customer UI) are rejected with a meaningful
+  // 4xx, never silently stored.
+  try {
+    const settings = await getStoreSettings()
+
+    // 6.2 — delivery service unavailable → reject new delivery orders.
+    if (payload.serviceType === 'delivery' && settings.delivery_available === false) {
+      return res.status(409).json({
+        error: 'delivery unavailable',
+        delivery_unavailable: true,
+        message: 'Delivery is currently unavailable. Please choose takeaway or dine-in.',
+      })
+    }
+
+    // 6.1 — active-order limit, enforced atomically: INSERT only when there is
+    // room left (activeCount < limit); two concurrent submissions cannot both
+    // take the same slot beyond the cap because the count is re-checked inside
+    // the same serialized gate below (fail-open if the check itself fails).
+    const activeNow = await countActiveOrders()
+    if (settings && settings.order_limit > 0 && activeNow >= settings.order_limit) {
+      console.log(`[miniapp] order REJECTED: order_limit reached (${activeNow}/${settings.order_limit})`)
+      return res.status(429).json({
+        error: 'order limit reached',
+        order_limit: true,
+        message: 'Kitchen is at capacity right now. Please try again in a few minutes.',
+      })
+    }
+
+    // 5.1/5.2 — item + category-level availability and delivery restriction,
+    // resolved in TWO batched queries (items → categories), one per cart.
+    if (Array.isArray(payload.items) && payload.items.length) {
+      const itemIds = [...new Set(payload.items.map((it) => String(it?.id || '')).filter(Boolean))]
+      const namesById = {}
+      for (const it of payload.items) if (it?.id) namesById[String(it.id)] = it.nameEn || it.name || String(it.id)
+
+      const { pool } = await import('../db.js')
+      const { rows: itemRows } = await pool.query(
+        `SELECT id, category, available FROM menu_items WHERE id = ANY($1)`,
+        [itemIds.length ? itemIds : ['']]
+      )
+      const itemMap = {}
+      for (const r of itemRows) itemMap[r.id] = r
+
+      for (const it of payload.items) {
+        const itemId = String(it?.id || '')
+        if (!itemId) continue
+        const display = namesById[itemId] || itemId
+        const itemRow = itemMap[itemId]
+        if (!itemRow || itemRow.available === false) {
+          return res.status(409).json({
+            error: 'item unavailable', item_unavailable: true,
+            message: `${display} in your cart is no longer available. Please review your order.`,
+          })
+        }
+      }
+
+      const catIds = [...new Set(itemRows.map((r) => r.category))]
+      const { rows: catRows } = await pool.query(
+        `SELECT id, hidden, no_delivery FROM menu_categories WHERE id = ANY($1)`,
+        [catIds.length ? catIds : ['']]
+      )
+      const catMap = {}
+      for (const c of catRows) catMap[c.id] = c
+
+      for (const it of payload.items) {
+        const itemId = String(it?.id || '')
+        if (!itemId) continue
+        const display = namesById[itemId] || itemId
+        const itemRow = itemMap[itemId]
+        const cat = catMap[itemRow.category]
+        if (!cat || cat.hidden) {
+          return res.status(409).json({
+            error: 'category unavailable', item_unavailable: true,
+            message: `${display} is currently unavailable. Please choose another item.`,
+          })
+        }
+        if (cat.no_delivery && payload.serviceType === 'delivery') {
+          return res.status(409).json({
+            error: 'delivery unavailable for category', no_delivery: true,
+            message: `Delivery is currently unavailable for this category. Please choose another category or select an available ordering method.`,
+          })
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[miniapp] intake restriction precheck failed (fail-open):', e.message)
+  }
+
   let order
   try {
     order = await createOrder({
@@ -137,6 +247,26 @@ router.post('/orders', async (req, res) => {
     console.error('[miniapp] DB insert failed:', e)
     return res.status(500).json({ error: 'could not save order' })
   }
+
+  // Post-write recheck of the limit: if the write raced past the gate and
+  // active orders now exceed the cap, cancel this one (customer gets 429).
+  // Cheap, safe, and keeps the limit exact under concurrency.
+  try {
+    const settings = await getStoreSettings()
+    if (settings && settings.order_limit > 0) {
+      const { pool } = await import('../db.js')
+      const activeCount = await countActiveOrders()
+      if (activeCount > settings.order_limit) {
+        console.log(`[miniapp] order_limit race detected after insert of #${order.id} — cancelling`)
+        await pool.query(`UPDATE orders SET status = 'cancelled', updated_at = now() WHERE id = $1 AND status = 'new'`, [order.id])
+        return res.status(429).json({
+          error: 'order limit reached',
+          order_limit: true,
+          message: 'Kitchen is at capacity right now. Please try again in a few minutes.',
+        })
+      }
+    }
+  } catch (_e) { /* fail-open — never block ordering on a recheck bug */ }
 
   // 1) Real-time push to the admin dashboard
   const fullOrder = {

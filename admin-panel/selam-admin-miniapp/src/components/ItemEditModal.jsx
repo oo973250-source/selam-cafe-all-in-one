@@ -2,10 +2,14 @@
 // (INTEGER Birr), description, photo and availability state via PATCH
 // /api/menu/:id, then the parent refetches the list (RULES: refetch after
 // successful PATCH). Save is guarded (no double submit).
+// Section 4.3: the manual Photo URL input is REPLACED by a file-picker
+// uploader (PhotoUploader) that produces a persistent data URL; unrelated
+// fields keep their existing photo unless the admin changes it.
 import React, { useState } from 'react'
 import { api } from '../api.js'
 import { useApp } from '../store.jsx'
 import { haptic } from '../telegram.js'
+import PhotoUploader from './PhotoUploader.jsx'
 
 export default function ItemEditModal({ item, onClose, onSaved, onErr }) {
   const { toast } = useApp()
@@ -89,17 +93,8 @@ export default function ItemEditModal({ item, onClose, onSaved, onErr }) {
           placeholder="Optional"
         />
 
-        <div className="f-label">Photo URL</div>
-        <div className="f-row">
-          {img.trim() ? <img className="f-thumb" src={img.trim()} alt="" /> : <div className="f-thumb" />}
-          <input
-            className="f-input"
-            value={img}
-            onChange={(e) => setImg(e.target.value)}
-            placeholder="https://…"
-            inputMode="url"
-          />
-        </div>
+        <div className="f-label">Photo</div>
+        <PhotoUploader value={img} onChange={setImg} />
 
         <div className="f-label">Availability</div>
         <button

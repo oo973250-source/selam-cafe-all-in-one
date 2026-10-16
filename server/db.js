@@ -173,15 +173,41 @@ export async function ensureSchema() {
   );
 
   CREATE TABLE IF NOT EXISTS menu_categories (
-    id         TEXT PRIMARY KEY,
-    name_en    TEXT NOT NULL,
-    name_am    TEXT,
-    icon       TEXT NOT NULL DEFAULT '🍽️',
-    section    TEXT NOT NULL DEFAULT 'food' CHECK (section IN ('food', 'drink')),
-    hidden     BOOLEAN NOT NULL DEFAULT FALSE,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    id          TEXT PRIMARY KEY,
+    name_en     TEXT NOT NULL,
+    name_am     TEXT,
+    icon        TEXT NOT NULL DEFAULT '🍽️',
+    section     TEXT NOT NULL DEFAULT 'food' CHECK (section IN ('food', 'drink')),
+    hidden      BOOLEAN NOT NULL DEFAULT FALSE,
+    no_delivery BOOLEAN NOT NULL DEFAULT FALSE,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
   );
+  -- Migration: DBs created before the No-delivery switch existed (idempotent).
+  ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS no_delivery BOOLEAN NOT NULL DEFAULT FALSE;
+
+  -- User reports (Section 7): admins reporting suspicious/abusive users.
+  -- Reports are ALLEGATIONS with a review lifecycle — never automatic guilt.
+  CREATE TABLE IF NOT EXISTS user_reports (
+    id               SERIAL PRIMARY KEY,
+    tg_user_id       BIGINT NOT NULL,
+    tg_username      TEXT,
+    tg_first_name    TEXT,
+    category         TEXT NOT NULL CHECK (category IN (
+                       'spam', 'duplicate_orders', 'order_flooding', 'payment_fraud',
+                       'fake_orders', 'restriction_bypass', 'exploitation', 'harassment', 'other')),
+    description      TEXT,
+    evidence         TEXT,
+    status           TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'under_review', 'resolved', 'dismissed')),
+    decision_note    TEXT,
+    blocked_on_resolve BOOLEAN NOT NULL DEFAULT FALSE,
+    reporter_tg_user_id BIGINT,
+    reporter_name    TEXT,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    reviewed_at      TIMESTAMPTZ
+  );
+  CREATE INDEX IF NOT EXISTS idx_user_reports_tg_user_id ON user_reports(tg_user_id);
+  CREATE INDEX IF NOT EXISTS idx_user_reports_status     ON user_reports(status);
   -- Migrations for DBs created before section/hidden existed (idempotent).
   ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS section TEXT NOT NULL DEFAULT 'food';
   ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS hidden  BOOLEAN NOT NULL DEFAULT FALSE;
@@ -198,6 +224,9 @@ export async function ensureSchema() {
   -- before the admin miniapp existed; idempotent).
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS note            TEXT;
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_phone  TEXT;
+
+  -- Section 3.1: removing a blocked user's orders from the ACTIVE queue must
+  -- not erase history — queue queries LEFT-JOIN blocked_users instead.
 
   INSERT INTO menu_categories (id, name_en, name_am, icon, section, sort_order)
   VALUES
@@ -312,6 +341,38 @@ export async function createOrder({ tgUserId, tgUsername, tgFirstName, payload }
   )
 
   return { id: orderId, tgUserId: rows[0].tg_user_id }
+}
+
+/**
+ * Active-order count for the admin Mini App order limit (6.1).
+ * 'Active' = still being worked: new | preparing | ready. Served orders are
+ * done (customer got their food), cancelled ones never were — neither counts.
+ */
+export async function countActiveOrders() {
+  try {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM orders WHERE status IN ('new', 'preparing', 'ready')`
+    )
+    return rows[0]?.n || 0
+  } catch (e) {
+    console.warn('[db] countActiveOrders failed (fail-open):', e.message)
+    return 0
+  }
+}
+
+/**
+ * Category restriction map for order validation (Sections 5.1 / 5.2):
+ * category id → { available, no_delivery }. Used by the order intake gate so
+ * unavailable categories are unorderable and delivery-restricted categories
+ * can't land in a delivery order — even via a hand-crafted request.
+ */
+export async function loadCategoryRestrictions() {
+  const { rows } = await pool.query(
+    `SELECT id, hidden FROM menu_categories`
+  )
+  const map = {}
+  for (const r of rows) map[r.id] = { available: !r.hidden }
+  return map
 }
 
 export async function updateOrderStatus(orderId, status, extra = {}) {
@@ -443,6 +504,115 @@ export async function unblockUser(idOrUsername) {
   if (!ref) return null
   await pool.query(`DELETE FROM blocked_users WHERE tg_user_id = $1`, [ref.tg_user_id])
   return ref
+}
+
+/**
+ * Resolve an order-user lookup for the Reports flow (Section 7): the admin
+ * pastes a Telegram ID / @username, the server returns identity + order
+ * history summary (NO payment details). Returns null when nothing found.
+ */
+export async function lookupUserForReport(idOrUsername) {
+  const raw = String(idOrUsername || '').trim().replace(/^@/, '')
+  if (!raw) return null
+  const idMatch = /^\d+$/.test(raw)
+
+  let userRow
+  if (idMatch) {
+    const { rows } = await pool.query(
+      `SELECT DISTINCT ON (tg_user_id)
+              tg_user_id, tg_username, tg_first_name
+         FROM orders WHERE tg_user_id::text = $1
+        ORDER BY tg_user_id, created_at DESC`, [raw]
+    )
+    userRow = rows[0] || { tg_user_id: Number(raw), tg_username: null, tg_first_name: null }
+  } else {
+    const { rows } = await pool.query(
+      `SELECT DISTINCT ON (tg_user_id)
+              tg_user_id, tg_username, tg_first_name
+         FROM orders WHERE lower(tg_username) = lower($1)
+        ORDER BY tg_user_id, created_at DESC`, [raw]
+    )
+    if (!rows[0]) return null
+    userRow = rows[0]
+  }
+
+  const { rows: stats } = await pool.query(
+    `SELECT COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE status = 'cancelled')::int AS cancelled,
+            COUNT(*) FILTER (WHERE status IN ('new','preparing','ready'))::int AS active,
+            COALESCE(SUM(total) FILTER (WHERE status = 'served'), 0)::int AS served_total
+       FROM orders WHERE tg_user_id = $1`,
+    [Number(userRow.tg_user_id)]
+  )
+  const { rows: recent } = await pool.query(
+    `SELECT id, service_type, customer_name, total, status, created_at, items
+       FROM orders WHERE tg_user_id = $1
+      ORDER BY created_at DESC LIMIT 10`,
+    [Number(userRow.tg_user_id)]
+  )
+  const { rows: blockedNow } = await pool.query(
+    `SELECT 1 FROM blocked_users WHERE tg_user_id = $1`,
+    [Number(userRow.tg_user_id)]
+  )
+
+  return {
+    ...userRow,
+    is_blocked: blockedNow.length > 0,
+    stats: stats[0] || { total: 0, cancelled: 0, active: 0, served_total: 0 },
+    recent_orders: recent,
+  }
+}
+
+/**
+ * Create a user report (Section 7). Returns the row. input-checked by the
+ * route; validation happens before this is called.
+ */
+export async function createUserReport({
+  tgUserId, tgUsername, tgFirstName, category, description, evidence, reporterTgUserId, reporterName,
+}) {
+  const { rows } = await pool.query(
+    `INSERT INTO user_reports
+       (tg_user_id, tg_username, tg_first_name, category, description, evidence,
+        reporter_tg_user_id, reporter_name)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING *`,
+    [Number(tgUserId), tgUsername || null, tgFirstName || null, category,
+      description || null, evidence || null,
+      reporterTgUserId ? Number(reporterTgUserId) : null, reporterName || null]
+  )
+  return rows[0]
+}
+
+export async function listUserReports(limit = 100) {
+  const { rows } = await pool.query(
+    `SELECT * FROM user_reports ORDER BY (status = 'pending') DESC, created_at DESC LIMIT $1`,
+    [limit]
+  )
+  return rows
+}
+
+/**
+ * Review / resolve / dismiss a report (Section 7). Only the recorded fields
+ * change — the report NEVER auto-blocks anyone; blocking is an explicit,
+ * authorized admin action recorded separately.
+ */
+export async function reviewUserReport(id, { status, decisionNote, blockedOnResolve }, actorName) {
+  const allowed = ['pending', 'under_review', 'resolved', 'dismissed']
+  const { rows } = await pool.query(
+    `UPDATE user_reports
+        SET status            = COALESCE($2, status),
+            decision_note     = COALESCE($3, decision_note),
+            blocked_on_resolve = COALESCE($4, blocked_on_resolve),
+            reviewed_at       = CASE WHEN $2 IS NOT NULL THEN now() ELSE reviewed_at END
+      WHERE id = $1
+      RETURNING *`,
+    [Number(id), allowed.includes(status) ? status : null, decisionNote ?? null,
+      typeof blockedOnResolve === 'boolean' ? blockedOnResolve : null]
+  )
+  if (rows[0]) {
+    console.log(`[reports] report #${id} reviewed → status=${status || 'unchanged'} by ${actorName}`)
+  }
+  return rows[0] || null
 }
 
 export async function listBlockedUsers() {
