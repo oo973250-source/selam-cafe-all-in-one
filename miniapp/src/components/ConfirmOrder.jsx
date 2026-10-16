@@ -66,7 +66,12 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
           {/* Big chef, bottom edge tucked slightly behind the title so she
               "leans" on it (reference screenshot). Negative bottom margin
               pulls the title up into her clasped-hands zone; the title's
-              zIndex keeps the text readable. */}
+              zIndex keeps the text readable.
+              pose-7's drawing actually ends at canvas row ~307 of 566 (the
+              lower half of the file is fully transparent), so the visible
+              silhouette bottom lands at ~236px of the 436px box. Margin
+              -200px sets the title right at her hands — closes the dead
+              gap that previously pushed the order box far down the page. */}
           <img
             src="/owner/pose-7-leaning-transparent.png"
             alt="Chef confirming your order"
@@ -79,7 +84,7 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
               filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.5))',
               userSelect: 'none',
               pointerEvents: 'none',
-              margin: '0 auto -88px',
+              margin: '0 auto -200px',
               display: 'block',
               position: 'relative',
               zIndex: 1,
