@@ -12,7 +12,7 @@ import { getT, normalizeLang, SUPPORTED_LANGS } from '../utils/i18n.js'
  *   2. Telegram client   — window.Telegram.WebApp.initDataUnsafe.user.
  *                          language_code, read synchronously (no effect /
  *                          no second render), normalised via normalizeLang.
- *   3. English.
+ *   3. Amharic (the bot's default language).
  *
  * Every screen MUST read the locale through useLang() — never call getT()
  * with a per-screen default, and never read localStorage/URL itself. That is
@@ -46,7 +46,7 @@ function telegramLang() {
 
 /** Resolved once at module-eval/provider-mount time — stable for the session. */
 function resolveInitialLang() {
-  return urlLang() || telegramLang() || 'en'
+  return urlLang() || telegramLang() || 'am'
 }
 
 export function LangProvider({ children }) {

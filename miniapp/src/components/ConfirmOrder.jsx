@@ -51,7 +51,7 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       {/* Outdoor cafe stall photo — the one used across the app, per spec */}
-      <SmartCafeBg {...bgProps} forceBg="day-stall" blur={3} brightness={0.42} />        <div className="frame-scroll no-bottom-bar"
+      <SmartCafeBg blur={3} brightness={0.42} />        <div className="frame-scroll no-bottom-bar"
         style={{
           position: 'relative',
           zIndex: 2,

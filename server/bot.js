@@ -249,23 +249,30 @@ const SERVICE_LABELS = {
 }
 
 // ── User language (DB-persisted) ─────────────────────────────────────────
-// Choices survive bot restarts. Falls back to the Telegram client language
-// for first-time users, then English.
+// Choices survive bot restarts. DEFAULT = Amharic: users who never picked a
+// language fall back to Amharic. Telegram clients running in English keep
+// getting English (see the /start seam below) — everything else gets Amharic.
 const FALLBACK_CLIENT_LANGS = { am: 'am', om: 'om', or: 'om', en: 'en' }
+const DEFAULT_LANG = 'am'
 
 function normalizeLang(code) {
   const base = (code || '').toLowerCase().split('-')[0]
   if (base === 'or') return 'om'
   if (base === 'am' || base === 'om') return base
-  return 'en'
+  return DEFAULT_LANG
 }
 
+// Kept in place because several callers remember the client language when
+// the user has never chosen one — a Telegram client that speaks English
+// still gets English, anything else defaults to Amharic.
 async function getUserLang(id) {
   try {
-    return await dbGetUserLang(id)
+    const stored = await dbGetUserLang(id)
+    if (stored) return stored
+    return DEFAULT_LANG
   } catch (e) {
-    console.warn('[bot] getUserLang failed, defaulting to en:', e.message)
-    return 'en'
+    console.warn('[bot] getUserLang failed, defaulting to am:', e.message)
+    return DEFAULT_LANG
   }
 }
 
@@ -1368,7 +1375,7 @@ export async function startBot(io) {
   // ── /start ─────────────────────────────────────────────────────────────
   bot.onText(/\/start(\s+(.+))?$/, async (msg, match) => {
     const name = msg.from.first_name || ''
-    const clientLang = FALLBACK_CLIENT_LANGS[(msg.from.language_code || '').toLowerCase().split('-')[0]] || 'en'
+    const clientLang = FALLBACK_CLIENT_LANGS[(msg.from.language_code || '').toLowerCase().split('-')[0]] || DEFAULT_LANG
     const lang = await getUserLang(msg.from.id)
     const deepLink = match?.[2]
     const cafe = await currentCafeName()
@@ -1381,9 +1388,11 @@ export async function startBot(io) {
       parse_mode: 'Markdown',
       ...languageButtons(),
     }).catch(() => {})
-    // Remember the Telegram client language for first-time users so their
-    // first HTTP order already arrives in their language.
-    if (lang === 'en' && clientLang !== 'en') {
+    // Remember the Telegram client language for first-time users (the stored
+    // default is Amharic) so their first HTTP order already arrives in their
+    // language. An English client still gets English; everyone else who has
+    // never picked keeps the Amharic default.
+    if (lang === DEFAULT_LANG && clientLang !== DEFAULT_LANG) {
       await rememberUserLang(msg.from.id, clientLang, msg.from.username, msg.from.first_name)
     }
   })
@@ -1757,7 +1766,7 @@ export async function startBot(io) {
     }
 
     // Remember the client language if the user never picked one.
-    await rememberUserLang(user.id, user.language_code || 'en', user.username, user.first_name)
+    await rememberUserLang(user.id, user.language_code || DEFAULT_LANG, user.username, user.first_name)
     const lang = await getUserLang(user.id)
 
     await sendOrderConfirmation(chatId, mergeOrderForMessages(order, payload), await safeTodaysCount(user.id), lang)

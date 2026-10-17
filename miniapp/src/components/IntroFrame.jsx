@@ -61,14 +61,14 @@ export default function IntroFrame({ onAdvance }) {
       }}
     >
       {/* ────────────────────────────────────────────────────────────
-          Background: night-stall.png
+          Background: day-stall.webp (the app's single bright bg).
           Slow zoom across both phases for cinematic feel.
       ──────────────────────────────────────────────────────────── */}
       <motion.div
         style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: 'url(/backgrounds/night-stall.png)',
+          backgroundImage: 'url(/backgrounds/day-stall.webp)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}

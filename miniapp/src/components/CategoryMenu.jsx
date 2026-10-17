@@ -161,6 +161,8 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
                           src={item.image_url}
                           alt={item.nameEn}
                           draggable={false}
+                          loading="eager"
+                          decoding="async"
                           style={{
                             width: '100%',
                             height: '100%',
@@ -202,7 +204,7 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
                   {has && <span className="qty-value">{qty}</span>}
                   <button
                     type="button"
-                    className="qty-btn qty-plus"
+                    className={`qty-btn qty-plus ${expandedId === item.id ? 'qty-plus-glow' : ''}`}
                     aria-label={`Add one ${item.nameEn}`}
                     onClick={() => {
                       addItem({

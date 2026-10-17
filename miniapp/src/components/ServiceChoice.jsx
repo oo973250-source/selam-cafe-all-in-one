@@ -71,21 +71,18 @@ const SERVICES = [
     icon: '🍽️',
     labelKey: 'dineIn',
     descKey: 'dineInDesc',
-    bg: 'dine-in-cozy',
   },
   {
     key: 'takeaway',
     icon: '🥡',
     labelKey: 'takeaway',
     descKey: 'takeawayDesc',
-    bg: 'takeaway-bustling',
   },
   {
     key: 'delivery',
     icon: '🚗',
     labelKey: 'delivery',
     descKey: 'deliveryDesc',
-    bg: 'night-taxi',
   },
 ]
 
@@ -93,7 +90,6 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
   const { setServiceType } = useCart()
   const { hapticFeedback } = useTelegram()
   const { t } = useLang()
-  const [hoveredBg, setHoveredBg] = useState(null)
   // Server-driven service availability (Section 6.2): the delivery option is
   // MUTED + NON-CLICKABLE when the admin pauses delivery — the state comes
   // from GET /api/miniapp/intake, matching the backend order gate exactly.
@@ -124,12 +120,7 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
-      <SmartCafeBg
-        {...bgProps}
-        forceBg={hoveredBg || bgProps?.forceBg}
-        blur={3}
-        brightness={0.35}
-      />
+      <SmartCafeBg blur={3} brightness={0.35} />
 
       {/* ────────────────────────────────────────────────────────────
           Top-right: cafe logo in a white circle
@@ -299,15 +290,6 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
                   transition={{ delay: 0.5 + i * 0.1, duration: 0.4 }}
                   whileHover={muted ? undefined : { scale: 1.06, y: -2 }}
                   whileTap={muted ? undefined : { scale: 0.95 }}
-                  onMouseEnter={() => !muted && setHoveredBg(svc.bg)}
-                  onMouseLeave={() => setHoveredBg(null)}
-                  onTouchStart={() => {
-                    if (!muted) {
-                      setHoveredBg(svc.bg)
-                      hapticFeedback.selectionChanged()
-                    }
-                  }}
-                  onTouchEnd={() => setHoveredBg(null)}
                   onClick={() => handleSelect(svc)}
                   style={{
                     flex: 0,
