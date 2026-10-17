@@ -51,14 +51,11 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       {/* Outdoor cafe stall photo — the one used across the app, per spec */}
-      <SmartCafeBg {...bgProps} forceBg="day-stall" blur={3} brightness={0.42} />
-
-      <div
-        className="frame-scroll no-bottom-bar"
+      <SmartCafeBg {...bgProps} forceBg="day-stall" blur={3} brightness={0.42} />        <div className="frame-scroll no-bottom-bar"
         style={{
           position: 'relative',
           zIndex: 2,
-          padding: '6px 16px calc(var(--safe-bottom) + 24px)',
+          padding: '5px 16px calc(var(--safe-bottom) + 22px)',
         }}
       >
         {/* ── HERO: chef above the gold title, divider with chef-hat ── */}
@@ -77,14 +74,14 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
             alt="Chef confirming your order"
             draggable={false}
             style={{
-              width: 340,
-              height: 436,
+              width: 282,
+              height: 362,
               objectFit: 'contain',
               objectPosition: 'top center',
-              filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.5))',
+              filter: 'drop-shadow(0 5px 14px rgba(0,0,0,0.5))',
               userSelect: 'none',
               pointerEvents: 'none',
-              margin: '0 auto -200px',
+              margin: '0 auto -166px',
               display: 'block',
               position: 'relative',
               zIndex: 1,
@@ -95,9 +92,9 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
               position: 'relative',
               zIndex: 2,
               fontFamily: 'var(--font-display)',
-              fontSize: 30,
+              fontSize: 23.5,
               fontWeight: 800,
-              margin: '0 0 10px',
+              margin: '0 0 6px',
               color: '#FFC107',
               letterSpacing: 0.3,
               textShadow: '0 2px 10px rgba(0,0,0,0.75)',
@@ -105,35 +102,38 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
           >
             {t('confirmTitle')}
           </h1>
+          <span aria-hidden>👨‍🍳</span>
           {/* Gold rules flanking a small chef-hat icon */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 12,
-              maxWidth: 280,
-              margin: '0 auto 18px',
+              gap: 10,
+              maxWidth: 236,
+              margin: '0 auto 10px',
             }}
           >
             <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #FFC107)' }} />
-            <span style={{ fontSize: 16 }} aria-hidden>👨‍🍳</span>
+              <span style={{ fontSize: 14.5 }} aria-hidden>👨‍🍳</span>
             <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #FFC107, transparent)' }} />
+
           </div>
-        </div>          {items.length === 0 ? (
+        </div>
+
+        {items.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: 24 }}>
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
               {t('confirmCartEmpty')}
             </p>
           </div>        ) : (
-          /* ── ORDER SUMMARY CARD (scrollable) ── */
-          <div
+          /* ── ORDER SUMMARY CARD (scrollable) ── */          <div
             style={{
-              background: 'rgba(15, 23, 30, 0.85)',
-              borderRadius: 16,
-              border: '1px solid rgba(255, 193, 7, 0.35)',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+              background: 'rgba(15, 23, 30, 0.782)',
+              borderRadius: 13,
+              border: '1px solid rgba(255, 193, 7, 0.32)',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.4)',
               overflow: 'hidden',
-              maxHeight: 368,
+              maxHeight: 285,
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch',
             }}
@@ -142,28 +142,28 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
               <div
                 key={item.id}
                 className="anim-slideInUp"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '14px 14px',
-                  marginBottom: 10,
-                  borderBottom: '1px solid rgba(255,255,255,0.07)',
-                  animationDelay: `${i * 60}ms`,
+                style={{                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 11,
+                    padding: '10px 13px',
+                    marginBottom: 6,
+                    borderBottom: '1px solid rgba(255,255,255,0.07)',
+                    animationDelay: `${i * 45}ms`,
+
                 }}
               >
                 {/* Thumbnail */}
                 <div
                   style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 12,
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
                     background: 'rgba(255,255,255,0.06)',
                     border: '1px solid rgba(255,255,255,0.1)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 24,
+                    fontSize: 19,
                     flexShrink: 0,
                   }}
                   aria-hidden
@@ -173,28 +173,26 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
 
                 {/* Name + unit price */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, color: '#FFFFFF', fontSize: 15, lineHeight: 1.2 }}>
+                  <div style={{ fontWeight: 700, color: '#FFFFFF', fontSize: 13, lineHeight: 1.2 }}>
                     {primaryName(item)}
                   </div>
-                  <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>
+                  <div style={{ fontSize: 10.5, color: '#9CA3AF', marginTop: 1 }}>
                     {item.price} Br {t('each')} · {secondaryName(item)}
                   </div>
-                </div>
-
-                {/* Circular qty stepper — dark minus, gold plus */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                </div>                {/* Circular qty stepper — dark minus, gold plus */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   <button
                     type="button"
                     aria-label={`${t('decreaseQty')} ${primaryName(item)}`}
                     onClick={() => handleMinus(item)}
                     style={{
-                      width: 36,
-                      height: 36,
+                      width: 30,
+                      height: 30,
                       borderRadius: '50%',
                       border: '1px solid rgba(255,255,255,0.16)',
                       background: 'rgba(255,255,255,0.08)',
                       color: '#fff',
-                      fontSize: 18,
+                      fontSize: 15,
                       lineHeight: 1,
                       cursor: 'pointer',
                       flexShrink: 0,
@@ -202,7 +200,7 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
                   >
                     −
                   </button>
-                  <span style={{ minWidth: 22, textAlign: 'center', fontWeight: 700, color: '#fff', fontSize: 16 }}>
+                  <span style={{ minWidth: 18, textAlign: 'center', fontWeight: 700, color: '#fff', fontSize: 13.5 }}>
                     {item.quantity}
                   </span>
                   <button
@@ -210,29 +208,31 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
                     aria-label={`${t('increaseQty')} ${primaryName(item)}`}
                     onClick={() => handlePlus(item)}
                     style={{
-                      width: 36,
-                      height: 36,
+                      width: 30,
+                      height: 30,
                       borderRadius: '50%',
                       border: 'none',
                       background: '#FFC107',
                       color: '#1a1a1a',
-                      fontSize: 20,
+                      fontSize: 16,
                       fontWeight: 700,
                       lineHeight: 1,
                       cursor: 'pointer',
                       flexShrink: 0,
                     }}
                   >
-                    +                  </button>
+                    +
+                  </button>
                 </div>
+
                 {/* Line total */}
                 <div
                   style={{
-                    minWidth: 64,
+                    minWidth: 58,
                     textAlign: 'right',
                     color: '#FFC107',
                     fontWeight: 800,
-                    fontSize: 15,
+                    fontSize: 14,
                     flexShrink: 0,
                   }}
                 >
@@ -247,7 +247,7 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '14px 14px',
+                padding: '10px 13px',
                 borderTop: '1px solid rgba(255,193,7,0.22)',
                 /* Opaque background — the sticky Total used to be nearly
                    transparent (4% gold wash), so cart rows were visibly
@@ -258,13 +258,14 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
                 bottom: 0,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 18 }} aria-hidden>📜</span>
-                <span style={{ fontWeight: 700, color: '#FFFFFF', fontSize: 15 }}>{t('total')}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span style={{ fontSize: 13.5 }} aria-hidden>📜</span>
+                <span style={{ fontWeight: 700, color: '#FFFFFF', fontSize: 13 }}>{t('total')}</span>
               </div>
-              <span style={{ color: '#FFC107', fontWeight: 800, fontSize: 22 }}>
+              <span style={{ color: '#FFC107', fontWeight: 800, fontSize: 18.5 }}>
                 {total} Br
               </span>
+              <span style={{ fontSize: 16.5 }} aria-hidden>📜</span>
             </div>
           </div>
         )}
@@ -276,33 +277,34 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
           position: 'absolute',
           left: 16,
           right: 16,
-          bottom: 'calc(var(--safe-bottom) + 16px)',
-          zIndex: 3,
-        }}
+          bottom: 'calc(var(--safe-bottom) + 14px)',
+          zIndex: 3,        }}
       >
+
+
         {/* Row 1: Add More + Pay */}
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 9 }}>
           <button
             type="button"
             className={items.length === 0 ? 'btn btn-secondary' : 'btn-teal'}
-            style={{ flex: 1, minHeight: 52, borderRadius: 999 }}
+            style={{ flex: 1, minHeight: 44, borderRadius: 999 }}
             onClick={() => {
               hapticFeedback.impactOccurred('light')
               onAddMore?.()
             }}
           >
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 15 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13 }}>
               <span
                 style={{
-                  width: 26,
-                  height: 26,
+                  width: 21,
+                  height: 21,
                   borderRadius: '50%',
                   background: 'rgba(52,211,153,0.22)',
                   border: '1px solid rgba(110,231,183,0.4)',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 14,
+                  fontSize: 12,
                   color: '#6EE7B7',
                 }}
                 aria-hidden
@@ -322,7 +324,7 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
             }}
             style={{
               flex: 1.15,
-              minHeight: 52,
+              minHeight: 44,
               borderRadius: 999,
               border: 'none',
               cursor: items.length === 0 ? 'not-allowed' : 'pointer',
@@ -330,33 +332,35 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
                 ? 'rgba(255,193,7,0.18)'
                 : 'linear-gradient(135deg, #FFD54F 0%, #FFB300 100%)',
               color: '#1a1a1a',
-              boxShadow: items.length === 0 ? 'none' : '0 6px 18px rgba(255,193,7,0.35)',
+              boxShadow: items.length === 0 ? 'none' : '0 4px 12px rgba(255,193,7,0.32)',
               opacity: items.length === 0 ? 0.7 : 1,
             }}
           >
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 15 }}>
-              <span aria-hidden>💳</span>
-              {t('payTotal').replace('{n}', total)}
-              <span aria-hidden style={{ fontSize: 14 }}>→</span>
-            </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13 }}>
+                <span aria-hidden>💳</span>
+                {t('payTotal').replace('{n}', total)}
+                <span aria-hidden style={{ fontSize: 12.5 }}>→</span>
+              </span>
           </button>
+
         </div>
 
         {/* Row 2: Back */}
         <button
           type="button"
           className="btn-back-pill"
-          style={{ display: 'block', margin: '10px auto 0', minWidth: 160 }}
+          style={{ display: 'block', margin: '7px auto 0', minWidth: 140 }}
           onClick={() => {
             hapticFeedback.impactOccurred('light')
             onBack?.()
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 14 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 12.5 }}>
             <span aria-hidden>←</span>
             {t('backShort')}
           </span>
         </button>
+
       </div>
     </div>
   )
