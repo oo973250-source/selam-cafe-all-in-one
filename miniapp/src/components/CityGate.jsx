@@ -78,6 +78,55 @@ export function useCityGate() {
   return ctx
 }
 
+/**
+ * Try NOT to use navigator.geolocation first: Telegram's in-app WebView
+ * (iOS especially) has no geolocation support and Android may silently
+ * deny it. Telegram's own WebApp.requestLocation() shows the native
+ * "share location" popup and works on both platforms. Returns
+ * {lat, lon} or null (nothing answered / user declined).
+ */
+function coordsViaTelegram(timeoutMs = 10000) {
+  const tg = window?.Telegram?.WebApp
+  if (!tg || typeof tg.requestLocation !== 'function') return Promise.resolve(null)
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(value)
+    }
+    const timer = setTimeout(() => finish(null), timeoutMs)
+    try {
+      tg.requestLocation((ok, loc) => {
+        finish(ok && loc ? { lat: loc.latitude, lon: loc.longitude } : null)
+      })
+    } catch {
+      finish(null)
+    }
+  })
+}
+
+/**
+ * Browser geolocation as fallback (works in the Telegram desktop app's
+ * browser and in a normal browser tab). Mirrors the old result shape.
+ */
+function coordsViaNavigator(timeoutMs = 12000) {
+  if (!navigator?.geolocation) return Promise.resolve({ error: 'unsupported' })
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+      }),
+      (err) => resolve({
+        error: err?.code === 1 ? 'denied' : err?.code === 3 ? 'timeout' : 'failed',
+      }),
+      { enableHighAccuracy: false, timeout: timeoutMs, maximumAge: 60000 }
+    )
+  })
+}
+
 export default function CityGate({ children }) {
   const { hapticFeedback } = useTelegram()
 
@@ -100,31 +149,30 @@ export default function CityGate({ children }) {
   const closeLocationModal = useCallback(() => setModal(null), [])
 
   const verifyByGps = useCallback(async () => {
-    if (!navigator?.geolocation) {
-      setModal((m) => ({ ...m, note: 'geolocationUnavailable' }))
-      return
-    }
     setModal((m) => ({ ...m, busy: true, note: null }))
-    let coords = null
-    let errCode = 'failed'
-    try {
-      coords = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve({
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude,
-          }),
-          (err) => reject(err),
-          { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
-        )
-      })
-    } catch (err) {
-      errCode = err?.code === 1 ? 'denied' : err?.code === 3 ? 'timeout' : 'failed'
+
+    // 1. Telegram-native location (most reliable inside the Telegram app,
+    //    including iOS where navigator.geolocation doesn't exist).
+    let coords = await coordsViaTelegram()
+    let errCode = 'telegram'
+
+    // 2. Browser geolocation fallback (Telegram desktop / normal browser).
+    if (!coords) {
+      const nav = await coordsViaNavigator()
+      if (nav?.lat) {
+        coords = { lat: nav.lat, lon: nav.lon }
+      } else {
+        errCode = nav?.error || 'failed'
+      }
     }
 
     if (!coords) {
       hapticFeedback.notificationOccurred('warning')
-      setModal((m) => ({ ...m, busy: false, note: errCode === 'denied' ? 'denied' : 'failed' }))
+      setModal((m) => ({
+        ...m,
+        busy: false,
+        note: errCode === 'denied' ? 'denied' : errCode === 'timeout' ? 'timeout' : 'failed',
+      }))
       return
     }
 
