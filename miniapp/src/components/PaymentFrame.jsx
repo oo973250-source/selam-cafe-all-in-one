@@ -236,15 +236,6 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
         return
       }
 
-      // 429 rate_limited = order flood guard: >10 orders in one minute were
-      // blocked server-side and every open order that user still had was
-      // automatically cancelled (the admin queue sees them flip live to
-      // 'cancelled').
-      if (res.status === 429 && (data.rate_limited || data.error === 'too many orders')) {
-        setOrderWarning(data.message || t('tooManyOrdersMsg'))
-        return
-      }
-
       // 409 = delivery globally unavailable OR a no-delivery category
       if (res.status === 409 && (data.delivery_unavailable || data.no_delivery || data.error === 'delivery unavailable')) {
         setOrderWarning(
