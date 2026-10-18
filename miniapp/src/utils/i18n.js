@@ -25,6 +25,7 @@ const translations = {
     introSubtitle: 'Fresh. Warm. Made with love.',
     introPrompt: 'How would you like your order?',
     introTapHint: 'Tap anywhere to continue',
+    adamaBanner: 'We deliver only in Adama',
     // Service choice (Frame 1)
     serviceTitle: 'How would you like to enjoy?',
     serviceSubtitle: 'Choose a service to begin your order',
@@ -159,6 +160,8 @@ const translations = {
     adamaLocationFailed: 'Could not get your location. Please make sure location services are enabled and try again.',
     // Order flood guard (server gate message fallback)
     tooManyOrdersMsg: 'Too many orders in a short time. Your recent orders were cancelled and ordering is paused. Please contact the cafe.',
+    // Adama-only delivery refusal (checked after name + location are shared)
+    outsideAdamaRefuse: 'We only accept delivery orders from within Adama',
   },
 
   am: {
@@ -167,6 +170,7 @@ const translations = {
     introSubtitle: 'ትኩስ። ሞቅ። በፍቅር የተሰራ።',
     introPrompt: 'ትዕዛዝዎን እንዴት ይፈልጋሉ?',
     introTapHint: 'ለመቀጠል የትኛውንም ቦታ ይንኩ',
+    adamaBanner: 'በአዳማ ብቻ እናቀርባለን',
     // Service choice
     serviceTitle: 'እንዴት እንደሚደሰቱ ይፈልጋሉ?',
     serviceSubtitle: 'ትዕዛዝዎን ለመጀመር አገልግሎት ይምረጡ',
@@ -301,6 +305,7 @@ const translations = {
     adamaLocationTimeout: 'አድራሻዎን ማግኘት በጣም ተቆርጧል። GPS በጠና እንደገና ይሞክሩ።',
     adamaLocationFailed: 'አድራሻዎን ማግኘት አልቻልንም። እባክዎ አድራሻዎ አብልቷል ወይም ዝግጁ አለ ያረጋግጡ።',
     tooManyOrdersMsg: 'በጣም ብዙ ትዕዛዝ አዝዘዋል። የቅርብ ጊዜ ትዕዛዞችዎ ተሰርዘዋል እና ማዘዝ በጊዜው ተረጋግጧል። እባክዎ ካፌውን ያግኙ።',
+    outsideAdamaRefuse: 'ትዕዛዝ ከአዳማ ውስጥ ብቻ እንቀበላለን',
   },
 
   om: {
@@ -309,6 +314,7 @@ const translations = {
     introSubtitle: "Haaraa. Hoo'a. Jaalalaan hojjate.",
     introPrompt: 'Rakoo keessan akkamitti barbaadduu?',
     introTapHint: 'Itti fufuuf bakka kamiyyuu tuqi',
+    adamaBanner: 'Adama qofa dabarsina',
     // Service choice
     serviceTitle: 'Akkamitti gammaduu barbaadda?',
     serviceSubtitle: 'Rakoo jalqabuuf tajaajila filadhaa',
@@ -442,6 +448,7 @@ const translations = {
     adamaLocationTimeout: 'Iddoo kee arguun yeroo dheeraadhe. GPS mirkaneessii irra deebi\u2019i yaali.',
     adamaLocationFailed: 'Iddoo kee arguun hin dandeenye. GPS banaa taasii irra deebi\u2019i yaali.',
     tooManyOrdersMsg: 'Yeroo gabaabaa keessatti ajaja baay’een ergitajirta. Ajajawwan dhiyoo haqamanii ajajni kun hin qaqqabe. Maaloo kafee qunnamsiisi.',
+    outsideAdamaRefuse: 'Ajaja dabarsuu Adama keessa qaqqabna qofa',
   },
 }
 

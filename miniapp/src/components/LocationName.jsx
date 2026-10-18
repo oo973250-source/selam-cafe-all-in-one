@@ -3,6 +3,7 @@ import SmartCafeBg from './SmartCafeBg.jsx'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
 import { useLang } from '../context/LangContext.jsx'
+import { getCurrentCoords, distanceKmToAdama } from './AdamaGate.jsx'
 
 /**
  * LocationName (Frame 5)
@@ -31,40 +32,45 @@ export default function LocationName({ bgProps, onPlaceOrder }) {
   const [manualAddress, setManualAddress] = React.useState(
     customerLocation?.address || ''
   )
+  // Adama-only enforcement (user request): the check happens HERE, at the
+  // very end, after the customer shares name + location. When the captured
+  // GPS places them outside the service radius the order is refused: a red
+  // refusal notice replaces the success line and "Place Order" disables.
+  const [outsideAdamaKm, setOutsideAdamaKm] = React.useState(null)
 
   const isDelivery = serviceType === 'delivery'
   const hasName = customerName.trim().length > 0
   const hasLocation =
     !isDelivery ||
     (customerLocation && (customerLocation.lat || customerLocation.address))
-  const canProceed = hasName && hasLocation
+  const canProceed = hasName && hasLocation && outsideAdamaKm === null
 
-  const handleShareLocation = () => {
-    if (!navigator?.geolocation) {
-      // eslint-disable-next-line no-alert
-      alert(t('geolocationUnavailable'))
-      return
-    }
+  const handleShareLocation = async () => {
     setLocating(true)
     hapticFeedback.impactOccurred('light')
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCustomerLocation({
-          lat: pos.coords.latitude,
-          lon: pos.coords.longitude,
-          address: manualAddress,
-        })
-        setLocating(false)
-        hapticFeedback.notificationOccurred('success')
-      },
-      () => {
-        setLocating(false)
-        hapticFeedback.notificationOccurred('error')
-        // eslint-disable-next-line no-alert
-        alert(t('geolocationFailed'))
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    )
+
+    // GPS capture: Telegram-native requestLocation first (works on iOS
+    // where navigator.geolocation is unavailable), browser API fallback.
+    const coords = await getCurrentCoords()
+
+    if (!coords) {
+      setLocating(false)
+      hapticFeedback.notificationOccurred('error')
+      // eslint-disable-next-line no-alert
+      alert(t('geolocationFailed'))
+      return
+    }
+
+    // Adama verdict on the captured coordinates.
+    const { inAdama, km } = distanceKmToAdama(coords.lat, coords.lon)
+    setOutsideAdamaKm(inAdama ? null : Math.round(km))
+    setCustomerLocation({
+      lat: coords.lat,
+      lon: coords.lon,
+      address: manualAddress,
+    })
+    setLocating(false)
+    hapticFeedback.notificationOccurred(inAdama ? 'success' : 'error')
   }
 
   const handleAddressChange = (e) => {
@@ -149,15 +155,24 @@ export default function LocationName({ bgProps, onPlaceOrder }) {
               <div
                 style={{
                   fontSize: 12,
-                  color: 'var(--accent-green)',
+                  color: outsideAdamaKm !== null
+                    ? 'var(--accent-red, #ff6b6b)'
+                    : 'var(--accent-green)',
                   marginBottom: 10,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
                 }}
               >
-                {t('locationCaptured')} ({customerLocation.lat.toFixed(4)},{' '}
-                {customerLocation.lon.toFixed(4)})
+                {outsideAdamaKm !== null
+                  ? `${t('outsideAdamaRefuse')} (${outsideAdamaKm} km)`
+                  : t('locationCaptured')}
+                {outsideAdamaKm === null && (
+                  <span>
+                    {' '}({customerLocation.lat.toFixed(4)},{' '}
+                    {customerLocation.lon.toFixed(4)})
+                  </span>
+                )}
               </div>
             )}
 

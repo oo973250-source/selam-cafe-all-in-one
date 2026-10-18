@@ -5,7 +5,7 @@ import { useTelegram } from './hooks/useTelegram.js'
 
 import SmartCafeBg from './components/SmartCafeBg.jsx'
 import IntroFrame from './components/IntroFrame.jsx'
-import CityGate from './components/CityGate.jsx'
+import AdamaGate from './components/AdamaGate.jsx'
 import ServiceChoice from './components/ServiceChoice.jsx'
 import MainMenu from './components/MainMenu.jsx'
 import CategoryMenu from './components/CategoryMenu.jsx'
@@ -180,9 +180,9 @@ export default function App() {
   return (
     <LangProvider>
       <CartProvider>
-        <CityGate>
+        <AdamaGate>
           <AppInner />
-        </CityGate>
+        </AdamaGate>
       </CartProvider>
     </LangProvider>
   )

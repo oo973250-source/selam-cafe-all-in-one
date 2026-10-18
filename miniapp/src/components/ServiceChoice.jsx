@@ -5,7 +5,6 @@ import BrandLogo from './BrandLogo.jsx'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
 import { useLang } from '../context/LangContext.jsx'
-import { useCityGate } from './CityGate.jsx'
 
 /**
  * ServiceChoice (Frame 1) — v3
@@ -96,12 +95,6 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
   // from GET /api/miniapp/intake, matching the backend order gate exactly.
   const [deliveryOff, setDeliveryOff] = useState(false)
 
-  // City gate (Adama-only service): delivery is locked outside Adama. The
-  // silent IP/GPS check runs in CityGate; here tapping the locked delivery
-  // button just pops the "Adama only" message with a verify button instead
-  // of advancing into the menu.
-  const { deliveryAllowed, showLocationModal } = useCityGate()
-
   useEffect(() => {
     let alive = true
     fetch('/api/miniapp/intake')
@@ -120,14 +113,9 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
       hapticFeedback.notificationOccurred('warning')
       return // muted option: not selectable
     }
-    // Adama-only guard: without a verified location the delivery button
-    // does NOT advance — it pops the "only works in Adama" message and
-    // offers "Verify My Location" as a recovery path.
-    if (svc.key === 'delivery' && !deliveryAllowed) {
-      hapticFeedback.notificationOccurred('warning')
-      showLocationModal('delivery')
-      return
-    }
+    // Adama enforcement happens LATER, on the Almost-There screen (after the
+    // customer shares name + location) and again server-side — choosing the
+    // icon here must stay friction-free (user request).
     hapticFeedback.impactOccurred('light')
     setServiceType(svc.key)
     onAdvance?.()
@@ -293,19 +281,14 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
               }}
             >
               {SERVICES.map((svc, i) => {
-                // Admin-off AND out-of-Adama both lock the button visually,
-                // but the two cases differ: admin-off shows "Delivery off";
-                // geo-lock stays labeled "Delivery" and responds to taps
-                // with the Adama popup + verify path.
-                const geoLocked = svc.key === 'delivery' && !deliveryAllowed
                 const muted = svc.key === 'delivery' && deliveryOff
                 const unavailable = muted || geoLocked
                 return (
                 <motion.button
                   key={svc.key}
                   type="button"
-                  aria-disabled={geoLocked || muted}
-                  title={unavailable ? (muted ? t('deliveryUnavailableMsg') : t('adamaDeliveryTitle')) : undefined}
+                  aria-disabled={muted}
+                  title={muted ? t('deliveryUnavailableMsg') : undefined}
                   initial={{ opacity: 0, y: 12, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: 0.5 + i * 0.1, duration: 0.4 }}

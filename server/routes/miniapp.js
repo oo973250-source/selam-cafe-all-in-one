@@ -341,6 +341,34 @@ router.post('/orders', async (req, res) => {
       })
     }
 
+    // Adama-only delivery (final gate, user request): if a delivery order
+    // carries real GPS coordinates, they must fall inside the service
+    // radius around Adama center. Outside → refuse BEFORE any DB write so
+    // hand-crafted requests can't bypass the customer-side refusal screen.
+    // No coordinates (manual address only) → fail-open: there is nothing to
+    // measure and a real Adama customer who types their address shouldn't
+    // be blocked by an unreliable IP guess.
+    if (
+      payload.serviceType === 'delivery' &&
+      Number.isFinite(Number(payload.customer?.location?.lat)) &&
+      Number.isFinite(Number(payload.customer?.location?.lon))
+    ) {
+      const km = haversineKm(
+        Number(payload.customer.location.lat),
+        Number(payload.customer.location.lon),
+        ADAMA_CENTER.lat,
+        ADAMA_CENTER.lon
+      )
+      if (km > ADAMA_RADIUS_KM) {
+        console.log(`[miniapp] delivery order REJECTED: ${km.toFixed(1)} km from Adama (tg ${tgUser.id})`)
+        return res.status(409).json({
+          error: 'delivery outside adama',
+          outside_adama: true,
+          message: 'We only accept delivery orders from within Adama. Please choose dine-in or takeaway, or order from inside Adama.',
+        })
+      }
+    }
+
     // 6.1 — active-order limit, enforced atomically: INSERT only when there is
     // room left (activeCount < limit); two concurrent submissions cannot both
     // take the same slot beyond the cap because the count is re-checked inside

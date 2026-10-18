@@ -1375,9 +1375,13 @@ export async function startBot(io) {
   // ── /start ─────────────────────────────────────────────────────────────
   bot.onText(/\/start(\s+(.+))?$/, async (msg, match) => {
     const name = msg.from.first_name || ''
-    const clientLang = FALLBACK_CLIENT_LANGS[(msg.from.language_code || '').toLowerCase().split('-')[0]] || DEFAULT_LANG
-    const lang = await getUserLang(msg.from.id)
-    const deepLink = match?.[2]
+    // Greeting ALWAYS opens in Amharic — the bot's default language — with
+    // the 3-language chooser (user request). Nothing switches until the
+    // user taps a language button: English → English, አማርኛ → Amharic,
+    // Afaan Oromoo → Oromo. The choice persists in user_langs and drives
+    // every later message plus the Mini App URL (?lang=). The old auto-seed
+    // of the Telegram client language was removed — the choice is explicit.
+    const lang = DEFAULT_LANG
     const cafe = await currentCafeName()
     const welcomeLine = t('welcome', lang).replace(/Kafee Selam|Selam Cafe/gi, cafe)
     const welcomeBackLine = t('welcomeBack', lang).replace(/Kafee Selam|Selam Cafe/gi, cafe)
@@ -1388,13 +1392,6 @@ export async function startBot(io) {
       parse_mode: 'Markdown',
       ...languageButtons(),
     }).catch(() => {})
-    // Remember the Telegram client language for first-time users (the stored
-    // default is Amharic) so their first HTTP order already arrives in their
-    // language. An English client still gets English; everyone else who has
-    // never picked keeps the Amharic default.
-    if (lang === DEFAULT_LANG && clientLang !== DEFAULT_LANG) {
-      await rememberUserLang(msg.from.id, clientLang, msg.from.username, msg.from.first_name)
-    }
   })
 
   // ── /menu — open the Mini App ──────────────────────────────────────
