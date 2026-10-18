@@ -60,6 +60,11 @@ const ALLOWED_ORIGINS = [
 // ─── Express app ─────────────────────────────────────────────────────────────
 const app = express()
 
+// Railway terminates TLS on a proxy front-end: trust the first proxy hop so
+// req.ip is the real client IP (needed by the order-flood limiter and the
+// per-IP geo cache). Without this every request looks like 127.0.0.1.
+app.set('trust proxy', 1)
+
 app.use(express.json())
 app.use(cookieParser())
 app.use(

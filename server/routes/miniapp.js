@@ -19,14 +19,173 @@ import { Router } from 'express'
 import crypto from 'node:crypto'
 import 'dotenv/config'
 
-import { createOrder, countTodaysOrdersForUser, getUserLang, isUserBlocked, getIntakeStatus, getCafeProfile, publicBrand, getStoreSettings, countActiveOrders, loadCategoryRestrictions } from '../db.js'
+import { createOrder, countTodaysOrdersForUser, getUserLang, isUserBlocked, blockUser, getIntakeStatus, getCafeProfile, publicBrand, getStoreSettings, countActiveOrders, loadCategoryRestrictions } from '../db.js'
 import { sendOrderConfirmation, notifyStaff } from '../bot.js'
-import { mergeOrderForMessages } from '../order-items.js'
+import { mergeOrderForMessages, normalizeOrderItems } from '../order-items.js'
 
 const router = Router()
 
 const BOT_TOKEN = process.env.BOT_TOKEN
 const MAX_INITDATA_AGE_SEC = 86400 // same freshness window as admin login
+
+// ── Silent city verification (Step 1 of the Adama-only gate) ────────────
+// The customer Mini App asks the SERVER to geolocate its IP (not the client:
+// ip-api.com's free tier is HTTP-only, so an https Mini App cannot call it
+// directly without mixed-content errors). The result is cached per IP for
+// 10 minutes so the intro's silent check never hammers the free API.
+//
+// Adama match = city named Adama / Nazret / Nazreth (Adama's former name,
+// still emitted by several geo DBs) OR the IP's coordinates within ~15 km
+// of Adama center (8.5414, 39.2689).
+
+const ADAMA_CENTER = { lat: 8.5414, lon: 39.2689 }
+const ADAMA_RADIUS_KM = 15
+const ADAMA_CITY_ALIASES = ['adama', 'nazret', 'nazreth']
+const GEO_CACHE_TTL_MS = 10 * 60 * 1000
+const geoCache = new Map() // ip → { at, result }
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371
+  const toRad = (deg) => (deg * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+router.get('/geo', async (req, res) => {
+  const ip = req.ip || 'unknown'
+  try {
+    const cached = geoCache.get(ip)
+    if (cached && Date.now() - cached.at < GEO_CACHE_TTL_MS) {
+      return res.json(cached.result)
+    }
+
+    const fields = encodeURIComponent('status,country,city,lat,lon')
+    const geoRes = await fetch(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=${fields}`, {
+      signal: AbortSignal.timeout(6000),
+    })
+    const data = await geoRes.json()
+
+    let result
+    if (data?.status === 'success') {
+      const city = String(data.city || '').toLowerCase()
+      const cityHit = ADAMA_CITY_ALIASES.some((alias) => city.includes(alias))
+      const coordHit =
+        Number.isFinite(data.lat) &&
+        Number.isFinite(data.lon) &&
+        haversineKm(data.lat, data.lon, ADAMA_CENTER.lat, ADAMA_CENTER.lon) <= ADAMA_RADIUS_KM
+      result = { inAdama: cityHit || coordHit, city: data.city || null, lat: data.lat ?? null, lon: data.lon ?? null }
+    } else {
+      // Lookup failed → tell the client it's inconclusive so it can rely on
+      // the GPS fallback instead of silently trusting a wrong answer.
+      result = { inAdama: null }
+    }
+
+    geoCache.set(ip, { at: Date.now(), result })
+    if (geoCache.size > 5000) geoCache.clear() // simple eviction for tiny free-tier memory
+    return res.json(result)
+  } catch (e) {
+    console.warn('[miniapp] geo lookup failed:', e.message)
+    return res.status(502).json({ inAdama: null, error: 'geo unavailable' })
+  }
+})
+
+// ── Order flood guard (user request: "10 orders in one minute → blocked,
+// every order canceled") ────────────────────────────────────────────────
+// In-memory sliding window over POST /order hits, keyed by BOTH the verified
+// Telegram user AND the client IP. Keying on IP alone would let one fake
+// Telegram identity inside a school/NAT network stop everyone on that Wi-Fi,
+// and keying on user alone ignores the "IP rate limiting" ask — so we track
+// both and trigger when either crosses the line. Persisting the block goes
+// into `blocked_users` (the existing blocklist) so restarts can't undo it,
+// and every order the flooder still had OPEN in the DB is cancelled and
+// pushed live to the admin dashboard via `order:update`.
+
+const FLOOD_WINDOW_MS = 60_000  // one minute
+const FLOOD_MAX_ORDERS = 10     // 10 orders inside that window
+const orderHits = [] // { user, ip, at } oldest-first
+
+function pruneFloodHits(now) {
+  while (orderHits.length && now - orderHits[0].at > FLOOD_WINDOW_MS) orderHits.shift()
+}
+
+/**
+ * Records a completed order hit and returns true when the flood limit is
+ * exceeded for this user or IP (checked BEFORE recording, so the caller
+ * decides what to do with the offending attempt).
+ */
+function hitFloodLimit(userId, ip, now = Date.now()) {
+  pruneFloodHits(now)
+  const userHit = orderHits.filter((h) => h.user === userId).length
+  const ipHit = orderHits.filter((h) => h.ip === ip).length
+  return userHit >= FLOOD_MAX_ORDERS || ipHit >= FLOOD_MAX_ORDERS
+}
+
+function recordFloodHit(userId, ip, now = Date.now()) {
+  pruneFloodHits(now)
+  orderHits.push({ user: userId, ip, at: now })
+}
+
+/**
+ * The flood response: cancel every order the user still has open, write an
+ * audit event per cancelled order, push each of them live to the admins
+ * room, add the user to the persistent blocklist, then reply 429.
+ */
+async function applyFloodBlock(req, tgUser) {
+  const poolMod = await import('../db.js')
+  const cancelled = []
+  try {
+    const { rows } = await poolMod.pool.query(
+      `UPDATE orders
+          SET status = 'cancelled', updated_at = now()
+        WHERE tg_user_id = $1 AND status IN ('new', 'preparing', 'ready')
+        RETURNING id, tg_user_id, tg_username, tg_first_name, service_type,
+                  customer_name, customer_loc, items, total, trust_level,
+                  status, payment_status, started_by, served_at, dismissed_at,
+                  created_at, updated_at`,
+      [String(tgUser.id)]
+    )
+    for (const row of rows) {
+      try {
+        await poolMod.pool.query(
+          `INSERT INTO order_events (order_id, event, payload)
+           VALUES ($1, 'flood_cancelled', $2)`,
+          [row.id, JSON.stringify({ reason: 'order flood: >10 orders in one minute' })]
+        )
+      } catch { /* audit is best-effort */ }
+      cancelled.push(row)
+      // Same shape bot.js emitOrderUpdate uses — the admin queue drops these
+      // cards live instead of showing stale "new" orders that no longer exist.
+      req.app.get('io')?.to('admins').emit('order:update', {
+        ...row,
+        items: normalizeOrderItems(row.items),
+      })
+    }
+  } catch (e) {
+    console.warn(`[miniapp] flood cancel-all failed for tg ${tgUser.id}:`, e.message)
+  }
+
+  // Persistent block — survives restarts, applies to the bot too.
+  try {
+    await blockUser({
+      tgUserId: tgUser.id,
+      tgUsername: tgUser.username || null,
+      tgFirstName: tgUser.first_name || null,
+      reason: 'auto-block: 10+ orders within one minute (flood control)',
+      blockedBy: null,
+    })
+  } catch (e) {
+    console.warn(`[miniapp] flood auto-block failed for tg ${tgUser.id}:`, e.message)
+  }
+
+  console.error(`[miniapp] FLOOD BLOCK: tg ${tgUser.id} (@${tgUser.username || 'no-username'}) ` +
+    `ordered ${FLOOD_MAX_ORDERS}+ times in ${FLOOD_WINDOW_MS / 1000}s — ` +
+    `${cancelled.length} open order(s) cancelled and user blocked.`)
+  return cancelled.length
+}
 
 /**
  * Verify Telegram Mini App initData per
@@ -144,6 +303,28 @@ router.post('/orders', async (req, res) => {
     })
   }
 
+  // Order flood guard: this attempt must pass the window check BEFORE any
+  // DB write. Crossing 10 orders/user-minute (or per-IP-minute) blocks the
+  // account persistently and cancels every open order it still owns.
+  // registered/previously-served orders don't count against the window —
+  // only rows this guard saw go through (they are the flood signal).
+  const clientIp =
+    req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || 'unknown'
+  try {
+    if (hitFloodLimit(tgUser.id, clientIp)) {
+      // The 11th+ attempt of the minute cancels everything and blocks.
+      await applyFloodBlock(req, tgUser)
+      return res.status(429).json({
+        error: 'too many orders',
+        rate_limited: true,
+        message: 'Too many orders in a short time. Your open orders have been cancelled and your account is temporarily blocked. Please contact the cafe.',
+      })
+    }
+  } catch (e) {
+    // Fail-open: a bug in the guard must never brick real orders.
+    console.warn('[miniapp] flood guard failed (fail-open):', e.message)
+  }
+
   // ── Section 5.1/5.2/6.1/6.2: server-enforced intake restrictions ────────
   // Validated AFTER initData verification but BEFORE any DB write so hand-
   // crafted requests (bypassing the customer UI) are rejected with a meaningful
@@ -242,6 +423,9 @@ router.post('/orders', async (req, res) => {
       tgFirstName: tgUser.first_name || null,
       payload,
     })
+    // Window bookkeeping for the flood guard (inserted AFTER a successful
+    // save — nothing counts unless a row actually landed).
+    recordFloodHit(tgUser.id, clientIp)
     console.log(`[miniapp] order #${order.id} saved for tg ${tgUser.id}`)
   } catch (e) {
     console.error('[miniapp] DB insert failed:', e)
