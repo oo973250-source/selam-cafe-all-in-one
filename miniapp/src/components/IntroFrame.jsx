@@ -87,6 +87,43 @@ export default function IntroFrame({ onAdvance }) {
       />
 
       {/* ────────────────────────────────────────────────────────────
+          Adama-only notice (user request): a small pill at the TOP
+          CENTER of the intro telling the customer the bot serves
+          Adama only. Static info — no prompts, no permission asks.
+      ──────────────────────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4, duration: 0.5 }}
+        style={{
+          position: 'absolute',
+          top: 'calc(var(--safe-top, 0px) + 12px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 12,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          maxWidth: '94%',
+          padding: '6px 14px',
+          borderRadius: 999,
+          background: 'rgba(15, 10, 5, 0.66)',
+          border: '1px solid rgba(212, 168, 83, 0.55)',
+          color: '#FFE9B8',
+          fontSize: 11.5,
+          fontWeight: 700,
+          letterSpacing: 0.2,
+          whiteSpace: 'nowrap',
+          textShadow: '0 1px 4px rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
+        }}
+      >
+        <span aria-hidden style={{ fontSize: 13 }}></span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t('adamaBanner')}</span>
+      </motion.div>
+
+      {/* ────────────────────────────────────────────────────────────
           Cross-fade content area: phase 1 = welcome, phase 2 = prompt
       ──────────────────────────────────────────────────────────── */}
       <AnimatePresence mode="wait">

@@ -245,6 +245,13 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
         return
       }
 
+      // 409 outside_adama = server Adama-radius gate: the shared GPS in
+      // the order is outside the service radius — refuse with the message.
+      if (res.status === 409 && (data.outside_adama || data.error === 'delivery outside adama')) {
+        setOrderWarning(data.message || t('outsideAdamaRefuse'))
+        return
+      }
+
       // 409 = delivery globally unavailable OR a no-delivery category
       if (res.status === 409 && (data.delivery_unavailable || data.no_delivery || data.error === 'delivery unavailable')) {
         setOrderWarning(
