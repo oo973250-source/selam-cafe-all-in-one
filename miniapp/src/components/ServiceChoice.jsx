@@ -5,6 +5,7 @@ import BrandLogo from './BrandLogo.jsx'
 import { useCart } from '../context/CartContext.jsx'
 import { useTelegram } from '../hooks/useTelegram.js'
 import { useLang } from '../context/LangContext.jsx'
+import { useCityGate } from './CityGate.jsx'
 
 /**
  * ServiceChoice (Frame 1) — v3
@@ -95,6 +96,12 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
   // from GET /api/miniapp/intake, matching the backend order gate exactly.
   const [deliveryOff, setDeliveryOff] = useState(false)
 
+  // City gate (Adama-only service): delivery is locked outside Adama. The
+  // silent IP/GPS check runs in CityGate; here tapping the locked delivery
+  // button just pops the "Adama only" message with a verify button instead
+  // of advancing into the menu.
+  const { deliveryAllowed, showLocationModal } = useCityGate()
+
   useEffect(() => {
     let alive = true
     fetch('/api/miniapp/intake')
@@ -112,6 +119,14 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
     if (svc.key === 'delivery' && deliveryOff) {
       hapticFeedback.notificationOccurred('warning')
       return // muted option: not selectable
+    }
+    // Adama-only guard: without a verified location the delivery button
+    // does NOT advance — it pops the "only works in Adama" message and
+    // offers "Verify My Location" as a recovery path.
+    if (svc.key === 'delivery' && !deliveryAllowed) {
+      hapticFeedback.notificationOccurred('warning')
+      showLocationModal('delivery')
+      return
     }
     hapticFeedback.impactOccurred('light')
     setServiceType(svc.key)
@@ -278,13 +293,19 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
               }}
             >
               {SERVICES.map((svc, i) => {
+                // Admin-off AND out-of-Adama both lock the button visually,
+                // but the two cases differ: admin-off shows "Delivery off";
+                // geo-lock stays labeled "Delivery" and responds to taps
+                // with the Adama popup + verify path.
+                const geoLocked = svc.key === 'delivery' && !deliveryAllowed
                 const muted = svc.key === 'delivery' && deliveryOff
+                const unavailable = muted || geoLocked
                 return (
                 <motion.button
                   key={svc.key}
                   type="button"
-                  aria-disabled={muted}
-                  title={muted ? t('deliveryUnavailableMsg') : undefined}
+                  aria-disabled={geoLocked || muted}
+                  title={unavailable ? (muted ? t('deliveryUnavailableMsg') : t('adamaDeliveryTitle')) : undefined}
                   initial={{ opacity: 0, y: 12, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: 0.5 + i * 0.1, duration: 0.4 }}
@@ -299,10 +320,10 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
                     border: '1px solid rgba(212, 168, 83, 0.55)',
                     background:
                       'linear-gradient(180deg, rgba(26, 14, 5, 0.96) 0%, rgba(10, 6, 2, 0.98) 100%)',
-                    color: '#FFF8E7',
+                    color: muted ? 'rgba(255,248,231,0.5)' : '#FFF8E7',
                     cursor: muted ? 'not-allowed' : 'pointer',
-                    opacity: muted ? 0.45 : 1,
-                    filter: muted ? 'grayscale(0.8)' : undefined,
+                    opacity: unavailable ? 0.45 : 1,
+                    filter: unavailable ? 'grayscale(0.8)' : undefined,
                     pointerEvents: 'auto',
                     display: 'flex',
                     flexDirection: 'column',
@@ -325,8 +346,7 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
                     }}
                   >
                     {muted ? t('deliveryOffShort') : t(svc.labelKey)}
-                  </span>
-                </motion.button>
+                  </span>                </motion.button>
                 )
               })}
             </div>
