@@ -258,7 +258,9 @@ const DEFAULT_LANG = 'am'
 function normalizeLang(code) {
   const base = (code || '').toLowerCase().split('-')[0]
   if (base === 'or') return 'om'
-  if (base === 'am' || base === 'om') return base
+  // 'en' must map to 'en' — falling through to DEFAULT_LANG here was the
+  // bug that made tapping the English button save Amharic instead.
+  if (base === 'en' || base === 'am' || base === 'om') return base
   return DEFAULT_LANG
 }
 
