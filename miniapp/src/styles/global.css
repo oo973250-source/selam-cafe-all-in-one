@@ -263,6 +263,54 @@ img {
   background: linear-gradient(135deg, #FFD75E 0%, #FFAA00 100%) !important;
 }
 
+/* === Add-button glow on EVERY menu item (user request) ===
+   Soft gold breathing halo + a thin ring that expands and fades. Each button
+   gets a staggered --glow-delay from its list index so they ripple instead
+   of flashing in unison. Kept gentle on purpose (earlier feedback: the loud
+   version was "too much"). */
+@keyframes addBtnGlow {
+  0%,
+  100% {
+    box-shadow:
+      0 3px 10px rgba(255, 170, 0, 0.35),
+      0 0 6px rgba(255, 202, 40, 0.25),
+      0 0 0 0 rgba(255, 202, 40, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 3px 14px rgba(255, 170, 0, 0.6),
+      0 0 18px rgba(255, 202, 40, 0.5),
+      0 0 0 7px rgba(255, 202, 40, 0);
+  }
+}
+
+/* Quick "pop" + flash when an item is added. */
+@keyframes addBtnPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.25); filter: brightness(1.25); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+.qty-plus.add-glow {
+  animation: addBtnGlow 2.4s ease-in-out infinite;
+  animation-delay: var(--glow-delay, 0s);
+  background: linear-gradient(135deg, #FFD75E 0%, #FFAA00 100%);
+  will-change: box-shadow;
+}
+
+.qty-plus.add-glow.add-pop {
+  animation: addBtnPop 320ms ease-out, addBtnGlow 2.4s ease-in-out infinite;
+  animation-delay: 0s, var(--glow-delay, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qty-plus.add-glow,
+  .qty-plus.add-glow.add-pop {
+    animation: none;
+    box-shadow: 0 3px 12px rgba(255, 170, 0, 0.5);
+  }
+}
+
 /* === Misc helpers === */
 .row {
   display: flex;

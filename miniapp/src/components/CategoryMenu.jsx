@@ -30,6 +30,7 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
   // (available === false)  must NOT appear in the customer's menu at all —
   // previously they rendered dimmed with an "out of stock" badge.
   const [expandedId, setExpandedId] = useState(null)
+  const [poppedId, setPoppedId] = useState(null) // item whose + was just tapped (pop flash)
   const categoryItems = useMemo(() => {
     if (!currentCategory) return []
     const section = menuData[currentCategory.sectionKey]
@@ -219,9 +220,12 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
                   {has && <span className="qty-value">{qty}</span>}
                   <button
                     type="button"
-                    className={`qty-btn qty-plus ${expandedId === item.id ? 'qty-plus-glow' : ''}`}
+                    className={`qty-btn qty-plus add-glow ${poppedId === item.id ? 'add-pop' : ''}`}
+                    style={{ '--glow-delay': `${(i % 6) * 0.35}s` }}
                     aria-label={`Add one ${item.nameEn}`}
                     onClick={() => {
+                      setPoppedId(item.id)
+                      setTimeout(() => setPoppedId((cur) => (cur === item.id ? null : cur)), 340)
                       addItem({
                         id: item.id,
                         nameEn: item.nameEn,
