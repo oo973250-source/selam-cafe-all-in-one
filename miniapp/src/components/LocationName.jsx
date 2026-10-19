@@ -98,7 +98,11 @@ export default function LocationName({ bgProps, onPlaceOrder }) {
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
-      <SmartCafeBg blur={2} brightness={0.85} />
+      {/* DIM + lower brightness (user request: "make the background darker
+          so it will be easy to type and see the buttons") — SmartCafeBg
+          adds an extra solid dark layer when `dim` is set, and night mode
+          stacks on top automatically. */}
+      <SmartCafeBg blur={3} brightness={0.55} dim />
 
       <div className="frame-scroll no-bottom-bar" style={{ position: 'relative', zIndex: 2 }}>
         <div className="frame-header" style={{ paddingTop: 12 }}>
@@ -244,7 +248,13 @@ export default function LocationName({ bgProps, onPlaceOrder }) {
           className={`btn btn-block ${canProceed ? 'btn-primary anim-pulseGlow' : 'btn-secondary'}`}
           disabled={!canProceed}
           onClick={handlePlaceOrder}
-          style={{ minHeight: 54 }}
+          style={{
+            minHeight: 54,
+            // Pop off the dimmed backdrop: brighter gold surface + ring.
+            boxShadow: canProceed
+              ? '0 8px 22px rgba(255,170,0,0.4), 0 0 0 2px rgba(255,213,77,0.35)'
+              : undefined,
+          }}
         >
           {t('placeOrder')}
         </button>

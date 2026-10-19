@@ -12,22 +12,17 @@ import {
 } from '../utils/chapa.js'
 
 /**
- * PaymentFrame (Frame 6)
- * -----------------------
- * Four states: 'options' | 'processing' | 'success' | 'error'
+ * PaymentFrame (Frame 6) — SIMPLIFIED (user request: "remove the payment
+ * choose like pay 50 birr or at the counter ... no need for that page")
+ * -------------------------------------------------------------------
+ * The old trust-ladder options page (Pay 50 Br deposit / Pay at Counter /
+ * Pay on Delivery, unlock counters, etc.) is REMOVED. This frame now
+ * auto-pays the FULL order total through the same Chapa pipeline (mock
+ * mode without live keys) and then submits the order:
  *
- * Trust ladder:
- *   Dine-in / Takeaway:
- *     - "Pay Full Amount"        always unlocked
- *     - "Pay 50 Br Deposit"      unlocked after 1 successful payment
- *     - "Pay at Counter/Table"   unlocked after 2 successful payments
- *   Delivery:
- *     - "Pay 50 Br Upfront"      always unlocked
- *     - "Pay on Delivery"        unlocked after 3 successful payments
- *       (shows progress like "2/3")
+ *   'processing' (arrows fly) → 'success' → submitOrder → ticket alert
+ *                          ↘ 'error' (Back retries, Cancel aborts)
  */
-
-const DEPOSIT_AMOUNT = 50 // Birr
 
 /**
  * CornerLogo
@@ -116,74 +111,11 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
   const { tg, initData, hapticFeedback, user } = useTelegram()
   const { t } = useLang()
 
-  const serviceShort = serviceType === 'dine_in'
-    ? t('dineInShort')
-    : serviceType === 'takeaway'
-    ? t('takeawayShort')
-    : t('deliveryShort')
-
-  // Build the available payment methods based on service type + trust.
-  const methods = (() => {
-    if (serviceType === 'delivery') {
-      return [
-        {
-          key: 'upfront',
-          icon: '🪙',
-          label: t('payUpfront').replace('{n}', DEPOSIT_AMOUNT),
-          desc: t('payUpfrontDesc'),
-          amount: DEPOSIT_AMOUNT,
-          unlocked: true,
-          progress: null,
-        },
-        {
-          key: 'on-delivery',
-          icon: '🚗',
-          label: t('payOnDelivery'),
-          desc: t('payOnDeliveryDesc'),
-          amount: total,
-          unlocked: successfulPayments >= 3,
-          progress: `${Math.min(successfulPayments, 3)}/3`,
-        },
-      ]
-    }
-    // Dine-in / Takeaway
-    return [
-      {
-        key: 'full',
-        icon: '💳',
-        label: t('payFull'),
-        desc: t('payFullDesc'),
-        amount: total,
-        unlocked: true,
-        progress: null,
-      },
-      {
-        key: 'deposit',
-        icon: '🪙',
-        label: t('payDeposit').replace('{n}', DEPOSIT_AMOUNT),
-        desc: t('payDepositDesc'),
-        amount: DEPOSIT_AMOUNT,
-        unlocked: successfulPayments >= 1,
-        progress: successfulPayments < 1 ? `${Math.min(successfulPayments, 1)}/1` : null,
-      },
-      {
-        key: 'counter',
-        icon: '🏪',
-        label: serviceType === 'dine_in' ? t('payTable') : t('payCounter'),
-        desc: t('payCounterDesc'),
-        amount: 0,
-        unlocked: successfulPayments >= 2,
-        progress: successfulPayments < 2 ? `${Math.min(successfulPayments, 2)}/2` : null,
-      },
-    ]
-  })()
-
-  const [state, setState] = useState('options') // 'options' | 'processing' | 'success' | 'error'
-  const [selectedMethod, setSelectedMethod] = useState(null)
+  const [state, setState] = useState('processing') // 'processing' | 'success' | 'error'
   const [errorMsg, setErrorMsg] = useState('')
-  const [pressedKey, setPressedKey] = useState(null)
   const [orderWarning, setOrderWarning] = useState('')
   const orderSubmittedRef = React.useRef(false)
+  const paymentStartedRef = React.useRef(false)
 
   // New flow: payment FIRST, then the order. Once payment succeeds we POST
   // the order to /api/miniapp/orders (HTTP, initData-verified) and the server
@@ -311,31 +243,22 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
-  const handlePickMethod = async (method) => {
-    if (!method.unlocked) {
-      hapticFeedback.notificationOccurred('warning')
-      return
-    }
-    setSelectedMethod(method)
-    setState('processing')
+  // AUTO-PAY the full total (no method picker): the frame mounts inside
+  // 'processing' and pays immediately through the same Chapa pipeline.
+  const payFull = async () => {
+    if (paymentStartedRef.current) return
+    paymentStartedRef.current = true
     setErrorMsg('')
 
-    // For "pay on delivery" / "pay at counter", no online payment is required;
-    // simulate a brief processing then succeed.
-    if (method.amount === 0 || method.key === 'on-delivery' || method.key === 'counter') {
-      // Simulate processing delay for visual continuity.
-      await new Promise((r) => setTimeout(r, 1500))
-      setState('success')
-      return
-    }
-
-    // Online payment via Chapa
     const txRef = generateTxRef()
     const email = user?.email || (user?.id ? `user${user.id}@cafe.guest` : 'guest@cafe.guest')
     const firstName = user?.first_name || user?.username || 'Guest'
 
+    // Small beat so the flying-arrows animation reads before it resolves.
+    await new Promise((r) => setTimeout(r, 700))
+
     const init = await initializePayment({
-      amount: method.amount,
+      amount: total,
       email,
       firstName,
       txRef,
@@ -363,107 +286,10 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
     }
   }
 
-  // ---------------- OPTIONS ----------------
-  if (state === 'options') {
-    return (
-      <div style={{ position: 'absolute', inset: 0 }}>
-        <SmartCafeBg {...bgProps} blur={2} brightness={0.8} />
-        <CornerLogo />
-        <div className="frame-scroll no-bottom-bar" style={{ position: 'relative', zIndex: 2 }}>
-          <div className="frame-header" style={{ paddingTop: 12, paddingRight: 60 }}>
-            <div className="title-block">
-              <h1>{t('payment')}</h1>
-              <p>{t('chooseHowToPay')}</p>
-            </div>
-          </div>
-
-          {/* Order summary card */}
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 8,
-              }}
-            >
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
-                {t('orderTotal')}
-              </span>
-              <span style={{ fontWeight: 700, color: 'var(--accent-gold)', fontSize: 18 }}>
-                {total} Br
-              </span>
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: 'var(--text-muted)',
-                borderTop: '1px solid var(--border-subtle)',
-                paddingTop: 8,
-              }}
-            >
-              {items.length} {items.length === 1 ? t('item') : t('items')} ·{' '}
-              {serviceShort}
-            </div>
-          </div>
-
-          {/* Method buttons */}
-          {methods.map((m) => {
-            const isLocked = !m.unlocked
-            return (
-              <button
-                key={m.key}
-                type="button"
-                disabled={isLocked}
-                onTouchStart={() => !isLocked && setPressedKey(m.key)}
-                onTouchEnd={() => setPressedKey(null)}
-                onMouseDown={() => !isLocked && setPressedKey(m.key)}
-                onMouseUp={() => setPressedKey(null)}
-                onMouseLeave={() => setPressedKey(null)}
-                onClick={() => handlePickMethod(m)}
-                className={`method-btn ${isLocked ? 'is-locked' : ''} ${
-                  pressedKey === m.key ? 'is-pressed' : ''
-                }`}
-              >
-                <span className="m-icon">{m.icon}</span>
-                <span className="m-text">
-                  <span className="m-label">
-                    {m.label}
-                    {isLocked && <span aria-hidden> 🔒</span>}
-                    {m.progress && (
-                      <span className="m-progress">{m.progress}</span>
-                    )}
-                  </span>
-                  <span className="m-desc">{m.desc}</span>
-                </span>
-                {!isLocked && <span className="m-arrow">→</span>}
-              </button>
-            )
-          })}
-
-          {/* Trust hint */}
-          <div
-            style={{
-              marginTop: 16,
-              padding: '12px 14px',
-              borderRadius: 12,
-              background: 'rgba(212,168,83,0.05)',
-              border: '1px dashed var(--border-subtle)',
-              fontSize: 12,
-              color: 'var(--text-muted)',
-              textAlign: 'center',
-            }}
-          >
-            {successfulPayments === 0
-              ? t('trustLockedHint')
-              : t('trustProgress')
-                  .replace('{n}', successfulPayments)
-                  .replace('{s}', successfulPayments === 1 ? '' : 's')}
-          </div>
-        </div>
-      </div>
-    )
-  }
+  useEffect(() => {
+    payFull()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ---------------- PROCESSING ----------------
   if (state === 'processing') {
@@ -501,17 +327,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
             {t('paymentProcessing')}
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
-            {selectedMethod?.label}
-          </p>
-          <p
-            style={{
-              color: 'var(--accent-gold)',
-              fontSize: 18,
-              fontWeight: 700,
-              margin: '8px 0 0',
-            }}
-          >
-            {selectedMethod?.amount || 0} Br
+            {t('payFull')}
           </p>
         </div>
       </div>
@@ -555,17 +371,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
             {t('paymentSuccess')}
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
-            {selectedMethod?.label}
-          </p>
-          <p
-            style={{
-              color: 'var(--accent-gold)',
-              fontSize: 22,
-              fontWeight: 800,
-              margin: '8px 0 28px',
-            }}
-          >
-            {selectedMethod?.amount || 0} Br
+            {t('payFull')}
           </p>
 
           {orderWarning && (
@@ -653,8 +459,11 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
             style={{ flex: 1 }}
             onClick={() => {
               hapticFeedback.impactOccurred('light')
-              setState('options')
+              // The options page no longer exists — Back RETRIES the payment.
+              paymentStartedRef.current = false
+              setState('processing')
               setErrorMsg('')
+              setTimeout(() => payFull(), 200)
             }}
           >
             {t('back')}

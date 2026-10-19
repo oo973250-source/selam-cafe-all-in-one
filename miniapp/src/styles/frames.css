@@ -399,20 +399,29 @@
 }
 
 /* ---- Inputs (frame 7) ---- */
+/* Dark opaque wells: legible to type in over both the day photo and the
+   deep-dim name/location backdrop (user request: "easy to type"). Rich
+   amber caret + focused gold ring for visibility. */
 .input-field {
   width: 100%;
   padding: 14px 16px;
   border-radius: 14px;
-  background: rgba(255, 248, 240, 0.04);
-  border: 1px solid var(--border-subtle);
+  background: rgba(15, 10, 6, 0.62);
+  border: 1px solid rgba(212, 168, 83, 0.35);
   color: var(--text-primary);
   font-size: 15px;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  caret-color: #FCD34D;
+  transition: border-color 200ms ease, box-shadow 200ms ease, background 200ms ease;
 }
 
 .input-field:focus {
+  background: rgba(15, 10, 6, 0.72);
   border-color: var(--border-active);
-  box-shadow: 0 0 0 3px rgba(212, 168, 83, 0.12);
+  box-shadow: 0 0 0 3px rgba(212, 168, 83, 0.22);
+}
+
+.input-field::placeholder {
+  color: rgba(255, 248, 240, 0.45);
 }
 
 .input-label {
