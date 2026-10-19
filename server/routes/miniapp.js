@@ -525,27 +525,44 @@ router.post('/orders', async (req, res) => {
   // Customer confirmation + staff alert BOTH use the merged order so item
   // names/quantities/total always render (Issue #5).
   const customerOrder = mergeOrderForMessages(order, payload)
-  try {
-    await sendOrderConfirmation(tgUser.id, customerOrder, todaysCount, lang)
-  } catch (e) {
-    console.error('[miniapp] confirmation send failed:', e.message)
+  // The customer confirmation and the staff alert are INDEPENDENT: a failure
+  // of one (e.g. the customer never pressed Start) must never suppress the
+  // other. Previously a failed confirmation returned early and the admin was
+  // never notified of a saved order. Both are started together and awaited.
+  const confirmationTask = sendOrderConfirmation(tgUser.id, customerOrder, todaysCount, lang)
+    .then(() => {
+      console.log(`[miniapp] confirmation sent to tg ${tgUser.id} for order #${order.id}`)
+      return true
+    })
+    .catch((e) => {
+      console.error(`[miniapp] confirmation send FAILED for tg ${tgUser.id}, order #${order.id}: ${e.message}`)
+      return false
+    })
+
+  const staffTask = (async () => {
+    try {
+      const results = await notifyStaff(customerOrder, payload, {
+        username: tgUser.username,
+        firstName: tgUser.first_name,
+      })
+      if (Array.isArray(results)) {
+        const ok = results.filter((r) => r.status === 'fulfilled').length
+        console.log(`[miniapp] staff alert for order #${order.id}: ${ok}/${results.length} chat(s) delivered`)
+      }
+    } catch (e) {
+      console.error(`[miniapp] staff notify FAILED for order #${order.id}: ${e.message}`)
+    }
+  })()
+
+  const [confirmationSent] = await Promise.all([confirmationTask, staffTask])
+
+  if (!confirmationSent) {
     return res.status(200).json({
       ok: true,
       orderId: order.id,
       confirmationSent: false,
       warning: 'order saved, but the bot could not message you. Please message the bot first (tap Start), then reopen the menu.',
     })
-  }
-  console.log(`[miniapp] confirmation sent to tg ${tgUser.id} for order #${order.id}`)
-
-  // 3) Staff notification with action buttons
-  try {
-    notifyStaff(customerOrder, payload, {
-      username: tgUser.username,
-      firstName: tgUser.first_name,
-    })
-  } catch (e) {
-    console.warn('[miniapp] staff notify failed:', e.message)
   }
 
   return res.status(200).json({

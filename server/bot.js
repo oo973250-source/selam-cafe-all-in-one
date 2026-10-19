@@ -1773,14 +1773,23 @@ export async function startBot(io) {
     await rememberUserLang(user.id, user.language_code || DEFAULT_LANG, user.username, user.first_name)
     const lang = await getUserLang(user.id)
 
-    await sendOrderConfirmation(chatId, mergeOrderForMessages(order, payload), await safeTodaysCount(user.id), lang)
+    // A failed customer confirmation must not suppress the staff alert.
+    try {
+      await sendOrderConfirmation(chatId, mergeOrderForMessages(order, payload), await safeTodaysCount(user.id), lang)
+    } catch (e) {
+      console.error(`[bot] confirmation send FAILED for order #${order.id}: ${e.message}`)
+    }
 
     // ── Push to admin dashboard (real-time) ──
     if (io) {
       io.emit('order:new', fullOrderForStaff(payload, order.id))
     }
 
-    notifyStaff(order, payload, { username: user.username, firstName: user.first_name })
+    try {
+      await notifyStaff(order, payload, { username: user.username, firstName: user.first_name })
+    } catch (e) {
+      console.error(`[bot] staff notify FAILED for order #${order.id}: ${e.message}`)
+    }
   })
 
   // ── callback_query — language selection + admin actions ──────────────
@@ -2248,8 +2257,12 @@ export function notifyStaff(order, payload, from = {}) {
 
   const staffOrder = fullOrderForStaff(payload, order.id)
 
-  for (const id of STAFF_CHAT_IDS) {
-    ;(async () => {
+  // Returns a promise (Promise.allSettled) so callers can await delivery and
+  // log exactly which staff chats succeeded or failed. Each failure is also
+  // logged here with Telegram's reason (most common: the admin never pressed
+  // Start on the bot → "chat not found" / 403 "bot can't initiate conversation").
+  const deliveries = STAFF_CHAT_IDS.map((id) =>
+    (async () => {
       let lang = 'en'
       try { lang = await getUserLang(id) } catch (_) { /* default en */ }
 
@@ -2275,8 +2288,13 @@ export function notifyStaff(order, payload, from = {}) {
       // App (or from another admin's bot) can re-render it with the new
       // state + buttons (Issue 6B — real-time bot card sync).
       if (sent?.message_id) rememberStaffCard(id, order.id, sent.message_id)
+      console.log(`[bot] staff alert for order #${order.id} delivered to chat ${id}`)
     })().catch((e) => {
-      console.warn(`[bot] notify chat ${id} failed:`, e.message)
+      console.error(`[bot] staff alert for order #${order.id} FAILED for chat ${id}: ${e.message}` +
+        ' (if "chat not found" / "can\'t initiate conversation": that admin must open the bot and press Start)')
+      throw e
     })
-  }
+  )
+
+  return Promise.allSettled(deliveries)
 }
