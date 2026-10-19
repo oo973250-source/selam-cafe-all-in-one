@@ -20,7 +20,7 @@ import crypto from 'node:crypto'
 import 'dotenv/config'
 
 import { createOrder, countTodaysOrdersForUser, getUserLang, isUserBlocked, blockUser, getIntakeStatus, getCafeProfile, publicBrand, getStoreSettings, countActiveOrders, loadCategoryRestrictions } from '../db.js'
-import { sendOrderConfirmation, notifyStaff } from '../bot.js'
+import { sendOrderConfirmation, notifyStaff, botStatus } from '../bot.js'
 import { mergeOrderForMessages, normalizeOrderItems } from '../order-items.js'
 
 const router = Router()
@@ -525,10 +525,32 @@ router.post('/orders', async (req, res) => {
   // Customer confirmation + staff alert BOTH use the merged order so item
   // names/quantities/total always render (Issue #5).
   const customerOrder = mergeOrderForMessages(order, payload)
+  // DIAGNOSTIC BEACON (user report: "confirmation message is not sent after
+  // ordering"): the save→send pipeline is all-or-nothing per step, so these
+  // two lines make the Railway log say exactly where the chain broke.
+  console.log(`[miniapp] order #${order.id} saved — sending customer confirmation to tg ${tgUser.id} (bot ${botStatus()})`)
+  let confirmed = false
+  let confirmErr = null
   try {
     await sendOrderConfirmation(tgUser.id, customerOrder, todaysCount, lang)
+    confirmed = true
   } catch (e) {
-    console.error('[miniapp] confirmation send failed:', e.message)
+    confirmErr = e.message
+    // ONE retry after a short pause: sendMessage can fail transiently while
+    // the bot process is converging (restarts, Telegram hiccups).
+    await new Promise((r) => setTimeout(r, 2500))
+    try {
+      await sendOrderConfirmation(tgUser.id, customerOrder, todaysCount, lang)
+      confirmed = true
+      confirmErr = null
+    } catch (e2) {
+      confirmErr = e2.message
+    }
+  }
+  if (confirmed) {
+    console.log(`[miniapp] confirmation sent to tg ${tgUser.id} for order #${order.id}`)
+  } else {
+    console.error(`[miniapp] customer confirmation FAILED for order #${order.id}: ${confirmErr}`)
     return res.status(200).json({
       ok: true,
       orderId: order.id,
@@ -536,16 +558,15 @@ router.post('/orders', async (req, res) => {
       warning: 'order saved, but the bot could not message you. Please message the bot first (tap Start), then reopen the menu.',
     })
   }
-  console.log(`[miniapp] confirmation sent to tg ${tgUser.id} for order #${order.id}`)
 
-  // 3) Staff notification with action buttons
+  // 3) Staff notification with action buttons (errors logged, not fatal)
   try {
     notifyStaff(customerOrder, payload, {
       username: tgUser.username,
       firstName: tgUser.first_name,
     })
   } catch (e) {
-    console.warn('[miniapp] staff notify failed:', e.message)
+    console.error(`[miniapp] STAFF NOTIFICATION FAILED for order #${order.id}: ${e.message}`)
   }
 
   return res.status(200).json({

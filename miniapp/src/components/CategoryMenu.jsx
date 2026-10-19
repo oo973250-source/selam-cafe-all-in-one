@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react'
 import SmartCafeBg from './SmartCafeBg.jsx'
-import CafeLogo from './CafeLogo.jsx'
+import BrandLogo from './BrandLogo.jsx'
 import { useCart } from '../context/CartContext.jsx'
 import { menuData } from '../data/menuData.js'
 import { useTelegram } from '../hooks/useTelegram.js'
+import { useLiveMenu } from '../hooks/useLiveMenu.js'
 import { useLang } from '../context/LangContext.jsx'
 
 /**
@@ -23,20 +24,42 @@ import { useLang } from '../context/LangContext.jsx'
 export default function CategoryMenu({ onBack, onNext, bgProps }) {
   const { currentCategory, items, addItem, removeItem } = useCart()
   const { hapticFeedback } = useTelegram()
-  const { t, lang } = useLang()
-
-  // Resolve items for the active category.
+  const { t, lang } = useLang()  // Resolve items for the active category.
   // OUT-OF-STOCK FILTER (user request): items the admin marked unavailable
-  // (available === false)  must NOT appear in the customer's menu at all —
-  // previously they rendered dimmed with an "out of stock" badge.
+  // (available === false) must NOT appear in the customer's menu at all.
+  // ADD-BUTTON MIGHT-LOOK-MISSING FIX (user report: the "+" button vanish-
+  // ing): the list can silently go EMPTY — (a) every item in the tapped
+  // category was just marked unavailable, or (b) the category's section
+  // changed server-side so the sectionKey lookup misses, or (c) a live
+  // menu sync landed but this memo never re-ran (deps didn't change). Now:
+  // - the renderer subscribes to the live sync version so the list
+  //   refreshes on every admin edit, and lookup falls back to BOTH
+  //   sections if the recorded sectionKey no longer matches, and
+  // - an empty list shows a visible "nothing available" card instead of a
+  //   blank area, so the "+" buttons are never silently "missing".
   const [expandedId, setExpandedId] = useState(null)
+  const menuVersion = useLiveMenu()
   const categoryItems = useMemo(() => {
     if (!currentCategory) return []
-    const section = menuData[currentCategory.sectionKey]
-    if (!section) return []
-    const cat = section.categories.find((c) => c.id === currentCategory.id)
+    let cat = null
+    const primary = menuData[currentCategory.sectionKey]
+    cat = primary?.categories.find((c) => c.id === currentCategory.id)
+    if (!cat) {
+      // Fallback: search the OTHER section too — an admin section move
+      // must never blank out the item list the customer is looking at.
+      for (const sectionKey of ['foods', 'drinks']) {
+        if (sectionKey === currentCategory.sectionKey) continue
+        const alt = menuData[sectionKey]?.categories.find(
+          (c) => c.id === currentCategory.id
+        )
+        if (alt) {
+          cat = alt
+          break
+        }
+      }
+    }
     return (cat?.items || []).filter((item) => item.available !== false)
-  }, [currentCategory])
+  }, [currentCategory, menuVersion])
 
   if (!currentCategory) {
     // Defensive: if no category was selected (e.g. user refreshed here),
@@ -101,7 +124,9 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
                   '0 3px 10px rgba(60, 40, 10, 0.26), 0 0 0 1.2px rgba(212, 168, 83, 0.5)',
               }}
             >
-              <CafeLogo size={42} />
+              {/* Live brand logo circle-cropped (matches intro + corners);
+                  emoji fallback keeps its composed look via CafeLogo. */}
+              <BrandLogo size={42} circle />
             </div>
           </div>
           <div className="title-block">
@@ -120,8 +145,36 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
           </div>
         </div>
 
-        {/* Item rows */}
+        {/* Item rows — with a visible empty state so the section never
+            looks like the app silently ate the "+" buttons (user report). */}
         <div>
+          {categoryItems.length === 0 && (
+            <div
+              className="card"
+              style={{
+                textAlign: 'center',
+                padding: '28px 20px',
+                marginBottom: 10,
+              }}
+            >
+              <div style={{ fontSize: 30, marginBottom: 6 }} aria-hidden>
+                🕒
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {t('categoryEmptyTitle') || 'Nothing available right now'}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: 'var(--text-secondary)',
+                  marginTop: 4,
+                }}
+              >
+                {t('categoryEmptyDesc') ||
+                  'This category has no items available at the moment — please check back soon or pick another category.'}
+              </div>
+            </div>
+          )}
           {categoryItems.map((item, i) => {
             const qty = getQty(item.id)
             const has = qty > 0

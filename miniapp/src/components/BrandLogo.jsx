@@ -21,8 +21,11 @@ import { brandConfig, subscribeLogo } from '../data/brand.js'
  *   size      pixel size of the longest edge (default: brandConfig.logoSize)
  *   className optional CSS class
  *   style     optional inline styles (merged on top of defaults)
+ *   circle    Telegram/TikTok-style avatar crop: fills the container it is
+ *             given and lets the caller's border-radius clip the image into
+ *             a circle (cover crop of RECTANGULAR uploads).
  */
-export default function BrandLogo({ size, className, style }) {
+export default function BrandLogo({ size, className, style, circle }) {
   const [imgError, setImgError] = useState(false)
   const [, forceRender] = useState(0)
 
@@ -49,9 +52,9 @@ export default function BrandLogo({ size, className, style }) {
       onError={() => setImgError(true)}
       draggable={false}
       style={{
-        width: finalSize,
-        height: finalSize,
-        objectFit: 'contain',
+        width: circle ? '100%' : finalSize,
+        height: circle ? '100%' : finalSize,
+        objectFit: circle ? 'cover' : 'contain',
         userSelect: 'none',
         pointerEvents: 'none',
         ...style,

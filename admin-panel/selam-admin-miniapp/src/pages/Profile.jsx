@@ -12,6 +12,8 @@ import { Spinner } from '../components/ui.jsx'
 import { useApp } from '../store.jsx'
 import { haptic, openLink } from '../telegram.js'
 
+import ImageCropper from '../components/ImageCropper.jsx'
+
 const DESC_MAX = 200
 
 // 30-min steps 00:00→23:30 — display "08:00 AM", payload "08:00" (24h HH:MM)
@@ -21,34 +23,6 @@ for (let m = 0; m < 24 * 60; m += 30) {
   const mm = String(m % 60).padStart(2, '0')
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12
   TIMES.push({ v: `${String(h24).padStart(2, '0')}:${mm}`, l: `${h12}:${mm} ${h24 < 12 ? 'AM' : 'PM'}` })
-}
-
-// Client-side downscale (max 256px JPEG data URL) — keeps the PATCH payload small
-// until a real upload endpoint exists (⚠️ INTEGRATION POINT: logo upload).
-function fileToLogo(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
-    const img = new Image()
-    img.onload = () => {
-      try {
-        const k = Math.min(1, 256 / Math.max(img.width, img.height))
-        const c = document.createElement('canvas')
-        c.width = Math.max(1, Math.round(img.width * k))
-        c.height = Math.max(1, Math.round(img.height * k))
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
-        URL.revokeObjectURL(url)
-        resolve(c.toDataURL('image/jpeg', 0.85))
-      } catch (err) {
-        URL.revokeObjectURL(url)
-        reject(err)
-      }
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error('bad image'))
-    }
-    img.src = url
-  })
 }
 
 export default function Profile() {
@@ -89,14 +63,22 @@ export default function Profile() {
     )
   }
 
+  // Cropper state: the picked file is handed to ImageCropper (Telegram/
+  // TikTok-style pan+zoom+circle-crop). Supersedes the old inline 256px
+  // downscale, which was removed as dead code (user-facing crop UX now
+  // lives entirely in ImageCropper).
+  const [cropSrc, setCropSrc] = useState(null)
+  // Kept for the HEIC-specific error path (name/type sniffing on error).
+  const [cropFile, setCropFile] = useState(null)
+
   async function onPickLogo(e) {
     const file = e.target.files && e.target.files[0]
     e.target.value = '' // allow re-picking the same file later
     if (!file) return
     try {
-      const dataUrl = await fileToLogo(file)
-      setForm((f) => ({ ...f, logo_url: dataUrl }))
-      haptic('select')
+      const url = URL.createObjectURL(file)
+      setCropSrc(url)
+      setCropFile(file)
     } catch (err) {
       // WHY (user report: "could not read the image try again" for some
       // photos): the phone delivers the photo in a format the in-app
@@ -114,6 +96,20 @@ export default function Profile() {
           : 'Could not read that image — pick a JPG or PNG photo'
       )
     }
+  }
+
+  const handleCropConfirm = (dataUrl) => {
+    if (cropSrc) URL.revokeObjectURL(cropSrc)
+    setCropSrc(null)
+    setCropFile(null)
+    setForm((f) => ({ ...f, logo_url: dataUrl }))
+    haptic('success')
+  }
+
+  const handleCropCancel = () => {
+    if (cropSrc) URL.revokeObjectURL(cropSrc)
+    setCropSrc(null)
+    setCropFile(null)
   }
 
   function openMapPicker() {
@@ -249,6 +245,30 @@ export default function Profile() {
                   filter excludes HEIC, and Android's picker stops offering
                   raw formats the in-app decoder cannot read. */}
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onPickLogo} />
+      {cropSrc && (
+        <ImageCropper
+          src={cropSrc}
+          shape="circle"
+          exportSize={512}
+          format="jpeg"
+          quality={0.9}
+          confirmLabel="Crop & Save"
+          cancelLabel="Cancel"
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+          onError={() => {
+            const looksHeic =
+              /hei[cf]$/i.test(cropFile?.name || '') ||
+              /image\/hei[cf]/i.test(cropFile?.type || '')
+            handleCropCancel()
+            toast(
+              looksHeic
+                ? 'iPhone HEIC photo — open the photo, screenshot re-save it as JPG, or send it to yourself on Telegram and pick it there'
+                : 'Could not read that image — pick a JPG or PNG photo'
+            )
+          }}
+        />
+      )}
             </div>
           </div>
 
