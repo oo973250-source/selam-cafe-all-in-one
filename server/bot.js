@@ -1382,6 +1382,11 @@ export async function startBot(io) {
     // every later message plus the Mini App URL (?lang=). The old auto-seed
     // of the Telegram client language was removed — the choice is explicit.
     const lang = DEFAULT_LANG
+    // Deep-link payload: /start reorder (sent by Telegram when the user taps
+    // the "order again" deep link). Empty for a plain /start. This MUST be
+    // derived here — it was previously referenced but never declared, which
+    // threw ReferenceError on every /start and silently killed the reply.
+    const deepLink = ((match && match[2]) || '').trim().toLowerCase()
     const cafe = await currentCafeName()
     const welcomeLine = t('welcome', lang).replace(/Kafee Selam|Selam Cafe/gi, cafe)
     const welcomeBackLine = t('welcomeBack', lang).replace(/Kafee Selam|Selam Cafe/gi, cafe)
