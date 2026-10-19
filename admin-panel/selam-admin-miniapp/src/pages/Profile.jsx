@@ -97,8 +97,22 @@ export default function Profile() {
       const dataUrl = await fileToLogo(file)
       setForm((f) => ({ ...f, logo_url: dataUrl }))
       haptic('select')
-    } catch {
-      toast('Could not read that image — try another file')
+    } catch (err) {
+      // WHY (user report: "could not read the image try again" for some
+      // photos): the phone delivers the photo in a format the in-app
+      // decoder cannot read — almost always iPhone HEIC/HEIF "High
+      // Efficiency" shots (Safari transcodes them, the Telegram WebView
+      // does not). The picker's accept filter now converts those on iOS
+      // and filters them out on Android; this message handles the rest.
+      const looksHeic =
+        /hei[cf]$/i.test(file.name || '') ||
+        /image\/hei[cf]/i.test(file.type || '')
+      haptic('error')
+      toast(
+        looksHeic
+          ? 'iPhone HEIC photo — open the photo, screenshot re-save it as JPG, or send it to yourself on Telegram and pick it there'
+          : 'Could not read that image — pick a JPG or PNG photo'
+      )
     }
   }
 
@@ -230,7 +244,11 @@ export default function Profile() {
                 </svg>
                 Remove
               </button>
-              <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPickLogo} />
+              {/* accept JPEG/PNG/WebP only: iOS Safari transparently
+                  transcodes default HEIC camera shots to JPEG when the
+                  filter excludes HEIC, and Android's picker stops offering
+                  raw formats the in-app decoder cannot read. */}
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onPickLogo} />
             </div>
           </div>
 

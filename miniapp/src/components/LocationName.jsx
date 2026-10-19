@@ -22,8 +22,10 @@ export default function LocationName({ bgProps, onPlaceOrder }) {
     total,
     customerName,
     customerLocation,
+    customerPhone,
     setCustomerName,
     setCustomerLocation,
+    setCustomerPhone,
   } = useCart()
   const { hapticFeedback } = useTelegram()
   const { t, lang } = useLang()
@@ -43,7 +45,20 @@ export default function LocationName({ bgProps, onPlaceOrder }) {
   const hasLocation =
     !isDelivery ||
     (customerLocation && (customerLocation.lat || customerLocation.address))
-  const canProceed = hasName && hasLocation && outsideAdamaKm === null
+
+  // PHONE (user request): customers who type their address MANUALLY — no
+  // GPS captured — must also leave a phone number so the driver can reach
+  // them at the described spot. The field appears for delivery orders
+  // without GPS coordinates and hides again once location is shared.
+  const manualAddressRequired = isDelivery && !customerLocation?.lat
+  const digitsPhone = (customerPhone || '').replace(/\D/g, '')
+  const phoneValid = digitsPhone.length >= 9 && digitsPhone.length <= 13
+  const phoneNeeded = manualAddressRequired && !phoneValid
+  const canProceed =
+    hasName &&
+    hasLocation &&
+    outsideAdamaKm === null &&
+    !(manualAddressRequired && !phoneValid)
 
   const handleShareLocation = async () => {
     setLocating(true)
@@ -189,6 +204,39 @@ export default function LocationName({ bgProps, onPlaceOrder }) {
               maxLength={200}
               autoComplete="street-address"
             />
+          </div>
+        )}
+
+        {/* Phone number — REQUIRED only for delivery with a manual address */}
+        {manualAddressRequired && (
+          <div style={{ marginBottom: 20, border: '1px solid ' + (phoneValid ? 'transparent' : 'rgba(212,168,83,0.55)'), borderRadius: '14px', padding: '14px 16px' }}>
+            <label htmlFor="cust-phone" style={{ display: 'flex', alignItems: 'center', fontSize: 15, fontWeight: 700, marginBottom: '8px', color: '#FFF8E7', letterSpacing: '.01em' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                📱 {t('yourPhone')}
+                <span style={{ color: '#fff8e7aa', fontSize: 13, fontWeight: 500 }}>({t('phoneRequiredHint')})</span>
+              </span>
+            </label>
+            <input
+              id="cust-phone"
+              type="tel"
+              className="input-field"
+              placeholder={t('phonePlaceholder')}
+              value={customerPhone || ''}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              maxLength={20}
+              autoComplete="tel"
+              inputMode="tel"
+            />
+            {(customerPhone || '').trim().length > 0 && phoneValid && (
+              <div style={{ fontSize: 11, color: 'var(--accent-gold)', marginTop: 4 }}>
+                ✓ {t('phoneSaved')}
+              </div>
+            )}
+            {(customerPhone || '').trim().length > 0 && !phoneValid && (
+              <div style={{ fontSize: 11, color: 'var(--accent-red, #ff6b6b)', marginTop: 4 }}>
+                {t('phoneInvalidHint')}
+              </div>
+            )}
           </div>
         )}
 

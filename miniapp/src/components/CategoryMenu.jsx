@@ -26,13 +26,16 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
   const { t, lang } = useLang()
 
   // Resolve items for the active category.
+  // OUT-OF-STOCK FILTER (user request): items the admin marked unavailable
+  // (available === false)  must NOT appear in the customer's menu at all —
+  // previously they rendered dimmed with an "out of stock" badge.
   const [expandedId, setExpandedId] = useState(null)
   const categoryItems = useMemo(() => {
     if (!currentCategory) return []
     const section = menuData[currentCategory.sectionKey]
     if (!section) return []
     const cat = section.categories.find((c) => c.id === currentCategory.id)
-    return cat?.items || []
+    return (cat?.items || []).filter((item) => item.available !== false)
   }, [currentCategory])
 
   if (!currentCategory) {

@@ -102,8 +102,9 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
           >
             {t('confirmTitle')}
           </h1>
-          <span aria-hidden>👨‍🍳</span>
-          {/* Gold rules flanking a small chef-hat icon */}
+          {/* Gold rules flanking a small chef-hat icon (user request: the
+              page used to show TWO chef emojis — one stray before the
+              divider and one on it; only the divider's centered one stays) */}
           <div
             style={{
               display: 'flex',
@@ -114,9 +115,12 @@ export default function ConfirmOrder({ onAddMore, onPay, onBack, bgProps }) {
             }}
           >
             <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #FFC107)' }} />
-              <span style={{ fontSize: 14.5 }} aria-hidden>👨‍🍳</span>
+            {/* SINGLE-codepoint emoji on purpose: the ZWJ sequence 👨‍🍳
+                renders as TWO glyphs (👨 + 🍳) on phones whose emoji font
+                lacks ZWJ support — user saw "2 emojis". 🍳 is one glyph
+                everywhere. */}
+            <span style={{ fontSize: 14.5 }} aria-hidden>🍳</span>
             <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #FFC107, transparent)' }} />
-
           </div>
         </div>
 

@@ -15,6 +15,7 @@ import React, {
  *   - currentCategory    { id, nameEn, nameAm, icon } | null
  *   - customerName       string
  *   - customerLocation   { lat, lon, address }
+ *   - customerPhone      string (delivery orders with a manually-typed address)
  *   - trustLevel         number  (0..3) — unlocks payment options
  *   - successfulPayments number  — running count of successful payments
  *
@@ -32,6 +33,7 @@ const initialState = {
   currentCategory: null,
   customerName: '',
   customerLocation: null,
+  customerPhone: '',
   trustLevel: 0,
   successfulPayments: 0,
 }
@@ -90,6 +92,9 @@ function cartReducer(state, action) {
 
     case 'SET_CUSTOMER_LOCATION':
       return { ...state, customerLocation: action.payload }
+
+    case 'SET_CUSTOMER_PHONE':
+      return { ...state, customerPhone: action.payload }
 
     case 'CLEAR_CART':
       return {
@@ -187,6 +192,7 @@ export function CartProvider({ children }) {
       setCustomerName: (n) => dispatch({ type: 'SET_CUSTOMER_NAME', payload: n }),
       setCustomerLocation: (loc) =>
         dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: loc }),
+      setCustomerPhone: (p) => dispatch({ type: 'SET_CUSTOMER_PHONE', payload: p }),
       clearCart: () => dispatch({ type: 'CLEAR_CART' }),
       recordSuccessfulPayment: () =>
         dispatch({ type: 'RECORD_SUCCESSFUL_PAYMENT' }),
