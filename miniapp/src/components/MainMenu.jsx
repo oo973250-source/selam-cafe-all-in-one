@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import CafeLogo from './CafeLogo.jsx'
+import BrandLogo from './BrandLogo.jsx'
 import { menuData } from '../data/menuData.js'
 import { useLiveMenu } from '../hooks/useLiveMenu.js'
 import { useCart } from '../context/CartContext.jsx'
@@ -241,7 +241,9 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
           zIndex: 30,
         }}
       >
-        <CafeLogo size={40} />
+        {/* Live brand logo (uploaded profile pic) circle-cropped like the
+            intro ring; falls back to the composed emoji mark when no URL. */}
+        <BrandLogo size={40} circle />
       </motion.div>
 
       {/* Top: meal-time segmented control (5 tabs: All / Breakfast / Lunch / Dinner / Snacks) */}

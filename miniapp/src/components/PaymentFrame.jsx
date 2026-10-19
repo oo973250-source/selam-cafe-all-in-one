@@ -52,7 +52,7 @@ function CornerLogo() {
         pointerEvents: 'none',
       }}
     >
-      <BrandLogo size={34} />
+      <BrandLogo size={34} circle />
     </div>
   )
 }

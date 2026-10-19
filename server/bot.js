@@ -293,6 +293,7 @@ const T = {
   en: {
     welcome: 'Welcome to Selam Cafe',
     chooseLang: 'Please choose your language to continue:',
+    phone: 'Phone',
     welcomeBack: 'Welcome back',
     langSet: 'Language set to English',
     tapMenu: 'Tap below to open the menu',
@@ -438,6 +439,7 @@ const T = {
   am: {
     welcome: 'ሰላም ካፌ እንኳን ደህና መጡ',
     chooseLang: 'እባክዎ ቋንቋ ይምረጡ:',
+    phone: 'ስልክ ቁጥር',
     welcomeBack: 'እንኳን ደህና መጡ',
     langSet: 'ቋንቋ አማርኛ ተመርጧል',
     tapMenu: 'ምናሌውን ለመክፈት ከታች ይንኩ',
@@ -582,6 +584,7 @@ const T = {
   om: {
     welcome: 'Baga nagaan dhuftaan Kafee Selam',
     chooseLang: 'Maaloo afaan filadhaa:',
+    phone: 'Lakkoofsa bilbila',
     welcomeBack: 'Baga nagaan dhuftaan',
     langSet: 'Afaan Oromoo filatameera',
     tapMenu: 'Maajii banuuf dibbaabaa tuqi',
@@ -1286,6 +1289,11 @@ function buildOrderMessage(kind, order, lang, extras = {}) {
     : '• —'
 
   const lines = []
+  // Phone line (user request): shown on BOTH the staff alert and the
+  // customer receipt whenever the order carries a phone number.
+  const phoneLine = order.customer_phone
+    ? `📱 ${t('phone', lang)}: ${order.customer_phone}`
+    : null
   if (kind === 'alert') {
     lines.push(`🔔 ${sep} 🔔`)
     lines.push(`${t('newOrderAlert', lang)} (${orderCode(order.id)})`)
@@ -1294,6 +1302,7 @@ function buildOrderMessage(kind, order, lang, extras = {}) {
       ? `@${extras.username}`
       : (extras.firstName || '—')
     lines.push(`👤 ${t('customer', lang)}: ${who}`)
+    if (phoneLine) lines.push(phoneLine)
     lines.push(`🚚 ${t('service', lang)}: ${serviceTypeLabel(order.service_type, lang)}`)
     lines.push('')
     lines.push(`🛍️ ${t('orderedItems', lang)}:`)
@@ -1305,6 +1314,7 @@ function buildOrderMessage(kind, order, lang, extras = {}) {
     if (extras.todaysCount != null) {
       lines.push(`📅 ${t('orderCountLabel', lang)}: ${extras.todaysCount}`)
     }
+    if (phoneLine) lines.push(phoneLine)
     lines.push('')
     lines.push(`🛍️ ${t('yourItems', lang)}:`)
   }
@@ -1335,6 +1345,13 @@ function isValidOrderId(n) {
 }
 
 // ── Main bot function ────────────────────────────────────────────────────
+// Health probe for the HTTP order path's diagnostic log line: says exactly
+// whether the polling instance exists at the moment an order was saved.
+export function botStatus() {
+  if (!BOT_TOKEN) return 'disabled:NO_TOKEN'
+  return activeBot ? 'running' : 'stopped'
+}
+
 export async function startBot(io) {
   if (!BOT_TOKEN) {
     console.warn('[bot] BOT_TOKEN not set — bot disabled')
@@ -2200,6 +2217,8 @@ function fullOrderForStaff(payload, orderId) {
     service_type: payload.serviceType,
     customer_name: payload.customer?.name || 'Unknown',
     customer_loc: payload.customer?.location || null,
+    // Phone passthrough so the staff alert shows the driver-reachable number.
+    customer_phone: (payload.customer?.phone && String(payload.customer.phone).trim()) || null,
     // Normalized so a staff alert card never renders "undefined" item lines
     // (payload items are {id,nameEn,...,quantity}; the card edits read
     // name/qty — see server/order-items.js).

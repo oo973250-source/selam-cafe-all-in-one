@@ -2634,3 +2634,94 @@ button {
   border-radius: 14px;
   font-size: 15px;
 }
+
+/* ── ImageCropper (Telegram/TikTok-style profile pic selector) ─────── */
+.cropper-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+.cropper-modal {
+  width: min(400px, 100%);
+  background: #17181b;
+  border: 1px solid #2c2e33;
+  border-radius: 16px;
+  padding: 14px 14px 10px;
+}
+.cropper-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text, #fff);
+}
+.cropper-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: #0c0d0f;
+  touch-action: none;        /* we own all touch gestures */
+  cursor: grab;
+  user-select: none;
+  border-radius: 10px;
+}
+.cropper-stage:active { cursor: grabbing; }
+.cropper-mask {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* Telegram-style spotlight: transparent circle + huge dimming shadow */
+.cropper-mask.is-circle {
+  border-radius: 50%;
+  box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.62),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.65);
+}
+.cropper-mask.is-square {
+  border-radius: 4px;
+  box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.62),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.65);
+}
+.cropper-zoom-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 4px 2px;
+}
+.cropper-zoom-row input[type="range"] { flex: 1; }
+.cropper-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+.cropper-actions .pcancel {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  background: transparent;
+  border: 1px solid var(--border, #3a3d43);
+  color: var(--text, #fff);
+  font-weight: 600;
+}
+.cropper-actions .pcrop {
+  flex: 2;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  background: var(--primary, #4c9aff);
+  color: #fff;
+  font-weight: 700;
+}
+.cropper-actions .pcrop:disabled { opacity: 0.5; }
+.cropper-hint {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--hint, #9aa0a6);
+}

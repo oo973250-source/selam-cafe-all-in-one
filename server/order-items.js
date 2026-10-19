@@ -51,5 +51,9 @@ export function mergeOrderForMessages(order, payload) {
     total: order?.total ?? p.total ?? 0,
     service_type: order?.service_type || p.serviceType || p.service_type,
     status: order?.status || 'new',
+    // Phone passthrough (user request): the label shows in BOTH the
+    // customer receipt and the staff alert when the customer left one.
+    customer_phone: order?.customer_phone ||
+      (p.customer?.phone ? String(p.customer.phone).trim() : null),
   }
 }

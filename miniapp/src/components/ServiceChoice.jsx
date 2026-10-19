@@ -148,7 +148,9 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
           zIndex: 30,
         }}
       >
-        <BrandLogo size={40} />
+        {/* circle prop: uploaded rectangular logo is cover-cropped into the
+            circular badge (same treatment as the intro ring) */}
+        <BrandLogo size={40} circle />
       </motion.div>
 
       {/* Main content — vertically centered, no header text */}
