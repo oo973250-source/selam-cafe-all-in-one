@@ -107,6 +107,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
     recordSuccessfulPayment,
     customerName,
     customerLocation,
+    customerPhone,
   } = useCart()
   const { tg, initData, hapticFeedback, user } = useTelegram()
   const { t } = useLang()
@@ -133,6 +134,9 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
       customer: {
         name: customerName.trim(),
         location: customerLocation,
+        // Delivery orders with a manually-typed address carry a phone so
+        // the driver can reach the described spot (server: orders.customer_phone).
+        phone: (customerPhone || '').trim() || null,
       },
       items: items.map((i) => ({
         id: i.id,
