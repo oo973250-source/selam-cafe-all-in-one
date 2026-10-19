@@ -367,7 +367,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
   if (state === 'options') {
     return (
       <div style={{ position: 'absolute', inset: 0 }}>
-        <SmartCafeBg {...bgProps} blur={3} brightness={0.4} />
+        <SmartCafeBg {...bgProps} blur={2} brightness={0.8} />
         <CornerLogo />
         <div className="frame-scroll no-bottom-bar" style={{ position: 'relative', zIndex: 2 }}>
           <div className="frame-header" style={{ paddingTop: 12, paddingRight: 60 }}>
@@ -469,7 +469,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
   if (state === 'processing') {
     return (
       <div style={{ position: 'absolute', inset: 0 }}>
-        <SmartCafeBg {...bgProps} blur={4} brightness={0.3} />
+        <SmartCafeBg {...bgProps} blur={2} brightness={0.7} />
         <CornerLogo />
         <div
           className="frame-scroll no-bottom-bar"
@@ -522,7 +522,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
   if (state === 'success') {
     return (
       <div style={{ position: 'absolute', inset: 0 }}>
-        <SmartCafeBg {...bgProps} blur={4} brightness={0.4} />
+        <SmartCafeBg {...bgProps} blur={2} brightness={0.8} />
         <CornerLogo />
         <div
           className="frame-scroll no-bottom-bar"
@@ -602,7 +602,7 @@ export default function PaymentFrame({ onSuccess, onError, bgProps }) {
   // state === 'error'
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
-      <SmartCafeBg {...bgProps} blur={4} brightness={0.3} />
+      <SmartCafeBg {...bgProps} blur={2} brightness={0.7} />
       <CornerLogo />
       <div
         className="frame-scroll no-bottom-bar"

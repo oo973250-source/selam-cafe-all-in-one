@@ -54,12 +54,24 @@ export default function CategoryMenu({ onBack, onNext, bgProps }) {
   const getQty = (id) => items.find((i) => i.id === id)?.quantity || 0
 
   return (
-    <div style={{ position: 'absolute', inset: 0 }}>
-      <SmartCafeBg {...bgProps} blur={3} brightness={0.35} />
+    // SCROLL FIX (user request): the root must be a flex column so the
+    // .frame-scroll child (flex: 1 + min-height: 0 in CSS) actually gets a
+    // bounded height — before, the list grew past the screen with no way
+    // to scroll it. The item list below is now properly scrollable above
+    // the fixed bottom bar.
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <SmartCafeBg {...bgProps} blur={2} brightness={0.85} />
 
       <div
         className="frame-scroll"
-        style={{ position: 'relative', zIndex: 2, paddingBottom: 'calc(var(--bottom-bar-h) + var(--safe-bottom) + 24px)' }}
+        style={{ position: 'relative', zIndex: 2, paddingBottom: 'calc(var(--bottom-bar-h) + var(--safe-bottom) + 24px)', height: '100%' }}
       >
         {/* Header — cafe logo on the LEFT, levitating.
             Replaces the owner character (per user v11). The logo sits

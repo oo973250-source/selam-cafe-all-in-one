@@ -466,7 +466,17 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
           zIndex: 10,
         }}
       >
-        {/* Tree header: menu → foods / drinks */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Tree header: menu → foods / drinks */}
         <div
           style={{
             display: 'flex',
@@ -518,42 +528,52 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
               strokeDasharray="3 3"
             />
           </svg>
-          {/* Two column headers */}
+          {/* Two column headers — 🍲 FOODS / 🥤 DRINKS */}
           <div
             style={{
               display: 'flex',
-              justifyContent: 'space-between',
+              gap: 4,
               width: '100%',
-              padding: '0 2px',
-              marginTop: -1,
             }}
           >
             <div
               style={{
-                fontSize: 9.5,
-                fontWeight: 700,
-                color: '#5C3A1E',
-                letterSpacing: 0.4,
+                flex: 1,
+                textAlign: 'center',
+                padding: '3px 4px',
+                borderRadius: 9,
+                background: 'rgba(212, 168, 83, 0.9)',
+                color: '#1a0e05',
+                fontSize: 9,
+                fontWeight: 800,
+                letterSpacing: 0.6,
                 textTransform: 'uppercase',
+                boxShadow: '0 2px 6px rgba(58, 36, 16, 0.3)',
               }}
             >
               🍲 {t('foods')}
             </div>
             <div
               style={{
-                fontSize: 9.5,
-                fontWeight: 700,
-                color: '#5C3A1E',
-                letterSpacing: 0.4,
+                flex: 1,
+                textAlign: 'center',
+                padding: '3px 4px',
+                borderRadius: 9,
+                background: 'rgba(139, 100, 32, 0.85)',
+                color: '#FFF8E7',
+                fontSize: 9,
+                fontWeight: 800,
+                letterSpacing: 0.6,
                 textTransform: 'uppercase',
+                boxShadow: '0 2px 6px rgba(58, 36, 16, 0.3)',
               }}
             >
-              {t('drinks')} 🥤
+              🥤 {t('drinks')}
             </div>
           </div>
         </div>
 
-        {/* Two columns of 7 category pills each.
+        {/* Two columns of category pills each.
             TWO-TAP PATTERN (per user feedback):
               1st tap → pill EXPANDS into a WIDER centered overlay
                        (~170px, escaping the narrow ~95px column) that
@@ -565,14 +585,20 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
                                        expands the new one.
             Compact pills stay small (46px) so the column stays tidy;
             only the expanded one becomes a wide floating card. */}
+        {/* SCROLLABLE PILLS AREA (user request): when the two columns
+            exceed the screen height (long category lists, big meal tabs)
+            this row scrolls vertically. The wrapper is FULL-WIDTH so the
+            expanded overlay cards (which intentionally escape their narrow
+            column horizontally) are never clipped by the scroll bounds. */}
         <div
           style={{
             flex: 1,
             display: 'flex',
             gap: 4,
             minHeight: 0,
-            // Allow expanded overlays to escape the column horizontally.
-            overflow: 'visible',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            paddingBottom: 'calc(var(--safe-bottom, 0px) + 66px)',
           }}
         >
           {/* Foods column — compact pills (same pattern as the drinks
@@ -584,7 +610,9 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
               and HIDES Snacks (which contains sambusa, not served at
               breakfast). Two-tap pattern preserved: 1st tap expands the
               pill into a wider horizontal overlay showing the full
-              category name; 2nd tap on the same pill advances to Frame 3. */}
+              category name; 2nd tap on the same pill advances to Frame 3.
+              SCROLLABLE (per user request): the column holds its own
+              vertical scroll when 7+ pills exceed the screen height. */}
           <div
             style={{
               flex: 1,
@@ -721,10 +749,11 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
                         style={{
                           position: 'absolute',
                           top: -8,
-                          right: 0,
-                          // Shrunk from 170 → 140 (v10) so the overlay
-                          // is guaranteed not to clip on phone ratio even
-                          // when the menu container is at left: 42%.
+                          // RIGHT of the pill (was right: 0): the scrollable
+                          // pills row would clip a left-growing card at the
+                          // row's left bound — growing rightward keeps the
+                          // full 140px card inside the row's scroll bounds.
+                          left: 0,
                           width: 140,
                           height: 56,
                           borderRadius: 14,
@@ -998,6 +1027,7 @@ export default function MainMenu({ onAdvance, onBack, bgProps }) {
             })}
           </div>
         </div>
+      </div>
       </motion.div>
     </div>
   )
