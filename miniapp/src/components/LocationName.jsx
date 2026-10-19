@@ -98,7 +98,7 @@ export default function LocationName({ bgProps, onPlaceOrder }) {
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
-      <SmartCafeBg blur={3} brightness={0.35} />
+      <SmartCafeBg blur={2} brightness={0.85} />
 
       <div className="frame-scroll no-bottom-bar" style={{ position: 'relative', zIndex: 2 }}>
         <div className="frame-header" style={{ paddingTop: 12 }}>

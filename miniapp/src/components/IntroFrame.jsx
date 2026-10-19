@@ -119,7 +119,7 @@ export default function IntroFrame({ onAdvance }) {
           WebkitBackdropFilter: 'blur(6px)',
         }}
       >
-        <span aria-hidden style={{ fontSize: 13 }}></span>
+        <span aria-hidden style={{ fontSize: 13 }}>🛵</span>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t('adamaBanner')}</span>
       </motion.div>
 

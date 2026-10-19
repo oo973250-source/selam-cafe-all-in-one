@@ -123,7 +123,7 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
-      <SmartCafeBg blur={3} brightness={0.35} />
+      <SmartCafeBg blur={2} brightness={0.85} />
 
       {/* ────────────────────────────────────────────────────────────
           Top-right: cafe logo in a white circle
@@ -282,7 +282,6 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
             >
               {SERVICES.map((svc, i) => {
                 const muted = svc.key === 'delivery' && deliveryOff
-                const unavailable = muted || geoLocked
                 return (
                 <motion.button
                   key={svc.key}
@@ -305,8 +304,8 @@ export default function ServiceChoice({ onAdvance, bgProps }) {
                       'linear-gradient(180deg, rgba(26, 14, 5, 0.96) 0%, rgba(10, 6, 2, 0.98) 100%)',
                     color: muted ? 'rgba(255,248,231,0.5)' : '#FFF8E7',
                     cursor: muted ? 'not-allowed' : 'pointer',
-                    opacity: unavailable ? 0.45 : 1,
-                    filter: unavailable ? 'grayscale(0.8)' : undefined,
+                    opacity: muted ? 0.45 : 1,
+                    filter: muted ? 'grayscale(0.8)' : undefined,
                     pointerEvents: 'auto',
                     display: 'flex',
                     flexDirection: 'column',
