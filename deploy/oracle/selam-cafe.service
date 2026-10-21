@@ -1,0 +1,21 @@
+[Unit]
+Description=Selam Cafe — all-in-one Mini App + bot + API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=selam
+Group=selam
+WorkingDirectory=/opt/selam-cafe
+EnvironmentFile=/opt/selam-cafe/.env
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=5
+# Hardening: nothing here needs root or broad access
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
