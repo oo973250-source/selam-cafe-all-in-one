@@ -228,3 +228,23 @@ I can do Case 1 for you end-to-end if the Railway project is still up — just a
 8. ☐ Domain → A record → server IP; `sudo certbot --nginx -d domain`
 9. ☐ `WEBAPP_URL` updated, restart, /ping works, menu button opens app
 10. ☐ Test order: customer receipt + staff alert arrive
+
+---
+
+## 📱 Phone-only edition (entire guide works on a smartphone)
+
+Do the same steps above, with these phone adaptations. Recommended:
+above steps 1–3 run in the phone browser with **Desktop site** enabled (⋮ menu),
+all terminal work happens inside **Oracle Cloud Shell** (the `>_` icon in the
+console's top bar) — zero apps to install.
+
+| Step | Phone adaptation |
+|---|---|
+| 1–3 (signup, VM, ingress 80/443) | Same in browser with **Desktop site** mode; use the console **search bar** instead of menu hunting; the downloaded `.key` files land in Downloads — also copy the private key TEXT into Notes as a backup |
+| 4 (SSH) | **Cloud Shell:** open `>_` → `ssh-keygen -t ed25519 -f ~/selam-key -N "" -C phone` → copy printed `.pub` line → instance page → *Edit SSH keys* → paste → save → `ssh -i ~/selam-key ubuntu@YOUR_IP`. Apps alternative: **Termux** (Android, from f-droid.org, `pkg install openssh`) or **Termius** (iOS/Android, paste private key text as the key) |
+| 5 (clone + .env + setup) | Clone public repo works as-is; if it asks for a password the repo is private — use a fine-grained GitHub token. Avoid nano: fill `.env` with `sed` one-liners: `sed -i "s#^JWT_SECRET=.*#JWT_SECRET=<value>#" .env` per key; then `sudo sh deploy/oracle/setup-server.sh` (runs server-side — safe to lock the screen) |
+| 6–8 (DuckDNS, certbot, restart) | DuckDNS is pure browser (perfect on phone); `sudo certbot --nginx -d selamcafe.duckdns.org`; update/restart via sed: `sudo sed -i "s#^WEBAPP_URL=.*#WEBAPP_URL=https://selamcafe.duckdns.org#" /opt/selam-cafe/.env && sudo systemctl restart selam-cafe`; BotFather settings are phone-native (Telegram app) |
+| 9 (tests) | All in the Telegram app: START → language → menu button → order → mock payment → 🧾 receipt + 🔔 staff alert; `/ping` → paste returned number with `sudo sed -i "s#^ADMIN_TELEGRAM_IDS=.*#ADMIN_TELEGRAM_IDS=<number>#" /opt/selam-cafe/.env && sudo systemctl restart selam-cafe` |
+| Ops habits | Backups with pg_dump same as PC; Cloud Shell keeps `~/selam-key`, so a fresh window needs only the 5-second ssh re-connect; keep this chat open split-screen for copy-paste of commands |
+
+Phone conclusion: identical destination — bot + Mini App live on Always Free, $0/forever.
